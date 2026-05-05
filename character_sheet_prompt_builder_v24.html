@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Character Sheet Prompt Builder v24</title>
+<link rel="icon" href="./favicon.ico" type="image/x-icon">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root{--main:#FF8C42;--light:#FFD4B0;--pale:#FFF6EF;--sub:#FFB347;--text:#3D2200;--muted:#6F421E;--shadow:rgba(200,100,30,.14)}
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Zen Maru Gothic',sans-serif;background:linear-gradient(135deg,#FFF4EC,#FFF8E8,#FFFBF0);min-height:100vh;color:var(--text);padding-bottom:60px}header{background:#fff;border-bottom:2px solid var(--light);padding:18px 22px;position:sticky;top:0;z-index:100;box-shadow:0 4px 20px var(--shadow);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.title{display:flex;align-items:center;gap:10px}.icon{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--main),var(--sub));display:flex;align-items:center;justify-content:center}h1{font-family:'DM Serif Display',serif;font-size:20px}h1 span{display:block;font-family:'Zen Maru Gothic',sans-serif;font-size:12px;color:var(--muted);font-weight:400}.container{max-width:1120px;margin:0 auto;padding:26px 18px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}.container>.card:first-child,.container>.output,.step05-card{grid-column:1/-1}.step06-card{grid-column:1/-1;width:100%;max-width:540px;justify-self:center}.card{background:#fff;border-radius:20px;padding:22px;box-shadow:0 4px 20px var(--shadow);border:1.5px solid transparent;position:relative;overflow:hidden}.card:before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--main),var(--sub))}.head{display:flex;align-items:center;gap:10px;margin-bottom:14px}.badge{background:linear-gradient(135deg,var(--light),#FFE8C8);font-size:11px;font-weight:700;color:var(--muted);padding:4px 10px;border-radius:18px}.ttl{font-size:15px;font-weight:700}.note{font-size:12px;color:var(--muted);line-height:1.7;margin-top:-4px;margin-bottom:12px}.chips{display:flex;flex-wrap:wrap;gap:8px}.chip{padding:8px 14px;border-radius:20px;border:1.5px solid var(--light);background:var(--pale);font-size:13px;color:var(--muted);cursor:pointer;user-select:none;transition:.15s}.chip:hover{border-color:var(--main);color:var(--text)}.chip.selected{background:linear-gradient(135deg,var(--main),var(--sub));border-color:transparent;color:#fff;font-weight:700;box-shadow:0 3px 10px rgba(220,100,30,.25)}.btns{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}.btn{border:none;border-radius:28px;padding:14px 22px;font-family:'Zen Maru Gothic',sans-serif;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 6px 20px rgba(220,100,30,.25);transition:.2s}.btn:hover{transform:translateY(-1px)}.primary{background:linear-gradient(135deg,#FF6B35,#FF8C42,#FFB347);color:#fff}.secondary{background:linear-gradient(135deg,#FFD580,#FFC04A);color:#5A3A00}.ghost{background:#fff;border:1.5px solid var(--main);color:var(--main);box-shadow:none}.output{display:none}.output.visible{display:block}.block{margin-bottom:18px}.block-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px}.lbl{font-size:12px;font-weight:700;padding:4px 12px;border-radius:20px}.jp{background:var(--light)}.en{background:#D4EDFF;color:#1a4a7a}.mj{background:#EAD9FF;color:#4B236A}.txt{white-space:pre-wrap;word-break:break-word;border:1.5px solid var(--light);border-radius:14px;background:var(--pale);padding:15px 17px;font-size:13px;line-height:1.85}.txt.enbox{background:#F0F8FF;border-color:#B8D9F5;font-size:12.5px}.copy{background:linear-gradient(135deg,#E8D5FF,#D4B8FF);color:#3a006a;border:none;border-radius:18px;padding:7px 16px;font-family:'Zen Maru Gothic',sans-serif;font-size:12px;font-weight:700;cursor:pointer}.copy.copied{background:linear-gradient(135deg,#B8F5B0,#80E878);color:#1a4a00}.status{font-size:12px;color:#1a5c2a;background:#F0FFF0;border:1px solid #B8F5B0;border-radius:12px;padding:10px 12px;display:none}.status.visible{display:block}.header-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.header-actions .btn{padding:10px 16px;font-size:12px;box-shadow:0 4px 14px rgba(220,100,30,.18)}
+.main-layout{max-width:1240px;margin:0 auto;padding:26px 18px;display:grid;grid-template-columns:minmax(0,820px) 340px;gap:18px;align-items:start}.main-layout>.container{max-width:none;margin:0;padding:0}.prompt-panel{position:sticky;top:92px}.prompt-panel .note{margin-bottom:14px}.prompt-grid{display:grid;grid-template-columns:1fr;gap:10px}.prompt-action{width:100%;min-height:54px;border:none;border-radius:16px;padding:11px 13px;font-family:'Zen Maru Gothic',sans-serif;font-size:13px;font-weight:700;line-height:1.35;text-align:left;cursor:pointer;background:linear-gradient(135deg,#FFF1D8,#FFD580);color:#5A3A00;box-shadow:0 4px 14px rgba(220,100,30,.16);transition:.18s}.prompt-action:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(220,100,30,.22)}.prompt-action.copied{background:linear-gradient(135deg,#B8F5B0,#80E878);color:#1a4a00}.prompt-action small{display:block;font-size:11px;font-weight:500;color:var(--muted);margin-top:2px}
+@media(max-width:960px){.main-layout{grid-template-columns:1fr}.prompt-panel{position:static}.main-layout>.container{order:1}.prompt-panel{order:2}.prompt-grid{grid-template-columns:repeat(2,1fr)}}.hair-group{margin-top:18px}.hair-label{font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px}.hair-group:first-of-type{margin-top:0}.hair-divider{border-top:1px dashed var(--light);margin-top:18px;padding-top:18px}.hair-free{width:100%;min-height:58px;border:1.5px solid var(--light);border-radius:14px;background:var(--pale);padding:12px 14px;font-family:'Zen Maru Gothic',sans-serif;font-size:13px;color:var(--text);resize:vertical}.hair-free::placeholder{color:#8F6A58}@media(max-width:760px){.container{grid-template-columns:1fr}.container>.card:first-child,.container>.output,.step05-card,.step06-card{grid-column:auto;max-width:none}}
+@media(max-width:520px){.prompt-grid{grid-template-columns:1fr}.card{padding:18px 15px}.chip{font-size:12px;padding:7px 11px}h1{font-size:17px}.btn{width:100%}}
+.note,.chip,.hair-label,h1 span,.prompt-action small{color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:rgba(61,34,0,.92);color:#fff;padding:12px 22px;border-radius:999px;font-size:14px;font-weight:700;box-shadow:0 8px 28px rgba(0,0,0,.22);z-index:9999;opacity:0;pointer-events:none;transition:.25s ease}.toast.visible{opacity:1;transform:translateX(-50%) translateY(0)}</style>
+</head>
+<body>
+<header><div class="title"><div class="icon">🧾</div><h1>Character Sheet Prompt Builder v24<span>販売用・プロンプトメーカー / 品番・名前自動生成対応版</span></h1></div><div class="header-actions"><button class="btn secondary" onclick="copyHeaderCropPrompt()">Trimming</button><button class="btn secondary" onclick="copyHeaderLooseDrawingFull()">Loose Drawing</button><button class="btn secondary" onclick="copyHeaderLipSyncPrompt()">Lip Sync</button><button class="btn ghost" onclick="resetAll()">リセット</button></div></header>
+<div class="container">
+  <div class="card"><div class="head"><span class="badge">FLOW</span><span class="ttl">使い方</span></div><div class="note">①必要項目を選ぶ、またはランダム作成 → ②構図を選ぶ → ③生成。三面図は切り抜き・Photoshop加工前提で、3体の間隔を広めに取る設定です。</div><div class="btns"><button class="btn secondary" onclick="randomCharacter()">🎲 ランダムキャラ作成</button></div><div class="status" id="status"></div></div>
+  <div class="card" style="grid-column:1/-1"><div class="head"><span class="badge">番号</span><span class="ttl">開始番号・キャラクター名</span></div><div class="note">前回の続きから始める場合は開始番号を入力してください。プロンプト生成時に品番と名前が自動で割り当てられます。</div><div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap"><label style="font-size:13px;font-weight:700;color:var(--muted)">開始番号</label><input id="startNumber" type="number" min="1" max="999" value="1" style="width:90px;border:1.5px solid var(--light);border-radius:12px;padding:8px 12px;font-family:'Zen Maru Gothic',sans-serif;font-size:15px;font-weight:700;color:var(--text);background:var(--pale);text-align:center"><span style="font-size:13px;color:var(--muted)">← 今日の最初の番号を入力（例：前回001まで作ったなら002）</span></div><div id="namePreview" style="margin-top:12px;display:none"><span style="font-size:13px;font-weight:700;color:var(--muted)">次の品番・名前：</span><span id="namePreviewText" style="font-size:15px;font-weight:700;color:var(--main);margin-left:8px"></span></div></div>
+  <div class="card"><div class="head"><span class="badge">STEP 01</span><span class="ttl">国籍（固定：日本人）</span></div><div class="chips" data-key="nationality"><button class="chip">日本人</button><button class="chip">東アジア</button><button class="chip">欧米</button><button class="chip">東南アジア</button><button class="chip">中東</button><button class="chip">アフリカ系</button></div></div>
+  <div class="card"><div class="head"><span class="badge">STEP 02</span><span class="ttl">顔タイプ（空白：ランダム）</span></div><div class="chips" data-key="facetype"><button class="chip">美人特化（黄金比）</button><button class="chip">かわいい特化（アイドル寄せ）</button><button class="chip">広告CV高い顔</button><button class="chip">個性的な美人</button><button class="chip">清楚系美人</button><button class="chip">韓国風クール美人</button><button class="chip">童顔ナチュラル</button><button class="chip">大人かわいい</button><button class="chip">ハーフ風華やか美人</button><button class="chip">知的クール</button></div></div>
+  <div class="card"><div class="head"><span class="badge">STEP 03</span><span class="ttl">年齢（空白：20代前半）</span></div><div class="chips" data-key="age"><button class="chip">20代前半</button><button class="chip">20代後半</button><button class="chip">30代前半</button><button class="chip">30代後半</button><button class="chip">40代</button></div></div>
+  <div class="card"><div class="head"><span class="badge">STEP 04</span><span class="ttl">体型（空白：モデル体型）</span></div><div class="chips" data-key="body"><button class="chip">モデル体型</button><button class="chip">スリム</button><button class="chip">自然体型</button><button class="chip">健康的</button></div></div>
+  <div class="card step05-card"><div class="head"><span class="badge">STEP 05</span><span class="ttl">髪（空白：ランダム）</span></div><div class="hair-group"><div class="hair-label">長さ</div><div class="chips" data-key="hairLength"><button class="chip">ロング</button><button class="chip">セミロング</button><button class="chip">ミディアム</button><button class="chip">ボブ</button><button class="chip">ショート</button><button class="chip">ベリーショート</button></div></div><div class="hair-group hair-divider"><div class="hair-label">色（複数可）</div><div class="chips" data-key="hairColor"><button class="chip">黒</button><button class="chip">ダークブラウン</button><button class="chip">ブラウン</button><button class="chip">ライトブラウン</button><button class="chip">ブロンド</button><button class="chip">グレー</button><button class="chip">ピンク</button><button class="chip">レッド</button><button class="chip">ブルー</button><button class="chip">ハイトーン</button><button class="chip">インナーカラー</button><button class="chip">グラデーション</button><button class="chip">ハイライト</button></div></div><div class="hair-group hair-divider"><div class="hair-label">スタイル</div><div class="chips" data-key="hairStyle"><button class="chip">ストレート</button><button class="chip">ゆる巻き</button><button class="chip">強めカール</button><button class="chip">レイヤー</button><button class="chip">外ハネ</button><button class="chip">内巻き</button><button class="chip">パーマ</button><button class="chip">ウェーブ</button><button class="chip">アップスタイル</button></div></div><div class="hair-group hair-divider"><div class="hair-label">前髪</div><div class="chips" data-key="bangs"><button class="chip">あり</button><button class="chip">なし</button><button class="chip">シースルー</button><button class="chip">ぱっつん</button><button class="chip">センターパート</button></div></div><div class="hair-group"><textarea class="hair-free" id="hairFree" placeholder="自由入力"></textarea></div></div>
+  <div class="card step06-card"><div class="head"><span class="badge">STEP 06</span><span class="ttl" style="color:#d93025;">構図（必ず一つ選択）</span></div><div class="chips" data-key="shot"><button class="chip">三面図</button><button class="chip">ウエストショット</button><button class="chip">全身</button></div><div class="btns" style="margin-top:15px;"><button class="btn primary" onclick="generatePrompt(false)">✨ プロンプト生成</button><button class="btn ghost" style="border-color:#999;color:#666;font-size:12px;" onclick="generatePrompt(true)">🔍 テスト生成（品番・名前なし）</button><button class="btn ghost" onclick="resetAll()">🔄 リセット</button></div></div>
+  <div class="card output" id="output"><div class="head"><span class="badge">OUTPUT</span><span class="ttl">生成結果</span></div><div class="block"><div class="block-head"><span class="lbl jp">🇯🇵 日本語プロンプト / 説明用</span><button class="copy" onclick="copyText('jpText',this)">コピー</button></div><div class="txt" id="jpText"></div></div><div class="block"><div class="block-head"><span class="lbl en">🇺🇸 英語プロンプト＋ネガティブ / 画像生成用</span><button class="copy" onclick="copyText('enText',this)">コピー</button></div><div class="txt enbox" id="enText"></div></div></div>
+</div>
+
+<div id="errorDebug" style="display:none;position:fixed;top:0;left:0;right:0;background:#d93025;color:#fff;padding:12px 16px;font-size:13px;font-weight:700;z-index:9999;word-break:break-all;"></div>
+<div class="toast" id="toast"></div>
+<script>
+const state={nationality:'',facetype:'',age:'',body:'',hairColor:[],hairLength:'',hairStyle:'',bangs:'',hairFree:'',shot:''};
+const data={
+ nationality:{'日本人':['日本人女性','Japanese woman'],'東アジア':['東アジア系女性','East Asian woman'],'欧米':['欧米系女性','Caucasian woman'],'東南アジア':['東南アジア系女性','Southeast Asian woman'],'中東':['中東系女性','Middle Eastern woman'],'アフリカ系':['アフリカ系女性','African woman']},
+ facetype:{'美人特化（黄金比）':['整った上品な美人系の顔立ち','golden ratio face proportions, high nose bridge, sharp defined jawline, symmetrical face, high cheekbones, refined elegant facial features, soft sophisticated expression, gentle smile-ready expression'],'かわいい特化（アイドル寄せ）':['明るく可愛らしいアイドル系の顔立ち','cute idol-like facial features, small face, big bright eyes, soft innocent expression, youthful friendly appearance'],'広告CV高い顔':['親しみやすく清潔感のある自然な顔立ち','natural beauty, girl-next-door natural beauty, slightly round soft face shape, approachable rather than glamorous, natural double eyelid, warm gentle expression, soft cheeks, clean everyday look, relatable attractive appearance'],'個性的な美人':['柔らかさのある個性的で上品な美人系の顔立ち','sharp almond-shaped eyes with calm soft gaze, slightly upswept eyebrows, mysterious calm expression with gentle softness, naturally defined jawline, cool and enigmatic beauty with approachable softness, subtle melancholy, quiet screen presence, soft neutral expression, closed-mouth subtle smile, lips gently closed, no teeth visible, high cheekbones, deep-set eyes'],'清楚系美人':['透明感があり上品で清楚な美人系の顔立ち','clear elegant beauty, graceful refined facial features, calm gentle eyes, soft natural expression, clean and pure impression, understated beauty, approachable softness'],'韓国風クール美人':['洗練された韓国風のクールな美人系の顔立ち','Korean-inspired cool beauty, sleek refined facial features, softly defined jawline, calm almond-shaped eyes, modern sophisticated appearance, gentle approachable expression, not severe'],'童顔ナチュラル':['若々しく親しみやすい童顔ナチュラルな顔立ち','youthful natural baby-face features, softly rounded face, gentle cheeks, natural bright eyes, friendly approachable expression, clean everyday beauty, not childish'],'大人かわいい':['甘すぎない上品な大人かわいい顔立ち','mature cute beauty, soft feminine facial features, gentle eyes, refined sweetness, calm friendly expression, elegant but cute impression, not overly childish'],'ハーフ風華やか美人':['華やかで立体感のあるハーフ風美人系の顔立ち','mixed-look inspired glamorous beauty, softly sculpted facial features, high nose bridge, dimensional face, bright expressive eyes, elegant glamorous impression, warm approachable softness, not overly sharp'],'知的クール':['落ち着きと知性のあるクールな美人系の顔立ち','intelligent cool beauty, calm thoughtful eyes, refined facial features, composed expression, subtle gentle smile, sophisticated quiet presence, approachable softness']},
+ age:{'20代前半':['20代前半','early 20s'],'20代後半':['20代後半','late 20s'],'30代前半':['30代前半','early 30s'],'30代後半':['30代後半','late 30s'],'40代':['40代','in her 40s']},
+ body:{'スリム':['スリムな体型','slim figure'],'自然体型':['自然でバランスの取れた体型','natural balanced body proportions'],'健康的':['健康的でバランスの取れた体型','healthy balanced body proportions'],'モデル体型':['モデルのような背が高く細身の体型','model-like tall slender figure']},
+ hairColor:{'黒':['黒髪','black hair'],'ダークブラウン':['ダークブラウンの髪','dark brown hair'],'ブラウン':['ブラウンの髪','brown hair'],'ライトブラウン':['ライトブラウンの髪','light brown hair'],'ブロンド':['ブロンドの髪','blonde hair'],'グレー':['グレーの髪','gray hair'],'ピンク':['ピンクの髪','pink hair'],'レッド':['レッドの髪','red hair'],'ブルー':['ブルーの髪','blue hair'],'ハイトーン':['ハイトーンカラーの髪','high-tone hair color'],'インナーカラー':['インナーカラーの髪','inner color hair'],'グラデーション':['グラデーションカラーの髪','gradient hair color'],'ハイライト':['ハイライト入りの髪','highlighted hair']},
+ hairLength:{'ロング':['ロングヘア','long hair'],'セミロング':['セミロングヘア','semi-long hair'],'ミディアム':['ミディアムヘア','medium length hair'],'ボブ':['ボブヘア','bob haircut'],'ショート':['ショートヘア','short hair'],'ベリーショート':['ベリーショートヘア','very short hair']},
+ hairStyle:{'ストレート':['ストレートヘア','straight hair'],'ゆる巻き':['ゆる巻きヘア','soft loose curls'],'強めカール':['強めのカールヘア','strong curled hair'],'レイヤー':['レイヤーヘア','layered hair'],'外ハネ':['外ハネヘア','outward flipped hair'],'内巻き':['内巻きヘア','inward curled hair'],'パーマ':['パーマヘア','permed hair'],'ウェーブ':['ウェーブヘア','soft wavy hair'],'アップスタイル':['アップスタイル','updo hairstyle']},
+ bangs:{'あり':['前髪あり','with bangs'],'なし':['前髪なし','no bangs'],'シースルー':['シースルーバング','see-through bangs'],'ぱっつん':['ぱっつん前髪','straight blunt bangs'],'センターパート':['センターパート','center-parted bangs']},
+ shot:{'三面図':['正面・側面・背面の三面図、3体を横一列に均等配置、人物同士の間隔を広めに空けた切り抜き用構図','character turnaround sheet, front view, side view, back view, three characters aligned horizontally, evenly spaced, wide spacing between characters, large gaps between each figure, each figure fully visible with clear margins, no overlap between characters'],'ウエストショット':['正面向きのウエストショット、上半身が見える構図、自然な姿勢','waist-up shot, front view, natural posture, centered composition, clean portrait framing'],'全身':['正面向きの全身、頭から足先まで見える構図、自然な直立姿勢、腕は自然に下ろす','full body, head to toe, including feet, front view, neutral standing pose, arms relaxed at sides, subject fills most of the frame, centered composition, minimal empty space']}
+};
+const productCodeMap={
+ facetype:{'美人特化（黄金比）':'BT','かわいい特化（アイドル寄せ）':'KW','広告CV高い顔':'CV','個性的な美人':'UQ','清楚系美人':'SS','韓国風クール美人':'HC','童顔ナチュラル':'DG','大人かわいい':'OK','ハーフ風華やか美人':'FH','知的クール':'IC'},
+ hairLength:{'ロング':'LG','セミロング':'SM','ミディアム':'MI','ボブ':'BB','ショート':'SH','ベリーショート':'VS'},
+ hairColor:{'黒':'K','ダークブラウン':'D','ブラウン':'B','ライトブラウン':'B','ブロンド':'L','グレー':'L','ピンク':'C','レッド':'C','ブルー':'C','ハイトーン':'L','インナーカラー':'M','グラデーション':'M','ハイライト':'M'},
+ hairStyle:{'ストレート':'S','ゆる巻き':'W','強めカール':'C','レイヤー':'Y','外ハネ':'Y','内巻き':'Y','パーマ':'W','ウェーブ':'W','アップスタイル':'U'},
+ bangs:{'あり':'B','なし':'N','シースルー':'T','ぱっつん':'P','センターパート':'C'}
+};
+const nameList=['桜','椿','藤','撫子','菖蒲','牡丹','芍薬','梅','蘭','菊','百合','杏','桃','薔薇','水仙','木蓮','紫陽花','山茶花','卯の花','八重桜','乙女椿','花水木','山桜','花梨','春蘭','菫','桔梗','竜胆','鳶尾','黒百合','彼岸花','夜顔','月見草','宵待草','露草','鬼灯','紫苑','秋桜','朝顔','夕顔','花菖蒲','杜若','水芭蕉','都忘れ','勿忘草','茉莉','向日葵','小菊','蒲公英','桜草','鈴蘭','姫百合','小百合','菜の花','れんげ','すみれ','雪柳','葵','橘','萩','芙蓉','木槿','金木犀','銀木犀','沈丁花','花楓','花蓮','睡蓮','花音','凛花','清花','純花','真花','誠花','端花','明花','朗花','爽花','雅花','優花','麗花','美花','彩花','花香','薫花','芳花','花緒','花衣','花影','花雫','花露','花月','花星','花空','花里','花鈴','花唄','花笑','花恵','花凛','花澄','花麗','花彩','花映'];
+function getCharacterName(){
+ const num=parseInt(document.getElementById('startNumber')?.value||'1',10);
+ const idx=num-1;
+ if(idx>=nameList.length)return null;
+ return nameList[idx];
+}
+function getSerialNumber(){
+ const num=parseInt(document.getElementById('startNumber')?.value||'1',10);
+ return String(num).padStart(3,'0');
+}
+function incrementNumber(){
+ const el=document.getElementById('startNumber');
+ if(el)el.value=parseInt(el.value||'1',10)+1;
+ updateNamePreview();
+}
+function updateNamePreview(){
+ const el=document.getElementById('namePreview');
+ const textEl=document.getElementById('namePreviewText');
+ if(!el||!textEl)return;
+ const serial=getSerialNumber();
+ const name=getCharacterName();
+ el.style.display='block';
+ if(name===null){
+  textEl.style.color='#d93025';
+  textEl.textContent='⚠️ 名前リストが上限に達しました（最大99体）';
+ }else{
+  textEl.style.color='var(--main)';
+  textEl.textContent=`番号：${serial}　名前：${name}`;
+ }
+}
+
+const defaults={nationality:'日本人',age:'20代前半',body:'モデル体型'};
+const neg='strong face change, unnatural resemblance, face distortion, altered facial structure, low detail face, blurry face, bad anatomy, unnatural body proportions, extra limbs, missing limbs, deformed hands, extra fingers, cropped feet, missing feet, dynamic pose, exaggerated pose, open mouth, showing teeth, patterned background, background objects, gradient background, heavy shadows, color cast, noise, motion blur,  watermark, low quality, compression artifacts, soft edges, bokeh background';
+function pick(arr){return arr[Math.floor(Math.random()*arr.length)]}
+function keys(k){return Object.keys(data[k])}
+function hairStyleOptionsForLength(length){
+ const arr=keys('hairStyle');
+ if(length==='ショート'||length==='ベリーショート')return arr.filter(v=>v!=='アップスタイル');
+ return arr;
+}
+function isInvalidHairCombo(length,style){
+ return (length==='ショート'||length==='ベリーショート')&&style==='アップスタイル';
+}
+function setVal(key,val){
+ if(key==='hairColor'){
+  if(!Array.isArray(state.hairColor))state.hairColor=[];
+  if(state.hairColor.includes(val)){state.hairColor=state.hairColor.filter(v=>v!==val)}else{state.hairColor.push(val)}
+  document.querySelectorAll(`.chips[data-key="${key}"] .chip`).forEach(b=>b.classList.toggle('selected',state.hairColor.includes(b.textContent.trim())));
+  return;
+ }
+ if(key==='hairStyle'&&isInvalidHairCombo(state.hairLength,val)){
+  showToast('ショート系ではアップスタイルを選択しません。');
+  return;
+ }
+ state[key]=val;
+ if(key==='hairLength'&&isInvalidHairCombo(val,state.hairStyle)){
+  state.hairStyle='';
+  document.querySelectorAll('.chips[data-key="hairStyle"] .chip').forEach(b=>b.classList.remove('selected'));
+  showToast('ショート系のためアップスタイルを解除しました。');
+ }
+ document.querySelectorAll(`.chips[data-key="${key}"] .chip`).forEach(b=>b.classList.toggle('selected',b.textContent.trim()===val));
+ if(key==='facetype')updateNamePreview();
+}
+window.onerror=function(msg,src,line,col,err){
+ const box=document.getElementById('errorDebug');
+ if(box){box.style.display='block';box.textContent='エラー詳細: '+msg+' (行'+line+' 列'+col+')';}
+ return false;
+};
+window.addEventListener('DOMContentLoaded',()=>{
+ document.querySelectorAll('.chips').forEach(group=>{const key=group.dataset.key;group.querySelectorAll('.chip').forEach(btn=>btn.addEventListener('click',()=>setVal(key,btn.textContent.trim())))});
+ const hairFreeEl=document.getElementById('hairFree');
+ if(hairFreeEl)hairFreeEl.addEventListener('input',e=>{state.hairFree=e.target.value.trim()});
+ renderPromptButtons();
+ const startEl=document.getElementById('startNumber');
+ if(startEl)startEl.addEventListener('input',updateNamePreview);
+});function randomCharacter(){setVal('nationality','日本人');setVal('age','20代前半');setVal('body','モデル体型');setVal('facetype',pick(keys('facetype')));setVal('hairLength',pick(keys('hairLength')));setVal('hairStyle',pick(hairStyleOptionsForLength(state.hairLength)));setVal('bangs',pick(keys('bangs')));state.hairColor=[];setVal('hairColor',pick(keys('hairColor')));const hf=document.getElementById('hairFree');if(hf)hf.value='';state.hairFree='';showStatus('ランダムキャラを作成しました。STEP 06で構図を選択してください。');}
+function applyDefaults(){Object.keys(defaults).forEach(k=>{if(!state[k])setVal(k,defaults[k])});if(!state.facetype)setVal('facetype',pick(keys('facetype')));if(!state.hairLength)setVal('hairLength',pick(keys('hairLength')));if(!state.hairStyle)setVal('hairStyle',pick(hairStyleOptionsForLength(state.hairLength)));if(!state.bangs)setVal('bangs',pick(keys('bangs')));if(!Array.isArray(state.hairColor)||state.hairColor.length===0)setVal('hairColor',pick(keys('hairColor')))}
+function jp(k){return data[k][state[k]][0]}
+function en(k){return data[k][state[k]][1]}
+function hairText(lang){
+ const free=(document.getElementById('hairFree')?.value||'').trim();
+ if(free)return free;
+ const idx=lang==='jp'?0:1;
+ const colors=(Array.isArray(state.hairColor)?state.hairColor:[]).map(v=>data.hairColor[v]?.[idx]).filter(Boolean).join(lang==='jp'?'、':', ');
+ return [colors,data.hairLength[state.hairLength]?.[idx],data.hairStyle[state.hairStyle]?.[idx],data.bangs[state.bangs]?.[idx]].filter(Boolean).join(lang==='jp'?'、':', ');
+}
+function productCode(){
+ const parts=[];
+ const faceCode=productCodeMap.facetype[state.facetype];
+ const lengthCode=productCodeMap.hairLength[state.hairLength];
+ const colorCodes=(Array.isArray(state.hairColor)?state.hairColor:[]).map(v=>productCodeMap.hairColor[v]).filter(Boolean);
+ const styleCode=productCodeMap.hairStyle[state.hairStyle];
+ const bangsCode=productCodeMap.bangs[state.bangs];
+ if(faceCode)parts.push(faceCode);
+ if(lengthCode)parts.push(lengthCode);
+ parts.push(...colorCodes);
+ if(styleCode)parts.push(styleCode);
+ if(bangsCode)parts.push(bangsCode);
+ return parts.join('-');
+}
+function generatePrompt(isTest=false){
+ applyDefaults();
+ if(!state.shot){showStatus('STEP 06で構図を選択してください。');return;}
+ const isTurnaround=state.shot==='三面図';
+ const isFull=state.shot==='全身';
+ const isWaist=state.shot==='ウエストショット';
+ const hairJp=hairText('jp');
+ const hairEn=hairText('en');
+ const code=productCode();
+ let serial='';
+ let charName='';
+ let fullCode='';
+ if(!isTest){
+  serial=getSerialNumber();
+  charName=getCharacterName();
+  if(charName===null){
+   showStatus('⚠️ 名前リストが上限（99体）に達しました。生成できません。');
+   return;
+  }
+  fullCode=`${serial}_${code}`;
+ }
+ const fixedQualityJpBase='柔らかい拡散光、頬骨と鼻筋にわずかなハイライト、自然な質感と輝きのあるみずみずしい肌、繊細なまつげ、詳細な虹彩と瞳孔、瞳の中の柔らかい反射、自然な唇の質感、髪の毛の細かなディテール';
+ const fixedExpressionJp=state.facetype==='個性的な美人'?'柔らかく落ち着いた表情、口元は閉じたままのごく自然な微笑み、歯は見せない、静かで上品な雰囲気':'柔らかく優しい表情、微かな微笑み、穏やかで上品な雰囲気';
+ const fixedQualityJp=fixedQualityJpBase+'、'+fixedExpressionJp;
+ const fixedQualityEnBase='soft lighting, diffused light, slight highlight on cheekbones and nose bridge, dewy skin texture, skin with natural texture and glow, delicate eyelashes, detailed iris and pupils, soft reflection in the eyes, natural lip texture, fine details in hair';
+ const fixedExpressionEn=state.facetype==='個性的な美人'?'soft and gentle expression, closed-mouth subtle smile, lips gently closed, no teeth visible, relaxed natural smile, serene atmosphere, elegant and sophisticated, captivating gaze':'soft and gentle expression, closed-mouth subtle smile, lips gently closed, no teeth visible, relaxed natural smile, serene atmosphere, elegant and sophisticated, captivating gaze';
+ const fixedQualityEn=fixedQualityEnBase+', '+fixedExpressionEn;
+ const jpBefore=`【プロンプト】\n${jp('nationality')}、${jp('age')}、${jp('facetype')}、清潔感のある自然な美しさ、笑顔映えする印象。\n${jp('body')}、${hairJp}。\n${fixedQualityJp}。\n${jp('shot')}。\n白のキャミソールと白のバイクショーツ、完全に均一な白背景、スタジオ撮影。\nやわらかい均一な光、影は最小限、人物と背景の境界が明確で、切り抜き・合成しやすいクリーンな人物素材。`;
+ const jpAfter=isTest
+  ? `【テスト生成：品番・名前は採番されていません】\n\n${jp('nationality')}、${jp('age')}、\n${jp('facetype')}、\n${hairJp}。`
+  : `【品番】${fullCode}\n【名前】${charName}\n\n${jp('nationality')}、${jp('age')}、\n${jp('facetype')}、\n${hairJp}。`;
+ const jpText=jpBefore+'\n\n'+jpAfter;
+ const clothes='white plain camisole top, white plain bike shorts';
+ const characterCore=`${en('nationality')}, ${en('age')}, ${en('facetype')}, ${en('body')}, ${hairEn}, ${fixedQualityEn}`;
+ const turnaroundPrompt=`Create an image:
+
+${characterCore},
+
+character turnaround sheet,
+front view, side view, back view,
+three full-body figures aligned horizontally,
+left: front view,
+center: side view,
+right: back view,
+
+moderate spacing between figures,
+each figure fully visible from head to toe,
+no overlap between figures,
+
+make each figure as large as possible while keeping the full body visible,
+all three figures must have the same height and scale,
+align the tops of the heads on the same horizontal line,
+align the soles of the feet on the same ground line,
+same camera distance for all three views,
+same body scale for all three views,
+
+prioritize both facial accuracy and model-like full-body proportions,
+face remains detailed without enlarging the head,
+sharp facial details while keeping model-like full-body proportions,
+sharp eyes,
+clear nose bridge,
+natural lips,
+closed mouth,
+no teeth visible,
+lips gently closed,
+detailed hair around the face,
+preserve the same facial impression across all views,
+
+full body, head to toe, including feet,
+neutral standing pose,
+both feet flat on the ground,
+full soles touching the ground,
+heels fully touching the ground,
+toes and heels on the same ground line,
+no raised heels,
+no tiptoe pose,
+no floating feet,
+arms relaxed at sides,
+legs naturally together,
+upright posture,
+balanced and stable pose,
+no dynamic pose,
+
+same outfit,
+same hairstyle,
+same hair color,
+consistent body proportions,
+white plain camisole top with a tiny pale orange "OP" logo embroidery on the left chest,
+white plain bike shorts with a tiny pale orange "OP" logo fabric tag on the lower right hem,
+
+pure white seamless background,
+completely uniform background,
+clean silhouette,
+clear body outline,
+
+studio lighting,
+soft lighting,
+diffused light,
+minimal shadows,
+slight highlight on cheekbones and nose bridge,
+
+85mm lens,
+photorealistic,
+ultra high resolution,
+extremely detailed,
+high-resolution character turnaround sheet,
+sharp hair texture,
+crisp body outline,
+clean studio image,
+noise-free,
+artifact-free,
+
+--ar 4:3
+
+--no extra limbs, raised heels, lifted heels, tiptoe, standing on toes, floating feet, feet not touching ground, pose variation, inconsistent proportions, inconsistent height, inconsistent scale, different body size, different camera distance, distorted body, short legs, stocky body, wide torso, thick waist, heavy body, compressed body proportions, shortened figure, unbalanced body shape, large head, oversized face, big face, enlarged head, childlike proportions, cluttered background, low detail face, blurry face, bad anatomy, missing limbs, deformed hands, extra fingers, cropped feet, missing feet, uneven ground line, misaligned feet, misaligned head height, open mouth, showing teeth, teeth visible, patterned background, background objects, gradient background, heavy shadows, color cast, noise, motion blur,  watermark, low quality, compression artifacts, soft edges, bokeh background`; const fullPrompt=`Create an image:\n\n${characterCore}, ${en('shot')}, sharp detailed face, clear eyes, natural smile, mouth closed, no teeth showing, looking at camera, ${clothes}, pure white seamless background, completely uniform background, studio lighting, even soft lighting, diffused light, minimal shadows, slight highlight on cheekbones and nose bridge, clean crisp edges between subject and background, cutout optimized, 85mm lens, portrait photography, photorealistic, ultra high resolution, sharp details, natural skin texture, clean image, noise-free, artifact-free, --ar 2:3\n\n--no ${neg}`;
+ const waistPrompt=`Create an image:\n\nUse the attached turnaround sheet as the main reference image.\n\nSelect only the front-facing figure on the left.\nCreate a waist-up portrait based on that front-facing figure.\n\nKeep the face, hairstyle, expression, body angle, and white camisole consistent with the selected front-facing figure.\nPrioritize the reference image over the written description.\n\nDo not use the side view or back view.\nDo not create three figures.\nDo not create a new character design.\n\n${characterCore},\n\nwaist-up shot, upper body only,\nsubject framed from upper torso to head,\ncropped above the waist,\ntight portrait framing, centered composition,\nframe ends above the waist,\nlower body completely out of frame,\nno lower body visible,\n\nfront view,\nsymmetrical front-facing composition,\nnatural upright posture, relaxed shoulders,\nshoulders level and facing forward,\nhead straight, minimal tilt,\nbalanced and stable pose, no dynamic pose,\n\nsharp detailed face, clear eyes,\nnatural smile, mouth closed, no teeth showing,\nlooking at camera,\n\nwhite plain camisole top with a tiny pale orange "OP" logo embroidery on the left chest,\nno bike shorts,\n\npure white seamless background,\ncompletely uniform background,\n\nstudio lighting, even soft lighting, diffused light, minimal shadows,\nslight highlight on cheekbones and nose bridge,\n\n85mm lens, portrait photography, photorealistic,\nultra high resolution, extremely detailed,\nskin with natural texture and glow, dewy skin texture,\nnatural lip texture, fine details in hair,\nclean image, noise-free, artifact-free,\n\n--ar 2:3\n\n--no dynamic pose, angled body, leaning pose, tilted head, turned shoulders, asymmetrical pose, lower body, full body, legs, hips, thighs, feet, bike shorts, white bike shorts, cutout optimized, clean silhouette, body outline emphasis, full-body framing, cropped feet, missing feet, bad anatomy, extra limbs, missing limbs, deformed hands, extra fingers, open mouth, showing teeth, patterned background, background objects, gradient background, heavy shadows, color cast, noise, motion blur,  watermark, low quality, compression artifacts, soft edges, bokeh background`;
+ document.getElementById('jpText').textContent=jpText;
+ document.getElementById('enText').textContent=isTurnaround?turnaroundPrompt:(isFull?fullPrompt:waistPrompt);
+ document.getElementById('output').classList.add('visible');
+ if(!isTest)incrementNumber();
+ setTimeout(()=>document.getElementById('output').scrollIntoView({behavior:'smooth',block:'start'}),100);
+}
+const promptButtons=[
+ {label:'全身正面',text:`Extend this image downward to show the full body
+of the same character from head to toe.
+
+- Add legs and feet below the existing waist
+- Same clothing style continues downward
+- Same lighting and color tone
+- Shoes or footwear appropriate to the outfit
+- Neutral standing pose, feet flat on ground
+- Do not change the face, hair, or upper body
+- Do not generate new facial features
+- fictional CGI character, 3D rendered
+- full body visible, head to toe
+- 9:16 portrait orientation
+- high resolution, high detail, sharp focus`},
+ {label:'側面',text:`Using this character as reference,
+show the exact same character from the side
+(90 degree profile view, facing left).
+
+- fictional CGI character, 3D rendered
+- exact same hair, clothing, height and body proportions
+- side profile view, full body visible head to toe
+- same shoes and outfit details
+- do not change character design
+- neutral standing pose
+- same lighting and color tone
+- 9:16 portrait orientation
+- high resolution, high detail, sharp focus`},
+ {label:'背面',text:`Using this character as reference,
+show the exact same character from behind
+(back view, 180 degrees).
+
+- fictional CGI character, 3D rendered
+- exact same hair style and length as seen from behind
+- exact same clothing, show back details of outfit
+- full body visible head to toe
+- back facing, do not show face
+- same height and body proportions
+- neutral standing pose
+- same lighting and color tone
+- 9:16 portrait orientation
+- high resolution, high detail, sharp focus`},
+ {label:'Loosedrawing\nウエストアップ',text:`flat illustration style, simple cute character,
+thick black outline, minimal facial features,
+flat colors no gradients,
+waist up portrait,
+transparent background, PNG,
+simple vector-like drawing,
+Japanese doodle character style,
+yuru illustration, sticker style,
+same character as reference image,
+same hair, same clothing, same color scheme,
+upper body only, cropped at waist
+2:3 aspect ratio, portrait orientation`},
+ {label:'Loosedrawing\n全身',text:`flat illustration style, simple cute character,
+thick black outline, minimal facial features,
+flat colors no gradients,
+loose casual pose, full body visible head to toe,
+transparent background, PNG,
+simple vector-like drawing,
+Japanese doodle character style,
+yuru illustration, sticker style,
+same character as reference image,
+same hair, same clothing, same color scheme
+9:16 aspect ratio, portrait orientation`},
+ {label:'Loosedrawing\nアイコン',text:`flat illustration style, simple cute character,
+thick black outline, minimal facial features,
+flat colors no gradients,
+face close-up, head and shoulders only,
+transparent background, PNG,
+simple vector-like drawing,
+Japanese doodle character style,
+yuru illustration,
+same character as reference image,
+same hair, same facial features, same color scheme,
+no circle frame, no border, no background shape,
+square composition, centered face,
+1:1 aspect ratio, square format`}
+];
+function renderPromptButtons(){
+ const grid=document.getElementById('promptButtonGrid');
+ if(!grid)return;
+ grid.innerHTML='';
+ promptButtons.forEach((item,index)=>{
+  const btn=document.createElement('button');
+  btn.className='prompt-action';
+  btn.innerHTML=item.label.split('\n').map(v=>v.trim()).join('<br>');
+  btn.addEventListener('click',()=>copyQuickPrompt(index,btn));
+  grid.appendChild(btn);
+ });
+}
+function copyQuickPrompt(index,btn){
+ const item=promptButtons[index];
+ navigator.clipboard.writeText(item.text).then(()=>{
+  const old=btn.innerHTML;
+  btn.innerHTML='✓ コピー済み';
+  btn.classList.add('copied');
+  showStatus(item.label.replace(/\n/g,' ')+' をコピーしました。');
+  setTimeout(()=>{btn.innerHTML=old;btn.classList.remove('copied')},1600);
+ }).catch(()=>{
+  showToast('コピーできませんでした。');
+  showStatus('クリップボードにコピーできませんでした。');
+ });
+}
+
+
+function copyToClipboardWithToast(text, successMessage){
+ if(navigator.clipboard && window.isSecureContext){
+  navigator.clipboard.writeText(text).then(()=>{showToast(successMessage)}).catch(()=>{fallbackCopyText(text, successMessage)});
+ }else{
+  fallbackCopyText(text, successMessage);
+ }
+}
+function fallbackCopyText(text, successMessage){
+ const textarea=document.createElement('textarea');
+ textarea.value=text;
+ textarea.setAttribute('readonly','');
+ textarea.style.position='fixed';
+ textarea.style.left='-9999px';
+ textarea.style.top='0';
+ document.body.appendChild(textarea);
+ textarea.focus();
+ textarea.select();
+ try{
+  const ok=document.execCommand('copy');
+  showToast(ok ? successMessage : 'コピーできませんでした。');
+ }catch(e){
+  showToast('コピーできませんでした。');
+ }
+ document.body.removeChild(textarea);
+}
+function copyHeaderLipSyncPrompt(){
+ const text=`mouth gently but clearly open (about 10–12mm gap), as if softly pronouncing "え",
+small vertical mouth opening visible,
+upper and lower teeth softly visible but not emphasized,
+lips relaxed, not stretched, not smiling widely,
+natural neutral expression,
+not wide open, not exaggerated`;
+ copyToClipboardWithToast(text,'Lip Sync プロンプトをコピーしました。');
+}
+
+function copyHeaderLooseDrawingFull(){
+ const text=`Create an
+
+ignore all previous outputs and variations,
+this is a completely new generation,
+do not inherit pose, expression, framing, crop, or style from earlier results,
+
+Use two reference images with clearly separated roles.
+
+Reference image 1 is the face identity reference only.
+Use reference image 1 only to distinguish this character’s facial impression from other characters.
+Use reference image 1 only for the character-specific facial impression, hairstyle, bangs, hair color, eye shape, eyebrow shape, face balance, mouth shape, calm expression, and overall character identity.
+
+Reference image 2 is the full-body pose and composition reference only.
+Use reference image 2 only for the standing pose, body direction, arm position, hand position, leg position, foot placement, outfit, full-body framing, and centered front-facing composition.
+
+Do not use reference image 1 for pose, body proportions, cropping, framing, camera distance, or composition.
+Do not use reference image 2 for facial identity, facial details, face shape, eye shape, mouth shape, or expression.
+
+The final image must be one full-body loose doodle character.
+The face and character impression must follow reference image 1.
+The pose and full-body composition must follow reference image 2.
+
+Keep the character front-facing,
+standing straight,
+arms relaxed down at both sides,
+hands near the thighs,
+legs close together,
+barefoot,
+head-to-toe visible.
+
+Do not create a waist-up portrait.
+Do not zoom in on the face.
+Do not crop the body.
+Do not create a bust shot.
+Do not create a close-up.
+Do not create multiple characters.
+Do not create side views or back views.
+
+Convert both references into one simplified loose doodle character.
+Keep only the pose, outfit, and placement from reference image 2.
+Do not preserve the realistic body proportions from reference image 2.
+Redraw the body with cute 5-head-tall loose doodle proportions.
+Keep the large head, shorter body, short legs, compact cute proportions, and simple rounded limbs.
+
+Keep the same white camisole and white shorts outfit from reference image 2.
+Add a tiny pale orange "OP" logo on the left chest of the camisole, drawn in the same loose doodle style.
+The logo must be small, simple, and subtle.
+Do not make it a large logo.
+Do not make it a watermark.
+Keep the same hair, bangs, hair color, facial impression, and calm neutral expression from reference image 1.
+
+Do not copy realistic rendering from reference image 1.
+Do not reproduce realistic facial details from reference image 1.
+Do not make the face photorealistic.
+Simplify the face into a cute loose anime doodle style.
+
+Preserve the character’s distinct impression through:
+eye shape,
+eyebrow shape,
+face balance,
+bangs,
+hair color,
+mouth shape,
+and expression.
+
+Avoid generic same-face anime features.
+Avoid identical face across different characters.
+Each character must keep a distinct facial impression based on reference image 1.
+
+Loose doodle illustration style,
+yuru loose drawing character,
+loose hand-drawn Japanese doodle style,
+2D anime-style illustration,
+clean line art,
+hand-drawn line illustration,
+line art is the primary visual element,
+slightly rough hand-drawn lines,
+soft sketch-like outline,
+thin but slightly uneven line quality,
+not perfectly mechanical lines,
+
+flat illustration style,
+simple cute character,
+Japanese loose doodle character style,
+loose illustration,
+loose doodle drawing style,
+loose hand-drawn doodle character,
+cute simplified loose doodle illustration,
+naive casual hand-drawn feel,
+sticker style,
+simple vector-like drawing,
+clearly stylized as a loose doodle drawing, not a realistic illustration,
+
+same hair,
+same clothing,
+same color scheme,
+same simplified facial impression and expression,
+convert the reference character into a simplified loose doodle character,
+do not preserve realistic rendering from the reference image,
+do not preserve realistic anatomy from the reference image,
+do not preserve realistic body proportions from the reference image,
+do not preserve long model-like legs from the reference image,
+
+thin black outline,
+delicate outline,
+clean delicate line art,
+thin consistent line weight,
+soft rounded line ends,
+avoid thick outline,
+avoid bold outline,
+no heavy outline,
+no thick contour lines,
+no bold outer contour,
+
+simple facial features,
+minimal facial features,
+minimalistic eyes,
+small simple mouth,
+reduced detail in facial features,
+flat colors,
+no gradients,
+flat cel-style coloring throughout the entire body,
+minimal shading,
+no shading or extremely minimal shading,
+no soft shadows,
+no airbrush shading,
+no skin texture,
+no painterly rendering,
+no photorealistic rendering,
+no realistic rendering,
+no lighting effects,
+
+full body visible,
+head to toe,
+entire figure fully contained within the frame,
+no body parts cut off,
+feet fully visible with extra space below,
+clear margin around the character,
+centered composition,
+character slightly smaller within the canvas,
+
+loose casual pose,
+relaxed standing pose,
+cute 5-head-tall proportions,
+large head relative to body,
+shorter body,
+short legs relative to the torso,
+compact cute body proportions,
+not model-like proportions,
+not tall slender proportions,
+not long legs,
+not realistic body proportions,
+simple rounded limbs,
+simple cute arms and legs,
+
+barefoot,
+feet drawn in the same simple loose doodle style,
+small simplified feet,
+each foot has exactly five toes,
+five toes on the left foot,
+five toes on the right foot,
+all toes are visible,
+tiny rounded toes,
+toes drawn simply and cutely, not realistically,
+minimal foot detail,
+no realistic feet,
+no detailed toes,
+no realistic foot rendering,
+no semi-realistic legs,
+no four-toed feet,
+no missing toes,
+no extra toes,
+no fused toes,
+no deformed toes,
+
+transparent background,
+PNG,
+clean cutout character,
+only the character is opaque,
+all surrounding background areas are transparent,
+transparent spaces between arms and body,
+transparent spaces between legs,
+transparent spaces inside hair gaps,
+the empty gap between the legs must be transparent, not white,
+no white fill in empty areas,
+no solid background,
+no background color,
+accurate transparent cutout,
+no leftover white background fragments,
+
+9:16 aspect ratio,
+portrait orientation,
+
+線は細く繊細に。
+太い輪郭線は使わないこと。
+手描き感のある、少しラフな細い線で描くこと。
+全身が見えるように描くこと。
+背景は完全に透明にすること。
+添付画像のような、ゆるいルーズなアニメ風ドローイングスタイルで描くこと。
+リアル調にしないこと。
+顔は参照画像1の特徴を残しつつ、シンプルなイラスト顔に変換すること。
+全員が同じ顔にならないよう、参照画像1ごとの顔印象の違いを残すこと。
+足の指は左右それぞれ必ず5本にすること。
+足指を4本にしないこと。
+足指を省略しないこと。
+リアルな足ではなく、シンプルで小さな丸い足指として描くこと。
+`;
+ copyToClipboardWithToast(text,'Loose Drawing をコピーしました。');
+}
+function copyHeaderCropPrompt(){
+ const text=`この画像を編集してください（生成ではありません）
+トリミング：
+左150pxから幅600px、上下そのまま`;
+ copyToClipboardWithToast(text,'Trimming プロンプトをコピーしました。');
+}
+function copyText(id,btn){navigator.clipboard.writeText(document.getElementById(id).textContent).then(()=>{const old=btn.textContent;btn.textContent='✓ コピー済み';btn.classList.add('copied');setTimeout(()=>{btn.textContent=old;btn.classList.remove('copied')},1600)})}
+function showToast(message){const t=document.getElementById('toast');if(!t)return;t.textContent=message;t.classList.add('visible');clearTimeout(window.__toastTimer);window.__toastTimer=setTimeout(()=>{t.classList.remove('visible')},1800)}
+function showStatus(t){const s=document.getElementById('status');if(!s)return;s.textContent=t;s.classList.add('visible')}
+function resetAll(){Object.keys(state).forEach(k=>{state[k]=Array.isArray(state[k])?[]:''});const hf=document.getElementById('hairFree');if(hf)hf.value='';document.querySelectorAll('.chip').forEach(c=>c.classList.remove('selected'));document.getElementById('output').classList.remove('visible');const status=document.getElementById('status');if(status){status.textContent='';status.classList.remove('visible')}showToast('リセットしました。');}
+</script>
+</body>
+</html>
