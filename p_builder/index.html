@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Character Sheet Prompt Builder v37</title>
+<title>Character Sheet Prompt Builder v38</title>
 <link rel="icon" href="./favicon.ico" type="image/x-icon">
 <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
 <style>
@@ -16,7 +16,7 @@
 .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:rgba(61,34,0,.92);color:#fff;padding:12px 22px;border-radius:999px;font-size:14px;font-weight:700;box-shadow:0 8px 28px rgba(0,0,0,.22);z-index:9999;opacity:0;pointer-events:none;transition:.25s ease}.toast.visible{opacity:1;transform:translateX(-50%) translateY(0)}</style>
 </head>
 <body>
-<header><div class="title"><div class="icon">🧾</div><h1>Character Sheet Prompt Builder v37<span>販売用・プロンプトメーカー / 一括コピーボタン追加</span></h1></div><div class="header-actions"><button class="btn secondary" onclick="copyHeaderCropPrompt()">Trimming</button><button class="btn secondary" onclick="copyHeaderLooseDrawingFull()">Loose Drawing</button><button class="btn secondary" onclick="copyHeaderLipSyncPrompt()">Lip Sync</button><button class="btn ghost" onclick="resetAll()">リセット</button></div></header>
+<header><div class="title"><div class="icon">🧾</div><h1>Character Sheet Prompt Builder v38<span>販売用・プロンプトメーカー / 鼻バリエーション追加</span></h1></div><div class="header-actions"><button class="btn secondary" onclick="copyHeaderCropPrompt()">Trimming</button><button class="btn secondary" onclick="copyHeaderLooseDrawingFull()">Loose Drawing</button><button class="btn secondary" onclick="copyHeaderLipSyncPrompt()">Lip Sync</button><button class="btn ghost" onclick="resetAll()">リセット</button></div></header>
 <div class="container">
   <div class="card"><div class="head"><span class="badge">FLOW</span><span class="ttl">使い方</span></div><div class="note">①必要項目を選ぶ、またはランダム作成 → ②構図を選ぶ → ③生成。三面図は切り抜き・Photoshop加工前提で、3体の間隔を広めに取る設定です。</div><div class="btns"><button class="btn secondary" onclick="randomCharacter()">🎲 ランダムキャラ作成</button></div><div class="status" id="status"></div></div>
   <div class="card" style="grid-column:1/-1"><div class="head"><span class="badge">番号</span><span class="ttl">開始番号・キャラクター名</span></div><div class="note">前回の続きから始める場合は開始番号を入力してください。<br>三面図・ウエスト・全身は同一番号で生成されます（同じキャラクター扱い）。次のキャラに進むときは、再度三面図を生成すると自動で番号が進みます。手動で進めたい/戻したい場合は下のボタンか開始番号を直接書き換えてください。</div><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><label style="font-size:13px;font-weight:700;color:var(--muted)">開始番号</label><input id="startNumber" type="number" min="1" max="999" value="1" style="width:90px;border:1.5px solid var(--light);border-radius:12px;padding:8px 12px;font-family:'Zen Maru Gothic',sans-serif;font-size:15px;font-weight:700;color:var(--text);background:var(--pale);text-align:center"><button class="btn secondary" style="padding:8px 16px;font-size:12px;box-shadow:0 3px 10px rgba(220,100,30,.18)" onclick="manualIncrement()">➡ 次のキャラへ</button><button class="btn ghost" style="padding:8px 16px;font-size:12px;border-color:#999;color:#666" onclick="manualDecrement()">⬅ 一つ戻す</button></div><div id="namePreview" style="margin-top:12px;display:none"><span style="font-size:13px;font-weight:700;color:var(--muted)">次の品番・名前：</span><span id="namePreviewText" style="font-size:15px;font-weight:700;color:var(--main);margin-left:8px"></span></div></div>
@@ -37,6 +37,10 @@ const state={nationality:'',facetype:'',age:'',body:'',hairColor:[],hairLength:'
 let lastTurnaroundSerial='';
 // 最後に生成した品番（コピーボタン用）
 let lastGeneratedFullCode='';
+// v38新規：鼻バリエーション管理
+// 顔タイプ内で鼻のバリエーションをランダム選択し、同じキャラ（=同じserial+facetype）では一貫性を保つ
+let currentNoseKey=''; // 'serial_facetype' 形式で保持
+let currentNoseVariant=null; // {jp, en, idx}
 const data={
  nationality:{'日本人':['日本人女性','Japanese woman'],'東アジア':['東アジア系女性','East Asian woman'],'欧米':['欧米系女性','Caucasian woman'],'東南アジア':['東南アジア系女性','Southeast Asian woman'],'中東':['中東系女性','Middle Eastern woman'],'アフリカ系':['アフリカ系女性','African woman']},
  facetype:{'美人特化（黄金比）':['整った上品な美人系の顔立ち','golden ratio face proportions, high nose bridge, sharp defined jawline, symmetrical face, high cheekbones, refined elegant facial features, soft sophisticated expression, gentle smile-ready expression'],'かわいい特化（アイドル寄せ）':['明るく可愛らしいアイドル系の顔立ち','cute idol-like facial features, small face, big bright eyes, soft innocent expression, youthful friendly appearance'],'広告CV高い顔':['親しみやすく清潔感のある自然な顔立ち','slightly rounded face shape, soft cheek line with natural fullness, medium-sized rounded eyes with natural double eyelid creases, average-height nose bridge with rounded tip, full softly curved lips, naturally arched eyebrows, no sharp angles in the face, friendly relatable everyday-person appearance, not glamorous, not fashion-model-like'],'個性的な美人':['個性的でクールな美人系の顔立ち','narrow almond-shaped eyes with outer corners tilted upward, slightly upswept thin eyebrows, sharply defined V-line jawline with visible angles, prominent high cheekbones casting subtle shadows, deep-set hooded eyelids, straight thin nose bridge with sharp tip, thin precisely defined lips closed in straight line, angular sculpted face structure, no roundness in face shape, mysterious distant atmosphere, no smile, no upturned mouth corners'],'清楚系美人':['透明感があり上品で清楚な美人系の顔立ち','oval face with soft yet defined contours, medium-sized almond-shaped eyes with double eyelids, straight nose bridge with delicate tip, small naturally shaped lips, lightly arched eyebrows, smooth jawline, clean translucent quality, calm composed presence, restrained understated beauty'],'韓国風クール美人':['洗練された韓国風のクールな美人系の顔立ち','sharply defined V-line jawline with narrow chin, narrow long almond-shaped eyes with monolid or low-crease double eyelids, straight high nose bridge with subtle pointed tip, thin precisely shaped lips, flat straight eyebrows, smooth poreless skin appearance, elongated face shape, modern sleek beauty, composed cold presence'],'童顔ナチュラル':['若々しく親しみやすい童顔ナチュラルな顔立ち','round soft face shape with full cheeks, large rounded eyes with prominent double eyelids, small slightly upturned nose with rounded tip, small softly curved lips, low slightly rounded eyebrows, smooth babyface contours, no sharp angles, youthful natural appearance, not childish, college-student-like maturity'],'大人かわいい':['甘すぎない上品な大人かわいい顔立ち','soft rounded face shape but with slightly defined chin, medium-large rounded eyes with double eyelids and gentle downturn at outer corners, average nose bridge with rounded tip, full softly shaped lips, gently arched eyebrows, balanced between cute and refined, mature feminine softness'],'ハーフ風華やか美人':['華やかで立体感のあるハーフ風美人系の顔立ち','three-dimensional sculpted facial structure, very high prominent nose bridge with defined tip, deep-set large almond-shaped eyes with strong double eyelid creases, sharply defined V-line jawline with pronounced contours, prominent high cheekbones, fuller lips with defined cupids bow, thicker fuller eyebrows, dimensional shadows on the face, glamorous striking impression, biracial-look facial features'],'知的クール':['落ち着きと知性のあるクールな美人系の顔立ち','oval face with sharply defined jawline, narrow almond-shaped eyes with calm focused gaze, straight thin nose bridge, thin precisely shaped lips closed, flat or slightly arched thin eyebrows, smooth angular cheekbones, composed neutral expression, contemplative serious atmosphere, refined intellectual presence, no smile or extremely subtle']},
@@ -47,6 +51,59 @@ const data={
  hairStyle:{'ストレート':['ストレートヘア','straight hair'],'ゆる巻き':['ゆる巻きヘア','soft loose curls'],'強めカール':['強めのカールヘア','strong curled hair'],'レイヤー':['レイヤーヘア','layered hair'],'外ハネ':['外ハネヘア','outward flipped hair'],'内巻き':['内巻きヘア','inward curled hair'],'パーマ':['パーマヘア','permed hair'],'ウェーブ':['ウェーブヘア','soft wavy hair'],'アップスタイル':['アップスタイル','updo hairstyle']},
  bangs:{'あり':['前髪あり','with bangs'],'なし':['前髪なし','no bangs'],'シースルー':['シースルーバング','see-through bangs'],'ぱっつん':['ぱっつん前髪','straight blunt bangs'],'センターパート':['センターパート','center-parted bangs']},
  shot:{'三面図':['正面・側面・背面の三面図、3体を横一列に均等配置、人物同士の間隔を広めに空けた切り抜き用構図','character turnaround sheet, front view, side view, back view, three characters aligned horizontally, evenly spaced, wide spacing between characters, large gaps between each figure, each figure fully visible with clear margins, no overlap between characters'],'ウエストショット':['正面向きのウエストショット、上半身が見える構図、自然な姿勢','waist-up shot, front view, natural posture, centered composition, clean portrait framing'],'全身':['正面向きの全身、頭から足先まで見える構図、自然な直立姿勢、腕は自然に下ろす','full body, head to toe, including feet, front view, neutral standing pose, arms relaxed at sides, subject fills most of the frame, centered composition, minimal empty space']}
+};
+// v38新規：顔タイプ内 鼻バリエーション（各タイプ3種、タイプの方向性を崩さない範囲）
+const noseVariants={
+ '美人特化（黄金比）':[
+  ['筋の通った高い鼻、すっきりした鼻先、控えめな小鼻','high straight nose bridge, refined narrow nose tip, slim nostrils, well-defined but not exaggerated nose, balanced nose length'],
+  ['シャープに通った鼻筋、繊細で尖りすぎない鼻先、引き締まった小鼻','sharp clean nose bridge, delicate slightly pointed nose tip, narrow nostrils, sculpted refined nose shape, medium-length nose'],
+  ['細身で高さのある鼻筋、きれいに整った鼻先、細い小鼻','slender high nose bridge, finely shaped nose tip, slim narrow nostrils, elegant refined nose, slightly longer balanced nose']
+ ],
+ 'かわいい特化（アイドル寄せ）':[
+  ['小ぶりで丸みのある鼻、丸い鼻先、控えめな小鼻','small softly rounded nose, rounded nose tip, small nostrils, gentle nose shape, short nose length'],
+  ['標準的な高さで自然な鼻、わずかに丸い鼻先、ナチュラルな小鼻','natural medium-height nose bridge, slightly rounded nose tip, soft natural nostrils, unremarkable balanced nose, medium-short nose length'],
+  ['小さめでまっすぐな鼻、すっきりした丸い鼻先、小ぶりな小鼻','small straight nose, neat rounded nose tip, petite nostrils, cute refined nose shape, short balanced nose']
+ ],
+ '広告CV高い顔':[
+  ['平均的な高さの鼻、丸い鼻先、自然な小鼻','average-height nose bridge, rounded nose tip, natural medium nostrils, ordinary relatable nose shape, standard nose length'],
+  ['やや低めで柔らかい印象の鼻、丸みのある鼻先、ふんわりした小鼻','slightly low soft nose bridge, soft rounded nose tip, gently rounded nostrils, approachable everyday nose, medium nose length'],
+  ['標準的でナチュラルな鼻、自然な丸みの鼻先、平均的な小鼻','natural standard nose bridge, naturally rounded nose tip, average everyday nostrils, unassuming friendly nose, medium balanced nose length']
+ ],
+ '個性的な美人':[
+  ['細身でシャープな鼻筋、尖った鼻先、引き締まった小鼻','slender sharp nose bridge, pointed sharp nose tip, narrow tight nostrils, angular sculpted nose, longer nose length'],
+  ['まっすぐ細い鼻、繊細で鋭い鼻先、細い小鼻','straight thin nose bridge, finely pointed nose tip, slim narrow nostrils, precise sculpted nose shape, medium-long nose'],
+  ['やや高めでシャープな鼻、シャープな鼻先、細い小鼻','slightly high sharp nose bridge, sharply defined nose tip, narrow defined nostrils, striking sculpted nose, balanced longer nose']
+ ],
+ '清楚系美人':[
+  ['繊細でまっすぐな鼻、控えめな鼻先、小さな小鼻','delicate straight nose bridge, subtle refined nose tip, small modest nostrils, understated graceful nose, balanced nose length'],
+  ['細身で上品な鼻、繊細な鼻先、控えめで整った小鼻','slim elegant nose bridge, delicate refined nose tip, small refined nostrils, gentle dignified nose, medium nose length'],
+  ['標準的でまっすぐな鼻、自然で控えめな鼻先、整った小鼻','standard straight nose bridge, naturally modest nose tip, neat balanced nostrils, calm composed nose shape, medium balanced nose length']
+ ],
+ '韓国風クール美人':[
+  ['高くシャープな鼻筋、すっきりした鼻先、引き締まった小鼻','high sharp nose bridge, clean defined nose tip, narrow tight nostrils, sleek modern nose, longer nose length'],
+  ['まっすぐ高さのある鼻、控えめにシャープな鼻先、細い小鼻','straight high nose bridge, subtly sharp nose tip, slim narrow nostrils, refined sleek nose shape, medium-long nose'],
+  ['すっきりとしたラインの鼻、繊細で整った鼻先、引き締まった小鼻','clean lined nose bridge, finely shaped nose tip, narrow refined nostrils, polished modern nose, balanced longer nose']
+ ],
+ '童顔ナチュラル':[
+  ['小さく丸い鼻、丸い鼻先、ふんわりした小鼻','small rounded nose, rounded soft nose tip, gentle small nostrils, youthful soft nose, short nose length'],
+  ['短めで丸みのある鼻、丸い鼻先、控えめな小鼻','short softly rounded nose, rounded gentle nose tip, small soft nostrils, babyface-like nose, short balanced nose'],
+  ['わずかに上向きの小ぶりな鼻、丸い鼻先、ナチュラルな小鼻','slightly upturned small nose, rounded soft nose tip, natural small nostrils, youthful unassuming nose, short medium nose length']
+ ],
+ '大人かわいい':[
+  ['標準的な高さで丸い鼻、丸みのある鼻先、自然な小鼻','medium-height nose bridge with soft roundness, rounded nose tip, natural medium nostrils, balanced feminine nose, medium nose length'],
+  ['やや高めで柔らかい鼻、丸みのある鼻先、整った小鼻','slightly high soft nose bridge, gently rounded nose tip, neat natural nostrils, balanced refined-yet-soft nose, medium nose length'],
+  ['平均的でナチュラルな鼻、自然な丸みの鼻先、ふんわりした小鼻','average natural nose bridge, naturally rounded nose tip, soft balanced nostrils, gentle mature-cute nose, medium balanced nose length']
+ ],
+ 'ハーフ風華やか美人':[
+  ['高くシャープな鼻筋、シャープな鼻先、引き締まった小鼻','very high sharp nose bridge, sharply defined nose tip, narrow defined nostrils, prominent three-dimensional nose, longer nose length'],
+  ['高くてやや丸みのある鼻先、しっかりした鼻筋、引き締まった小鼻','high prominent nose bridge with slightly rounded yet defined tip, sculpted nose tip, narrow defined nostrils, dimensional nose with soft edge, medium-long nose'],
+  ['高くまっすぐ通った長めの鼻筋、整った鼻先、細い小鼻','high straight elongated nose bridge, finely shaped nose tip, slim defined nostrils, statuesque nose, longer balanced nose length']
+ ],
+ '知的クール':[
+  ['細身でまっすぐな鼻、繊細な鼻先、引き締まった小鼻','slender straight nose bridge, finely shaped nose tip, narrow refined nostrils, composed sculpted nose, medium-long nose length'],
+  ['シャープに通ったまっすぐな鼻、控えめにシャープな鼻先、細い小鼻','sharp straight nose bridge, subtly defined nose tip, slim narrow nostrils, intelligent sleek nose shape, longer nose length'],
+  ['標準的で細身の鼻、繊細で整った鼻先、引き締まった小鼻','standard slim nose bridge, finely refined nose tip, narrow neat nostrils, calm intellectual nose, medium balanced nose length']
+ ]
 };
 const productCodeMap={
  facetype:{'美人特化（黄金比）':'BT','かわいい特化（アイドル寄せ）':'KW','広告CV高い顔':'CV','個性的な美人':'UQ','清楚系美人':'SS','韓国風クール美人':'HC','童顔ナチュラル':'DG','大人かわいい':'OK','ハーフ風華やか美人':'FH','知的クール':'IC'},
@@ -102,6 +159,28 @@ function updateNamePreview(){
   textEl.style.color='var(--main)';
   textEl.textContent=`番号：${serial}　名前：${name}`;
  }
+}
+
+// v38新規：鼻バリエーション取得（同じキャラ内で一貫性を保つ）
+// キーは serial+facetype。一致する間は同じ鼻を返す。
+// 違うキャラ（番号変更 or 顔タイプ変更）になったら新しい鼻をランダム選択。
+function getNoseVariant(serial,facetype){
+ if(!facetype||!noseVariants[facetype])return null;
+ const key=`${serial}_${facetype}`;
+ if(currentNoseKey===key&&currentNoseVariant){
+  return currentNoseVariant;
+ }
+ // 新しいキャラ：新しい鼻をランダム選択
+ const variants=noseVariants[facetype];
+ const idx=Math.floor(Math.random()*variants.length);
+ currentNoseVariant={jp:variants[idx][0],en:variants[idx][1],idx:idx};
+ currentNoseKey=key;
+ return currentNoseVariant;
+}
+// 鼻バリエーションを強制的に再選択（テスト・確認用）
+function resetNoseVariant(){
+ currentNoseKey='';
+ currentNoseVariant=null;
 }
 
 const defaults={nationality:'日本人',age:'20代前半',body:'モデル体型'};
@@ -269,13 +348,19 @@ function generatePrompt(isTest=false){
  const fixedQualityJp=fixedQualityJpBase+'、'+fixedExpressionJp;
  const fixedQualityEnBase='soft lighting, diffused light, slight highlight on cheekbones and nose bridge, natural skin texture, natural hair texture';
  const fixedQualityEn=fixedQualityEnBase+', '+fixedExpressionEn;
- const jpBefore=`【プロンプト】\n${jp('nationality')}、${jp('age')}、${jp('facetype')}、清潔感のある自然な美しさ、笑顔映えする印象。\n${jp('body')}、${hairJp}。\n${fixedQualityJp}。\n${jp('shot')}。\n白のキャミソールと白の4分丈レギンス、完全に均一な白背景、スタジオ撮影。\nやわらかい均一な光、影は最小限、人物と背景の境界が明確で、切り抜き・合成しやすいクリーンな人物素材。`;
+ // v38新規：鼻バリエーション取得（同じキャラ内では一貫、新キャラは新しい鼻）
+ // テスト生成（番号未採番）の場合は serial='test' 扱いで毎回固定キーにせず、表示用の鼻だけ得る
+ const noseSerialKey=isTest?'test':serial;
+ const noseVariant=getNoseVariant(noseSerialKey,state.facetype);
+ const noseJp=noseVariant?noseVariant.jp:'';
+ const noseEn=noseVariant?noseVariant.en:'';
+ const jpBefore=`【プロンプト】\n${jp('nationality')}、${jp('age')}、${jp('facetype')}、清潔感のある自然な美しさ、笑顔映えする印象。\n${jp('body')}、${hairJp}。\n${noseJp?noseJp+'。\n':''}${fixedQualityJp}。\n${jp('shot')}。\n白のキャミソールと白の4分丈レギンス、完全に均一な白背景、スタジオ撮影。\nやわらかい均一な光、影は最小限、人物と背景の境界が明確で、切り抜き・合成しやすいクリーンな人物素材。`;
  const jpAfter=isTest
   ? `【テスト生成：品番・名前は採番されていません】\n\n${jp('nationality')}、${jp('age')}、\n${jp('facetype')}、\n${hairJp}。`
   : `【1点限定】${fullCode}\n【名前】${charName}\n\n${jp('nationality')}、${jp('age')}、\n${jp('facetype')}、\n${hairJp}。`;
  const jpText=jpBefore+'\n\n'+jpAfter;
  const clothes='white plain camisole top, white plain above-knee leggings, 4-bu length leggings';
- const characterCore=`${en('nationality')}, ${en('age')}, ${en('facetype')}, ${en('body')}, ${hairEn}, ${fixedQualityEn}`;
+ const characterCore=`${en('nationality')}, ${en('age')}, ${en('facetype')}, ${noseEn?noseEn+', ':''}${en('body')}, ${hairEn}, ${fixedQualityEn}`;
  const turnaroundPrompt=`${imageGenerationIntro}
 
 ${characterCore},
@@ -302,7 +387,6 @@ prioritize both facial accuracy and model-like full-body proportions,
 face remains detailed without enlarging the head,
 sharp facial details while keeping model-like full-body proportions,
 sharp eyes,
-clear nose bridge,
 natural lips,
 closed mouth,
 no teeth visible,
@@ -500,7 +584,8 @@ function fallbackCopyText(text, successMessage){
  document.body.removeChild(textarea);
 }
 function copyHeaderLipSyncPrompt(){
- const text=`この画像の女性に下記のプロンプトを適用してください。
+ const text=`この画像の女性に下記のプロンプトを適用してください。履歴や前チャットを参照しないでください。
+背景は透過しないでください。
 
 mouth gently but clearly open (about 10–12mm gap), as if softly pronouncing "え",
 small vertical mouth opening visible,
