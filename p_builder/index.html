@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Character Sheet Prompt Builder v38</title>
+<title>Character Sheet Prompt Builder v39</title>
 <link rel="icon" href="./favicon.ico" type="image/x-icon">
 <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
 <style>
@@ -13,10 +13,100 @@
 @media(max-width:960px){.main-layout{grid-template-columns:1fr}.prompt-panel{position:static}.main-layout>.container{order:1}.prompt-panel{order:2}.prompt-grid{grid-template-columns:repeat(2,1fr)}}.hair-group{margin-top:18px}.hair-label{font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px}.hair-group:first-of-type{margin-top:0}.hair-divider{border-top:1px dashed var(--light);margin-top:18px;padding-top:18px}.hair-free{width:100%;min-height:58px;border:1.5px solid var(--light);border-radius:14px;background:var(--pale);padding:12px 14px;font-family:'Zen Maru Gothic',sans-serif;font-size:13px;color:var(--text);resize:vertical}.hair-free::placeholder{color:#8F6A58}@media(max-width:760px){.container{grid-template-columns:1fr}.container>.card:first-child,.container>.output,.step05-card,.step06-card{grid-column:auto;max-width:none}}
 @media(max-width:520px){.prompt-grid{grid-template-columns:1fr}.card{padding:18px 15px}.chip{font-size:12px;padding:7px 11px}h1{font-size:17px}.btn{width:100%}}
 .note,.chip,.hair-label,h1 span,.prompt-action small{color:var(--muted)}
-.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:rgba(61,34,0,.92);color:#fff;padding:12px 22px;border-radius:999px;font-size:14px;font-weight:700;box-shadow:0 8px 28px rgba(0,0,0,.22);z-index:9999;opacity:0;pointer-events:none;transition:.25s ease}.toast.visible{opacity:1;transform:translateX(-50%) translateY(0)}</style>
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:rgba(61,34,0,.92);color:#fff;padding:12px 22px;border-radius:999px;font-size:14px;font-weight:700;box-shadow:0 8px 28px rgba(0,0,0,.22);z-index:9999;opacity:0;pointer-events:none;transition:.25s ease}.toast.visible{opacity:1;transform:translateX(-50%) translateY(0)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-start;justify-content:center;z-index:10000;padding:40px 16px;overflow-y:auto}
+.modal-overlay.visible{display:flex}
+.modal-box{background:#fff;border-radius:14px;max-width:680px;width:100%;box-shadow:0 16px 48px rgba(0,0,0,.25);position:relative;padding:24px 28px}
+.modal-close{position:absolute;top:14px;right:16px;background:none;border:none;font-size:22px;cursor:pointer;color:#666;line-height:1}
+.modal-close:hover{color:#000}
+.modal-title{margin:0 0 16px;font-size:18px;color:var(--main);font-weight:800}
+.code-section{margin-bottom:18px}
+.code-section h3{margin:0 0 8px;font-size:14px;color:var(--main);border-bottom:1px solid #f0d9b5;padding-bottom:4px}
+.code-table{width:100%;border-collapse:collapse;font-size:13px}
+.code-table td{padding:4px 8px;border-bottom:1px solid #f5f0e5}
+.code-table td.code{font-family:monospace;font-weight:700;color:var(--main);width:80px;letter-spacing:.5px}
+@media(max-width:520px){.modal-box{padding:18px 16px}.code-table{font-size:12px}.code-table td.code{width:60px}}</style>
 </head>
 <body>
-<header><div class="title"><div class="icon">🧾</div><h1>Character Sheet Prompt Builder v38<span>販売用・プロンプトメーカー / 鼻バリエーション追加</span></h1></div><div class="header-actions"><button class="btn secondary" onclick="copyHeaderCropPrompt()">Trimming</button><button class="btn secondary" onclick="copyHeaderLooseDrawingFull()">Loose Drawing</button><button class="btn secondary" onclick="copyHeaderLipSyncPrompt()">Lip Sync</button><button class="btn ghost" onclick="resetAll()">リセット</button></div></header>
+<header><div class="title"><div class="icon">🧾</div><h1>Character Sheet Prompt Builder v39<span>販売用・プロンプトメーカー / 髪色髪型グループ解除</span></h1></div><div class="header-actions"><button class="btn secondary" onclick="copyHeaderCropPrompt()">Trimming</button><button class="btn secondary" onclick="copyHeaderLooseDrawingFull()">Loose Drawing</button><button class="btn secondary" onclick="copyHeaderLipSyncPrompt()">Lip Sync</button><button class="btn secondary" onclick="openCodeTable()">コード表</button><button class="btn ghost" onclick="resetAll()">リセット</button></div></header>
+<div class="modal-overlay" id="codeTableModal" onclick="if(event.target===this)closeCodeTable()">
+ <div class="modal-box">
+  <button class="modal-close" onclick="closeCodeTable()" aria-label="閉じる">✕</button>
+  <h2 class="modal-title">📋 品番コード対応表（v39）</h2>
+  <div class="code-section">
+   <h3>顔タイプ（FaceType）</h3>
+   <table class="code-table"><tbody>
+    <tr><td class="code">BT</td><td>美人特化（黄金比）</td></tr>
+    <tr><td class="code">KW</td><td>かわいい特化（アイドル寄せ）</td></tr>
+    <tr><td class="code">CV</td><td>広告CV高い顔</td></tr>
+    <tr><td class="code">UQ</td><td>個性的な美人</td></tr>
+    <tr><td class="code">SS</td><td>清楚系美人</td></tr>
+    <tr><td class="code">HC</td><td>韓国風クール美人</td></tr>
+    <tr><td class="code">DG</td><td>童顔ナチュラル</td></tr>
+    <tr><td class="code">OK</td><td>大人かわいい</td></tr>
+    <tr><td class="code">FH</td><td>ハーフ風華やか美人</td></tr>
+    <tr><td class="code">IC</td><td>知的クール</td></tr>
+   </tbody></table>
+  </div>
+  <div class="code-section">
+   <h3>髪の長さ（Length）</h3>
+   <table class="code-table"><tbody>
+    <tr><td class="code">LG</td><td>ロング</td></tr>
+    <tr><td class="code">SM</td><td>セミロング</td></tr>
+    <tr><td class="code">MI</td><td>ミディアム</td></tr>
+    <tr><td class="code">BB</td><td>ボブ</td></tr>
+    <tr><td class="code">SH</td><td>ショート</td></tr>
+    <tr><td class="code">VS</td><td>ベリーショート</td></tr>
+   </tbody></table>
+  </div>
+  <div class="code-section">
+   <h3>髪色（Color）<span style="font-size:11px;color:#999;font-weight:400">　※v39で展開</span></h3>
+   <table class="code-table"><tbody>
+    <tr><td class="code">K</td><td>黒</td></tr>
+    <tr><td class="code">D</td><td>ダークブラウン</td></tr>
+    <tr><td class="code">B</td><td>ブラウン</td></tr>
+    <tr><td class="code">T</td><td>ライトブラウン</td></tr>
+    <tr><td class="code">L</td><td>ブロンド</td></tr>
+    <tr><td class="code">G</td><td>グレー</td></tr>
+    <tr><td class="code">H</td><td>ハイトーン</td></tr>
+    <tr><td class="code">P</td><td>ピンク</td></tr>
+    <tr><td class="code">R</td><td>レッド</td></tr>
+    <tr><td class="code">U</td><td>ブルー</td></tr>
+    <tr><td class="code">I</td><td>インナーカラー</td></tr>
+    <tr><td class="code">A</td><td>グラデーション</td></tr>
+    <tr><td class="code">X</td><td>ハイライト</td></tr>
+   </tbody></table>
+  </div>
+  <div class="code-section">
+   <h3>髪型（Style）<span style="font-size:11px;color:#999;font-weight:400">　※v39で展開</span></h3>
+   <table class="code-table"><tbody>
+    <tr><td class="code">S</td><td>ストレート</td></tr>
+    <tr><td class="code">W</td><td>ゆる巻き</td></tr>
+    <tr><td class="code">P</td><td>パーマ</td></tr>
+    <tr><td class="code">V</td><td>ウェーブ</td></tr>
+    <tr><td class="code">C</td><td>強めカール</td></tr>
+    <tr><td class="code">L</td><td>レイヤー</td></tr>
+    <tr><td class="code">H</td><td>外ハネ</td></tr>
+    <tr><td class="code">I</td><td>内巻き</td></tr>
+    <tr><td class="code">U</td><td>アップスタイル</td></tr>
+   </tbody></table>
+  </div>
+  <div class="code-section">
+   <h3>前髪（Bangs）</h3>
+   <table class="code-table"><tbody>
+    <tr><td class="code">B</td><td>あり</td></tr>
+    <tr><td class="code">N</td><td>なし</td></tr>
+    <tr><td class="code">T</td><td>シースルー</td></tr>
+    <tr><td class="code">P</td><td>ぱっつん</td></tr>
+    <tr><td class="code">C</td><td>センターパート</td></tr>
+   </tbody></table>
+  </div>
+  <div style="font-size:12px;color:#888;margin-top:12px;line-height:1.6">
+   <strong>品番形式：</strong>連番_顔タイプ-長さ-色-髪型-前髪　例: <code style="background:#fef3e2;padding:1px 6px;border-radius:4px">004_FH-BB-L-W-T</code><br>
+   ※髪色と前髪、髪型と前髪に同じ文字（C/T/Pなど）が出ますが、<strong>位置で判別</strong>できます。
+  </div>
+ </div>
+</div>
 <div class="container">
   <div class="card"><div class="head"><span class="badge">FLOW</span><span class="ttl">使い方</span></div><div class="note">①必要項目を選ぶ、またはランダム作成 → ②構図を選ぶ → ③生成。三面図は切り抜き・Photoshop加工前提で、3体の間隔を広めに取る設定です。</div><div class="btns"><button class="btn secondary" onclick="randomCharacter()">🎲 ランダムキャラ作成</button></div><div class="status" id="status"></div></div>
   <div class="card" style="grid-column:1/-1"><div class="head"><span class="badge">番号</span><span class="ttl">開始番号・キャラクター名</span></div><div class="note">前回の続きから始める場合は開始番号を入力してください。<br>三面図・ウエスト・全身は同一番号で生成されます（同じキャラクター扱い）。次のキャラに進むときは、再度三面図を生成すると自動で番号が進みます。手動で進めたい/戻したい場合は下のボタンか開始番号を直接書き換えてください。</div><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><label style="font-size:13px;font-weight:700;color:var(--muted)">開始番号</label><input id="startNumber" type="number" min="1" max="999" value="1" style="width:90px;border:1.5px solid var(--light);border-radius:12px;padding:8px 12px;font-family:'Zen Maru Gothic',sans-serif;font-size:15px;font-weight:700;color:var(--text);background:var(--pale);text-align:center"><button class="btn secondary" style="padding:8px 16px;font-size:12px;box-shadow:0 3px 10px rgba(220,100,30,.18)" onclick="manualIncrement()">➡ 次のキャラへ</button><button class="btn ghost" style="padding:8px 16px;font-size:12px;border-color:#999;color:#666" onclick="manualDecrement()">⬅ 一つ戻す</button></div><div id="namePreview" style="margin-top:12px;display:none"><span style="font-size:13px;font-weight:700;color:var(--muted)">次の品番・名前：</span><span id="namePreviewText" style="font-size:15px;font-weight:700;color:var(--main);margin-left:8px"></span></div></div>
@@ -108,8 +198,10 @@ const noseVariants={
 const productCodeMap={
  facetype:{'美人特化（黄金比）':'BT','かわいい特化（アイドル寄せ）':'KW','広告CV高い顔':'CV','個性的な美人':'UQ','清楚系美人':'SS','韓国風クール美人':'HC','童顔ナチュラル':'DG','大人かわいい':'OK','ハーフ風華やか美人':'FH','知的クール':'IC'},
  hairLength:{'ロング':'LG','セミロング':'SM','ミディアム':'MI','ボブ':'BB','ショート':'SH','ベリーショート':'VS'},
- hairColor:{'黒':'K','ダークブラウン':'D','ブラウン':'B','ライトブラウン':'B','ブロンド':'L','グレー':'L','ピンク':'C','レッド':'C','ブルー':'C','ハイトーン':'L','インナーカラー':'M','グラデーション':'M','ハイライト':'M'},
- hairStyle:{'ストレート':'S','ゆる巻き':'W','強めカール':'C','レイヤー':'Y','外ハネ':'Y','内巻き':'Y','パーマ':'W','ウェーブ':'W','アップスタイル':'U'},
+ // v39：髪色を13種すべて固有1文字コードに展開（旧B=ブラウン+ライトブラウン → B/T、旧L=3種混在 → L/G/H、旧C=3種混在 → P/R/U、旧M=3種混在 → I/A/X）
+ hairColor:{'黒':'K','ダークブラウン':'D','ブラウン':'B','ライトブラウン':'T','ブロンド':'L','グレー':'G','ハイトーン':'H','ピンク':'P','レッド':'R','ブルー':'U','インナーカラー':'I','グラデーション':'A','ハイライト':'X'},
+ // v39：髪型を9種すべて固有1文字コードに展開（旧W=ゆる巻き+パーマ+ウェーブ → W/P/V、旧Y=レイヤー+外ハネ+内巻き → L/H/I）
+ hairStyle:{'ストレート':'S','ゆる巻き':'W','パーマ':'P','ウェーブ':'V','強めカール':'C','レイヤー':'L','外ハネ':'H','内巻き':'I','アップスタイル':'U'},
  bangs:{'あり':'B','なし':'N','シースルー':'T','ぱっつん':'P','センターパート':'C'}
 };
 const nameList=['桜','椿','藤','撫子','菖蒲','牡丹','芍薬','梅','蘭','菊','百合','杏','桃','薔薇','水仙','木蓮','紫陽花','山茶花','卯の花','八重桜','乙女椿','花水木','山桜','花梨','春蘭','菫','桔梗','竜胆','鳶尾','黒百合','彼岸花','夜顔','月見草','宵待草','露草','鬼灯','紫苑','秋桜','朝顔','夕顔','花菖蒲','杜若','水芭蕉','都忘れ','勿忘草','茉莉','向日葵','小菊','蒲公英','桜草','鈴蘭','姫百合','小百合','菜の花','れんげ','すみれ','雪柳','葵','橘','萩','芙蓉','木槿','金木犀','銀木犀','沈丁花','花楓','花蓮','睡蓮','花音','凛花','清花','純花','真花','誠花','端花','明花','朗花','爽花','雅花','優花','麗花','美花','彩花','花香','薫花','芳花','花緒','花衣','花影','花雫','花露','花月','花星','花空','花里','花鈴','花唄','花笑','花恵','花凛','花澄','花麗','花彩','花映'];
@@ -595,6 +687,23 @@ natural neutral expression,
 not wide open, not exaggerated`;
  copyToClipboardWithToast(text,'Lip Sync プロンプトをコピーしました。');
 }
+
+// v39新規：コード表モーダル
+function openCodeTable(){
+ const m=document.getElementById('codeTableModal');
+ if(m)m.classList.add('visible');
+}
+function closeCodeTable(){
+ const m=document.getElementById('codeTableModal');
+ if(m)m.classList.remove('visible');
+}
+// ESCキーで閉じる
+document.addEventListener('keydown',function(e){
+ if(e.key==='Escape'){
+  const m=document.getElementById('codeTableModal');
+  if(m&&m.classList.contains('visible'))m.classList.remove('visible');
+ }
+});
 
 function copyHeaderLooseDrawingFull(){
  const text=`Create an ignore all previous outputs and variations, this is a completely new generation, do not inherit pose, expression, framing, crop, or style from earlier results,
