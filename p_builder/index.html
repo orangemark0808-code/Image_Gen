@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Character Sheet Prompt Builder V42</title>
+<title>Character Sheet Prompt Builder V43</title>
 <link rel="icon" href="./favicon.ico" type="image/x-icon">
 <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -29,7 +29,7 @@
 @media(max-width:520px){.modal-box{padding:18px 16px}.code-table{font-size:12px}.code-table td.code{width:60px}}</style>
 </head>
 <body>
-<header><div class="title"><div class="icon">🧾</div><h1>Character Sheet Prompt Builder V42<span>販売用・プロンプトメーカー / コピー文言調整</span></h1></div><div class="header-actions"><button class="btn save-root-btn" onclick="selectPromptSaveRoot()">保存先選択</button><button class="btn secondary" onclick="copyHeaderCropPrompt()">Trimming</button><button class="btn secondary" onclick="copyHeaderLooseDrawingFull()">Loose Drawing</button><button class="btn secondary" onclick="copyHeaderLipSyncPrompt()">Lip Sync</button><button class="btn secondary" onclick="openCodeTable()">コード表</button><button class="btn ghost" onclick="resetAll()">リセット</button></div></header>
+<header><div class="title"><div class="icon">🧾</div><h1>Character Sheet Prompt Builder V43<span>販売用・プロンプトメーカー / prompt別名保存対応</span></h1></div><div class="header-actions"><button class="btn save-root-btn" onclick="selectPromptSaveRoot()">保存先選択</button><button class="btn secondary" onclick="copyHeaderCropPrompt()">Trimming</button><button class="btn secondary" onclick="copyHeaderLooseDrawingFull()">Loose Drawing</button><button class="btn secondary" onclick="copyHeaderLipSyncPrompt()">Lip Sync</button><button class="btn secondary" onclick="openCodeTable()">コード表</button><button class="btn ghost" onclick="resetAll()">リセット</button></div></header>
 <div class="modal-overlay" id="codeTableModal" onclick="if(event.target===this)closeCodeTable()">
  <div class="modal-box">
   <button class="modal-close" onclick="closeCodeTable()" aria-label="閉じる">✕</button>
@@ -109,7 +109,7 @@
  </div>
 </div>
 <div class="container">
-  <div class="card"><div class="head"><span class="badge">FLOW</span><span class="ttl">使い方</span></div><div class="note">①必要項目を選ぶ、またはランダム作成 → ②構図を選ぶ → ③生成。三面図は切り抜き・Photoshop加工前提で、3体の間隔を広めに取る設定です。<br><span style="color:#c66;font-weight:700">V42：品番コピーとBooth用コピーを販売用の文言に調整しました。</span></div><div class="btns"><button class="btn secondary" onclick="randomCharacter()">🎲 ランダムキャラ作成</button></div><div style="margin-top:12px;padding:10px 12px;background:#fdf6ec;border-radius:8px;border:1px solid #f0d9b5"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span style="font-size:12px;font-weight:700;color:var(--main)">📖 直前5体の履歴</span><button class="btn ghost" style="padding:4px 10px;font-size:11px;border-color:#999;color:#666" onclick="clearHistory()">履歴クリア</button></div><div id="historyDisplay"><span style="color:#999;font-size:12px">履歴なし（ランダム生成すると直前5体が記録されます）</span></div></div><div class="status" id="status"></div></div>
+  <div class="card"><div class="head"><span class="badge">FLOW</span><span class="ttl">使い方</span></div><div class="note">①必要項目を選ぶ、またはランダム作成 → ②構図を選ぶ → ③生成。三面図は切り抜き・Photoshop加工前提で、3体の間隔を広めに取る設定です。<br><span style="color:#c66;font-weight:700">V43：既存フォルダのprompt.txtを上書きせず、日時付きで別名保存します。</span></div><div class="btns"><button class="btn secondary" onclick="randomCharacter()">🎲 ランダムキャラ作成</button></div><div style="margin-top:12px;padding:10px 12px;background:#fdf6ec;border-radius:8px;border:1px solid #f0d9b5"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span style="font-size:12px;font-weight:700;color:var(--main)">📖 直前5体の履歴</span><button class="btn ghost" style="padding:4px 10px;font-size:11px;border-color:#999;color:#666" onclick="clearHistory()">履歴クリア</button></div><div id="historyDisplay"><span style="color:#999;font-size:12px">履歴なし（ランダム生成すると直前5体が記録されます）</span></div></div><div class="status" id="status"></div></div>
   <div class="card" style="grid-column:1/-1"><div class="head"><span class="badge">番号</span><span class="ttl">開始番号・キャラクター名</span></div><div class="note">前回の続きから始める場合は開始番号を入力してください。<br>三面図・ウエスト・全身は同一番号で生成されます（同じキャラクター扱い）。次のキャラに進むときは、再度三面図を生成すると自動で番号が進みます。手動で進めたい/戻したい場合は下のボタンか開始番号を直接書き換えてください。</div><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><label style="font-size:13px;font-weight:700;color:var(--muted)">開始番号</label><input id="startNumber" type="number" min="1" max="999" value="1" style="width:90px;border:1.5px solid var(--light);border-radius:12px;padding:8px 12px;font-family:'Zen Maru Gothic',sans-serif;font-size:15px;font-weight:700;color:var(--text);background:var(--pale);text-align:center"><button class="btn secondary" style="padding:8px 16px;font-size:12px;box-shadow:0 3px 10px rgba(220,100,30,.18)" onclick="manualIncrement()">➡ 次のキャラへ</button><button class="btn ghost" style="padding:8px 16px;font-size:12px;border-color:#999;color:#666" onclick="manualDecrement()">⬅ 一つ戻す</button></div><div id="namePreview" style="margin-top:12px;display:none"><span style="font-size:13px;font-weight:700;color:var(--muted)">次の品番・名前：</span><span id="namePreviewText" style="font-size:15px;font-weight:700;color:var(--main);margin-left:8px"></span></div></div>
   <div class="card"><div class="head"><span class="badge">STEP 01</span><span class="ttl">国籍（固定：日本人）</span></div><div class="chips" data-key="nationality"><button class="chip">日本人</button><button class="chip">東アジア</button><button class="chip">欧米</button><button class="chip">東南アジア</button><button class="chip">中東</button><button class="chip">アフリカ系</button></div></div>
   <div class="card"><div class="head"><span class="badge">STEP 02</span><span class="ttl">顔タイプ（空白：ランダム）</span></div><div class="chips" data-key="facetype"><button class="chip">美人特化（黄金比）</button><button class="chip">かわいい特化（アイドル寄せ）</button><button class="chip">広告CV高い顔</button><button class="chip">個性的な美人</button><button class="chip">清楚系美人</button><button class="chip">韓国風クール美人</button><button class="chip">童顔ナチュラル</button><button class="chip">大人かわいい</button><button class="chip">ハーフ風華やか美人</button><button class="chip">知的クール</button></div></div>
@@ -322,10 +322,10 @@ function isInvalidHairCombo(length,style){
  return (length==='ショート'||length==='ベリーショート')&&style==='アップスタイル';
 }
 
-// ============ v42：履歴管理＋連続見た目回避 ============
+// ============ v43：履歴管理＋連続見た目回避 ============
 // 直前N体の履歴を localStorage に保存し、同じ髪色/髪型/顔タイプ/髪色グループが連続しないように制御
-const HISTORY_KEY='cspb_v42_history';
-const LEGACY_HISTORY_KEYS=['cspb_v41_history','cspb_v40_history'];
+const HISTORY_KEY='cspb_v43_history';
+const LEGACY_HISTORY_KEYS=['cspb_v42_history','cspb_v41_history','cspb_v40_history'];
 const HISTORY_LIMIT=5;
 // 髪色の見た目グループ（パッと見の印象が近いものをグルーピング）
 const hairColorGroups={
@@ -456,14 +456,14 @@ window.addEventListener('DOMContentLoaded',()=>{
  renderPromptButtons();
  const startEl=document.getElementById('startNumber');
  if(startEl)startEl.addEventListener('input',updateNamePreview);
- // v42: 履歴表示を初期化
+ // v43: 履歴表示を初期化
  updateHistoryDisplay();
 });function randomCharacter(){
  // 国籍・年齢・体型は固定（日本人モデル前提）
  setVal('nationality','日本人');
  setVal('age','20代前半');
  setVal('body','モデル体型');
- // v42：履歴から避けたい値を取得
+ // v43：履歴から避けたい値を取得
  const {bannedColors,bannedStyles,bannedFacetypes,bannedColorGroups}=getBannedValues();
  // 顔タイプ：直前5体と被らない選択
  const facetypeOptions=keys('facetype');
@@ -501,7 +501,7 @@ window.addEventListener('DOMContentLoaded',()=>{
  ]);
  setVal('hairColor',hc);
  const hf=document.getElementById('hairFree');if(hf)hf.value='';state.hairFree='';
- // v42：今回の選択を履歴に追加
+ // v43：今回の選択を履歴に追加
  pushHistory({
   facetype:state.facetype,
   hairColor:hc,
@@ -537,6 +537,11 @@ function productCode(){
 }
 function sanitizeFileName(name){
  return String(name).replace(/[<>:"/\\|?*\x00-\x1F]/g,'_').replace(/[. ]+$/,'').trim()||'prompt';
+}
+function timestampForFileName(){
+ const d=new Date();
+ const pad=n=>String(n).padStart(2,'0');
+ return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
 }
 async function selectPromptSaveRoot(){
  if(!window.showDirectoryPicker){
@@ -575,15 +580,20 @@ async function saveTurnaroundPromptFile(fullCode,charName,jpText,enText){
  }
  const folderName=sanitizeFileName(`${fullCode}_${charName}`);
  const dirHandle=await promptSaveRootHandle.getDirectoryHandle(folderName,{create:true});
- const fileHandle=await dirHandle.getFileHandle('prompt.txt',{create:true});
+ let promptFileName='prompt.txt';
+ try{
+  await dirHandle.getFileHandle(promptFileName);
+  promptFileName=`prompt_${timestampForFileName()}.txt`;
+ }catch(e){}
+ const fileHandle=await dirHandle.getFileHandle(promptFileName,{create:true});
  const writable=await fileHandle.createWritable();
  await writable.write(`${jpText}\n\n---\n\n${enText}`);
  await writable.close();
- showStatus(`✅ ${folderName}\\prompt.txt を自動作成しました。`);
- showToast('prompt.txtを自動作成しました。');
- return folderName;
+ showStatus(`✅ ${folderName}\\${promptFileName} を自動作成しました。`);
+ showToast(`${promptFileName}を自動作成しました。`);
+ return {folderName,promptFileName};
 }
-async function appendFolderNameToExcel(folderName){
+async function appendFolderNameToExcel(folderName,promptFileName='prompt.txt'){
  if(!window.showDirectoryPicker){
   showStatus('⚠️ Excel追記にはChrome / Edgeが必要です。');
   return;
@@ -616,7 +626,7 @@ async function appendFolderNameToExcel(folderName){
  const rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:'',blankrows:false});
  const exists=rows.some(row=>String(row?.[0]||'').trim()===folderName);
  if(exists){
-  showStatus(`✅ ${folderName}\\prompt.txt を作成しました。${PROMPT_EXCEL_FILE_NAME} には同じ名前があるため追記しませんでした。`);
+  showStatus(`✅ ${folderName}\\${promptFileName} を作成しました。${PROMPT_EXCEL_FILE_NAME} には同じ名前があるため追記しませんでした。`);
   return;
  }
  let nextRow=1;
@@ -631,7 +641,7 @@ async function appendFolderNameToExcel(folderName){
  const writable=await fileHandle.createWritable();
  await writable.write(output);
  await writable.close();
- showStatus(`✅ ${folderName}\\prompt.txt を作成し、${PROMPT_EXCEL_FILE_NAME} の「${sheetName}」シートA列へ追記しました。`);
+ showStatus(`✅ ${folderName}\\${promptFileName} を作成し、${PROMPT_EXCEL_FILE_NAME} の「${sheetName}」シートA列へ追記しました。`);
 }
 function generatePrompt(isTest=false){
  applyDefaults();
@@ -797,9 +807,9 @@ artifact-free,
  // 次に三面図を生成しようとしたとき、この番号と一致すれば自動で次に進む
  if(!isTest&&isTurnaround){
   lastTurnaroundSerial=serial;
-  saveTurnaroundPromptFile(fullCode,charName,jpText,enText).then(folderName=>{
-   if(!folderName)return;
-   appendFolderNameToExcel(folderName).catch(e=>{
+  saveTurnaroundPromptFile(fullCode,charName,jpText,enText).then(result=>{
+   if(!result)return;
+   appendFolderNameToExcel(result.folderName,result.promptFileName).catch(e=>{
     console.error(e);
     showStatus(`⚠️ prompt.txtは作成しましたが、${PROMPT_EXCEL_FILE_NAME}への追記に失敗しました。Excelを閉じてからもう一度試してください。`);
    });
