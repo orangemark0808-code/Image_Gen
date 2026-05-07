@@ -3,13 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Character Sheet Prompt Builder v40</title>
+<title>Character Sheet Prompt Builder v41</title>
 <link rel="icon" href="./favicon.ico" type="image/x-icon">
 <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root{--main:#FF8C42;--light:#FFD4B0;--pale:#FFF6EF;--sub:#FFB347;--text:#3D2200;--muted:#6F421E;--shadow:rgba(200,100,30,.14)}
 *{box-sizing:border-box;margin:0;padding:0}body{font-family:'Zen Maru Gothic',sans-serif;background:linear-gradient(135deg,#FFF4EC,#FFF8E8,#FFFBF0);min-height:100vh;color:var(--text);padding-bottom:60px}header{background:#fff;border-bottom:2px solid var(--light);padding:18px 22px;position:sticky;top:0;z-index:100;box-shadow:0 4px 20px var(--shadow);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.title{display:flex;align-items:center;gap:10px}.icon{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--main),var(--sub));display:flex;align-items:center;justify-content:center}h1{font-family:'DM Serif Display',serif;font-size:20px}h1 span{display:block;font-family:'Zen Maru Gothic',sans-serif;font-size:12px;color:var(--muted);font-weight:400}.container{max-width:1120px;margin:0 auto;padding:26px 18px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}.container>.card:first-child,.container>.output,.step05-card{grid-column:1/-1}.step06-card{grid-column:1/-1;width:100%;max-width:540px;justify-self:center}.card{background:#fff;border-radius:20px;padding:22px;box-shadow:0 4px 20px var(--shadow);border:1.5px solid transparent;position:relative;overflow:hidden}.card:before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--main),var(--sub))}.head{display:flex;align-items:center;gap:10px;margin-bottom:14px}.badge{background:linear-gradient(135deg,var(--light),#FFE8C8);font-size:11px;font-weight:700;color:var(--muted);padding:4px 10px;border-radius:18px}.ttl{font-size:15px;font-weight:700}.note{font-size:12px;color:var(--muted);line-height:1.7;margin-top:-4px;margin-bottom:12px}.chips{display:flex;flex-wrap:wrap;gap:8px}.chip{padding:8px 14px;border-radius:20px;border:1.5px solid var(--light);background:var(--pale);font-size:13px;color:var(--muted);cursor:pointer;user-select:none;transition:.15s}.chip:hover{border-color:var(--main);color:var(--text)}.chip.selected{background:linear-gradient(135deg,var(--main),var(--sub));border-color:transparent;color:#fff;font-weight:700;box-shadow:0 3px 10px rgba(220,100,30,.25)}.btns{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}.btn{border:none;border-radius:28px;padding:14px 22px;font-family:'Zen Maru Gothic',sans-serif;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 6px 20px rgba(220,100,30,.25);transition:.2s}.btn:hover{transform:translateY(-1px)}.primary{background:linear-gradient(135deg,#FF6B35,#FF8C42,#FFB347);color:#fff}.secondary{background:linear-gradient(135deg,#FFD580,#FFC04A);color:#5A3A00}.ghost{background:#fff;border:1.5px solid var(--main);color:var(--main);box-shadow:none}.output{display:none}.output.visible{display:block}.block{margin-bottom:18px}.block-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px}.lbl{font-size:12px;font-weight:700;padding:4px 12px;border-radius:20px}.jp{background:var(--light)}.en{background:#D4EDFF;color:#1a4a7a}.mj{background:#EAD9FF;color:#4B236A}.txt{white-space:pre-wrap;word-break:break-word;border:1.5px solid var(--light);border-radius:14px;background:var(--pale);padding:15px 17px;font-size:13px;line-height:1.85}.txt.enbox{background:#F0F8FF;border-color:#B8D9F5;font-size:12.5px}.copy{background:linear-gradient(135deg,#E8D5FF,#D4B8FF);color:#3a006a;border:none;border-radius:18px;padding:7px 16px;font-family:'Zen Maru Gothic',sans-serif;font-size:12px;font-weight:700;cursor:pointer}.copy.copied{background:linear-gradient(135deg,#B8F5B0,#80E878);color:#1a4a00}.status{font-size:12px;color:#1a5c2a;background:#F0FFF0;border:1px solid #B8F5B0;border-radius:12px;padding:10px 12px;display:none}.status.visible{display:block}.header-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.header-actions .btn{padding:10px 16px;font-size:12px;box-shadow:0 4px 14px rgba(220,100,30,.18)}
-.main-layout{max-width:1240px;margin:0 auto;padding:26px 18px;display:grid;grid-template-columns:minmax(0,820px) 340px;gap:18px;align-items:start}.main-layout>.container{max-width:none;margin:0;padding:0}.prompt-panel{position:sticky;top:92px}.prompt-panel .note{margin-bottom:14px}.prompt-grid{display:grid;grid-template-columns:1fr;gap:10px}.prompt-action{width:100%;min-height:54px;border:none;border-radius:16px;padding:11px 13px;font-family:'Zen Maru Gothic',sans-serif;font-size:13px;font-weight:700;line-height:1.35;text-align:left;cursor:pointer;background:linear-gradient(135deg,#FFF1D8,#FFD580);color:#5A3A00;box-shadow:0 4px 14px rgba(220,100,30,.16);transition:.18s}.prompt-action:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(220,100,30,.22)}.prompt-action.copied{background:linear-gradient(135deg,#B8F5B0,#80E878);color:#1a4a00}.prompt-action small{display:block;font-size:11px;font-weight:500;color:var(--muted);margin-top:2px}
+.main-layout{max-width:1240px;margin:0 auto;padding:26px 18px;display:grid;grid-template-columns:minmax(0,820px) 340px;gap:18px;align-items:start}.main-layout>.container{max-width:none;margin:0;padding:0}.prompt-panel{position:sticky;top:92px}.prompt-panel .note{margin-bottom:14px}.prompt-grid{display:grid;grid-template-columns:1fr;gap:10px}.prompt-action{width:100%;min-height:54px;border:none;border-radius:16px;padding:11px 13px;font-family:'Zen Maru Gothic',sans-serif;font-size:13px;font-weight:700;line-height:1.35;text-align:left;cursor:pointer;background:linear-gradient(135deg,#FFF1D8,#FFD580);color:#5A3A00;box-shadow:0 4px 14px rgba(220,100,30,.16);transition:.18s}.prompt-action:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(220,100,30,.22)}.prompt-action.copied{background:linear-gradient(135deg,#B8F5B0,#80E878);color:#1a4a00}.prompt-action small{display:block;font-size:11px;font-weight:500;color:var(--muted);margin-top:2px}.save-root-btn{background:linear-gradient(135deg,#35B6D8,#4ED6B8);color:#fff;box-shadow:0 4px 14px rgba(30,150,170,.22)}
 @media(max-width:960px){.main-layout{grid-template-columns:1fr}.prompt-panel{position:static}.main-layout>.container{order:1}.prompt-panel{order:2}.prompt-grid{grid-template-columns:repeat(2,1fr)}}.hair-group{margin-top:18px}.hair-label{font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px}.hair-group:first-of-type{margin-top:0}.hair-divider{border-top:1px dashed var(--light);margin-top:18px;padding-top:18px}.hair-free{width:100%;min-height:58px;border:1.5px solid var(--light);border-radius:14px;background:var(--pale);padding:12px 14px;font-family:'Zen Maru Gothic',sans-serif;font-size:13px;color:var(--text);resize:vertical}.hair-free::placeholder{color:#8F6A58}@media(max-width:760px){.container{grid-template-columns:1fr}.container>.card:first-child,.container>.output,.step05-card,.step06-card{grid-column:auto;max-width:none}}
 @media(max-width:520px){.prompt-grid{grid-template-columns:1fr}.card{padding:18px 15px}.chip{font-size:12px;padding:7px 11px}h1{font-size:17px}.btn{width:100%}}
 .note,.chip,.hair-label,h1 span,.prompt-action small{color:var(--muted)}
@@ -28,7 +29,7 @@
 @media(max-width:520px){.modal-box{padding:18px 16px}.code-table{font-size:12px}.code-table td.code{width:60px}}</style>
 </head>
 <body>
-<header><div class="title"><div class="icon">🧾</div><h1>Character Sheet Prompt Builder v40<span>販売用・プロンプトメーカー / 直前5体回避ロジック追加</span></h1></div><div class="header-actions"><button class="btn secondary" onclick="copyHeaderCropPrompt()">Trimming</button><button class="btn secondary" onclick="copyHeaderLooseDrawingFull()">Loose Drawing</button><button class="btn secondary" onclick="copyHeaderLipSyncPrompt()">Lip Sync</button><button class="btn secondary" onclick="openCodeTable()">コード表</button><button class="btn ghost" onclick="resetAll()">リセット</button></div></header>
+<header><div class="title"><div class="icon">🧾</div><h1>Character Sheet Prompt Builder v41<span>販売用・プロンプトメーカー / prompt.txt自動作成追加</span></h1></div><div class="header-actions"><button class="btn save-root-btn" onclick="selectPromptSaveRoot()">保存先選択</button><button class="btn secondary" onclick="copyHeaderCropPrompt()">Trimming</button><button class="btn secondary" onclick="copyHeaderLooseDrawingFull()">Loose Drawing</button><button class="btn secondary" onclick="copyHeaderLipSyncPrompt()">Lip Sync</button><button class="btn secondary" onclick="openCodeTable()">コード表</button><button class="btn ghost" onclick="resetAll()">リセット</button></div></header>
 <div class="modal-overlay" id="codeTableModal" onclick="if(event.target===this)closeCodeTable()">
  <div class="modal-box">
   <button class="modal-close" onclick="closeCodeTable()" aria-label="閉じる">✕</button>
@@ -108,7 +109,7 @@
  </div>
 </div>
 <div class="container">
-  <div class="card"><div class="head"><span class="badge">FLOW</span><span class="ttl">使い方</span></div><div class="note">①必要項目を選ぶ、またはランダム作成 → ②構図を選ぶ → ③生成。三面図は切り抜き・Photoshop加工前提で、3体の間隔を広めに取る設定です。<br><span style="color:#c66;font-weight:700">v40：直前5体と同じ髪色グループ・髪色・髪型・顔タイプを避けて生成します。</span></div><div class="btns"><button class="btn secondary" onclick="randomCharacter()">🎲 ランダムキャラ作成</button></div><div style="margin-top:12px;padding:10px 12px;background:#fdf6ec;border-radius:8px;border:1px solid #f0d9b5"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span style="font-size:12px;font-weight:700;color:var(--main)">📖 直前5体の履歴</span><button class="btn ghost" style="padding:4px 10px;font-size:11px;border-color:#999;color:#666" onclick="clearHistory()">履歴クリア</button></div><div id="historyDisplay"><span style="color:#999;font-size:12px">履歴なし（ランダム生成すると直前5体が記録されます）</span></div></div><div class="status" id="status"></div></div>
+  <div class="card"><div class="head"><span class="badge">FLOW</span><span class="ttl">使い方</span></div><div class="note">①必要項目を選ぶ、またはランダム作成 → ②構図を選ぶ → ③生成。三面図は切り抜き・Photoshop加工前提で、3体の間隔を広めに取る設定です。<br><span style="color:#c66;font-weight:700">v41：直前5体回避ロジックに加えて、三面図生成時のprompt.txt自動作成に対応しました。</span></div><div class="btns"><button class="btn secondary" onclick="randomCharacter()">🎲 ランダムキャラ作成</button></div><div style="margin-top:12px;padding:10px 12px;background:#fdf6ec;border-radius:8px;border:1px solid #f0d9b5"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span style="font-size:12px;font-weight:700;color:var(--main)">📖 直前5体の履歴</span><button class="btn ghost" style="padding:4px 10px;font-size:11px;border-color:#999;color:#666" onclick="clearHistory()">履歴クリア</button></div><div id="historyDisplay"><span style="color:#999;font-size:12px">履歴なし（ランダム生成すると直前5体が記録されます）</span></div></div><div class="status" id="status"></div></div>
   <div class="card" style="grid-column:1/-1"><div class="head"><span class="badge">番号</span><span class="ttl">開始番号・キャラクター名</span></div><div class="note">前回の続きから始める場合は開始番号を入力してください。<br>三面図・ウエスト・全身は同一番号で生成されます（同じキャラクター扱い）。次のキャラに進むときは、再度三面図を生成すると自動で番号が進みます。手動で進めたい/戻したい場合は下のボタンか開始番号を直接書き換えてください。</div><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><label style="font-size:13px;font-weight:700;color:var(--muted)">開始番号</label><input id="startNumber" type="number" min="1" max="999" value="1" style="width:90px;border:1.5px solid var(--light);border-radius:12px;padding:8px 12px;font-family:'Zen Maru Gothic',sans-serif;font-size:15px;font-weight:700;color:var(--text);background:var(--pale);text-align:center"><button class="btn secondary" style="padding:8px 16px;font-size:12px;box-shadow:0 3px 10px rgba(220,100,30,.18)" onclick="manualIncrement()">➡ 次のキャラへ</button><button class="btn ghost" style="padding:8px 16px;font-size:12px;border-color:#999;color:#666" onclick="manualDecrement()">⬅ 一つ戻す</button></div><div id="namePreview" style="margin-top:12px;display:none"><span style="font-size:13px;font-weight:700;color:var(--muted)">次の品番・名前：</span><span id="namePreviewText" style="font-size:15px;font-weight:700;color:var(--main);margin-left:8px"></span></div></div>
   <div class="card"><div class="head"><span class="badge">STEP 01</span><span class="ttl">国籍（固定：日本人）</span></div><div class="chips" data-key="nationality"><button class="chip">日本人</button><button class="chip">東アジア</button><button class="chip">欧米</button><button class="chip">東南アジア</button><button class="chip">中東</button><button class="chip">アフリカ系</button></div></div>
   <div class="card"><div class="head"><span class="badge">STEP 02</span><span class="ttl">顔タイプ（空白：ランダム）</span></div><div class="chips" data-key="facetype"><button class="chip">美人特化（黄金比）</button><button class="chip">かわいい特化（アイドル寄せ）</button><button class="chip">広告CV高い顔</button><button class="chip">個性的な美人</button><button class="chip">清楚系美人</button><button class="chip">韓国風クール美人</button><button class="chip">童顔ナチュラル</button><button class="chip">大人かわいい</button><button class="chip">ハーフ風華やか美人</button><button class="chip">知的クール</button></div></div>
@@ -127,6 +128,11 @@ const state={nationality:'',facetype:'',age:'',body:'',hairColor:[],hairLength:'
 let lastTurnaroundSerial='';
 // 最後に生成した品番（コピーボタン用）
 let lastGeneratedFullCode='';
+// 三面図生成時に prompt.txt を自動保存する保存先（例：Desktop\キャラクター）
+let promptSaveRootHandle=null;
+const PROMPT_EXCEL_FILE_NAME='品番.xlsx';
+const PROMPT_EXCEL_TARGET_SHEET='品番';
+const PROMPT_EXCEL_FALLBACK_SHEET='販売';
 // v38新規：鼻バリエーション管理
 // 顔タイプ内で鼻のバリエーションをランダム選択し、同じキャラ（=同じserial+facetype）では一貫性を保つ
 let currentNoseKey=''; // 'serial_facetype' 形式で保持
@@ -314,9 +320,10 @@ function isInvalidHairCombo(length,style){
  return (length==='ショート'||length==='ベリーショート')&&style==='アップスタイル';
 }
 
-// ============ v40新規：履歴管理＋連続見た目回避 ============
+// ============ v41：履歴管理＋連続見た目回避 ============
 // 直前N体の履歴を localStorage に保存し、同じ髪色/髪型/顔タイプ/髪色グループが連続しないように制御
-const HISTORY_KEY='cspb_v40_history';
+const HISTORY_KEY='cspb_v41_history';
+const LEGACY_HISTORY_KEY='cspb_v40_history';
 const HISTORY_LIMIT=5;
 // 髪色の見た目グループ（パッと見の印象が近いものをグルーピング）
 const hairColorGroups={
@@ -334,7 +341,11 @@ function getColorGroup(color){
 }
 function loadHistory(){
  try{
-  const raw=localStorage.getItem(HISTORY_KEY);
+  let raw=localStorage.getItem(HISTORY_KEY);
+  if(!raw){
+   raw=localStorage.getItem(LEGACY_HISTORY_KEY);
+   if(raw)localStorage.setItem(HISTORY_KEY,raw);
+  }
   if(!raw)return [];
   const arr=JSON.parse(raw);
   return Array.isArray(arr)?arr:[];
@@ -353,7 +364,7 @@ function pushHistory(entry){
  updateHistoryDisplay();
 }
 function clearHistory(){
- try{localStorage.removeItem(HISTORY_KEY);}catch(e){}
+ try{localStorage.removeItem(HISTORY_KEY);localStorage.removeItem(LEGACY_HISTORY_KEY);}catch(e){}
  updateHistoryDisplay();
  showToast('履歴をクリアしました。');
 }
@@ -435,14 +446,14 @@ window.addEventListener('DOMContentLoaded',()=>{
  renderPromptButtons();
  const startEl=document.getElementById('startNumber');
  if(startEl)startEl.addEventListener('input',updateNamePreview);
- // v40: 履歴表示を初期化
+ // v41: 履歴表示を初期化
  updateHistoryDisplay();
 });function randomCharacter(){
  // 国籍・年齢・体型は固定（日本人モデル前提）
  setVal('nationality','日本人');
  setVal('age','20代前半');
  setVal('body','モデル体型');
- // v40：履歴から避けたい値を取得
+ // v41：履歴から避けたい値を取得
  const {bannedColors,bannedStyles,bannedFacetypes,bannedColorGroups}=getBannedValues();
  // 顔タイプ：直前5体と被らない選択
  const facetypeOptions=keys('facetype');
@@ -480,7 +491,7 @@ window.addEventListener('DOMContentLoaded',()=>{
  ]);
  setVal('hairColor',hc);
  const hf=document.getElementById('hairFree');if(hf)hf.value='';state.hairFree='';
- // v40：今回の選択を履歴に追加
+ // v41：今回の選択を履歴に追加
  pushHistory({
   facetype:state.facetype,
   hairColor:hc,
@@ -513,6 +524,104 @@ function productCode(){
  if(styleCode)parts.push(styleCode);
  if(bangsCode)parts.push(bangsCode);
  return parts.join('-');
+}
+function sanitizeFileName(name){
+ return String(name).replace(/[<>:"/\\|?*\x00-\x1F]/g,'_').replace(/[. ]+$/,'').trim()||'prompt';
+}
+async function selectPromptSaveRoot(){
+ if(!window.showDirectoryPicker){
+  showStatus('⚠️ このブラウザでは自動保存が使えません。Chrome / EdgeでこのHTMLを開いてください。');
+  showToast('自動保存に未対応のブラウザです。');
+  return;
+ }
+ try{
+  promptSaveRootHandle=await window.showDirectoryPicker({mode:'readwrite'});
+  showStatus('✅ 保存先を設定しました。次回から三面図生成時に「品番_名前」フォルダと prompt.txt を自動作成します。');
+  showToast('保存先を設定しました。');
+ }catch(e){
+  showStatus('保存先の選択をキャンセルしました。');
+ }
+}
+async function ensurePromptSavePermission(){
+ if(!promptSaveRootHandle)return false;
+ const options={mode:'readwrite'};
+ if(!promptSaveRootHandle.queryPermission||!promptSaveRootHandle.requestPermission)return true;
+ if(await promptSaveRootHandle.queryPermission(options)==='granted')return true;
+ return await promptSaveRootHandle.requestPermission(options)==='granted';
+}
+async function saveTurnaroundPromptFile(fullCode,charName,jpText,enText){
+ if(!window.showDirectoryPicker){
+  showStatus('⚠️ 自動保存にはChrome / Edgeが必要です。生成結果は画面からコピーできます。');
+  return;
+ }
+ if(!promptSaveRootHandle){
+  showStatus('⚠️ prompt.txtは未保存です。ヘッダーの「保存先選択」で Desktop\\キャラクター を選ぶと、次回から自動作成できます。');
+  return;
+ }
+ const permitted=await ensurePromptSavePermission();
+ if(!permitted){
+  showStatus('⚠️ 保存権限がありません。もう一度「保存先選択」から保存先を選んでください。');
+  return;
+ }
+ const folderName=sanitizeFileName(`${fullCode}_${charName}`);
+ const dirHandle=await promptSaveRootHandle.getDirectoryHandle(folderName,{create:true});
+ const fileHandle=await dirHandle.getFileHandle('prompt.txt',{create:true});
+ const writable=await fileHandle.createWritable();
+ await writable.write(`${jpText}\n\n---\n\n${enText}`);
+ await writable.close();
+ showStatus(`✅ ${folderName}\\prompt.txt を自動作成しました。`);
+ showToast('prompt.txtを自動作成しました。');
+ return folderName;
+}
+async function appendFolderNameToExcel(folderName){
+ if(!window.showDirectoryPicker){
+  showStatus('⚠️ Excel追記にはChrome / Edgeが必要です。');
+  return;
+ }
+ if(typeof XLSX==='undefined'){
+  showStatus('⚠️ Excel追記用ライブラリを読み込めませんでした。インターネット接続後にHTMLを再読み込みしてください。');
+  return;
+ }
+ if(!promptSaveRootHandle){
+  showStatus('⚠️ Excelは未追記です。ヘッダーの「保存先選択」で Desktop\\キャラクター を選んでください。');
+  return;
+ }
+ const permitted=await ensurePromptSavePermission();
+ if(!permitted){
+  showStatus('⚠️ 保存権限がありません。もう一度「保存先選択」から保存先を選んでください。');
+  return;
+ }
+ const fileHandle=await promptSaveRootHandle.getFileHandle(PROMPT_EXCEL_FILE_NAME);
+ const file=await fileHandle.getFile();
+ const workbook=XLSX.read(await file.arrayBuffer(),{type:'array'});
+ let sheetName=workbook.SheetNames.includes(PROMPT_EXCEL_TARGET_SHEET)
+  ? PROMPT_EXCEL_TARGET_SHEET
+  : (workbook.SheetNames.includes(PROMPT_EXCEL_FALLBACK_SHEET)?PROMPT_EXCEL_FALLBACK_SHEET:workbook.SheetNames[0]);
+ if(!sheetName){
+  sheetName=PROMPT_EXCEL_TARGET_SHEET;
+  workbook.SheetNames.push(sheetName);
+  workbook.Sheets[sheetName]=XLSX.utils.aoa_to_sheet([]);
+ }
+ const sheet=workbook.Sheets[sheetName];
+ const rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:'',blankrows:false});
+ const exists=rows.some(row=>String(row?.[0]||'').trim()===folderName);
+ if(exists){
+  showStatus(`✅ ${folderName}\\prompt.txt を作成しました。${PROMPT_EXCEL_FILE_NAME} には同じ名前があるため追記しませんでした。`);
+  return;
+ }
+ let nextRow=1;
+ for(let i=rows.length-1;i>=0;i--){
+  if(String(rows[i]?.[0]||'').trim()){
+   nextRow=i+2;
+   break;
+  }
+ }
+ XLSX.utils.sheet_add_aoa(sheet,[[folderName]],{origin:`A${nextRow}`});
+ const output=XLSX.write(workbook,{bookType:'xlsx',type:'array'});
+ const writable=await fileHandle.createWritable();
+ await writable.write(output);
+ await writable.close();
+ showStatus(`✅ ${folderName}\\prompt.txt を作成し、${PROMPT_EXCEL_FILE_NAME} の「${sheetName}」シートA列へ追記しました。`);
 }
 function generatePrompt(isTest=false){
  applyDefaults();
@@ -664,13 +773,24 @@ artifact-free,
 
 --no generic AI beauty face, same-face syndrome, default Asian beauty face, plastic-looking smooth face, overly idealized face, generic anime face, AI-generated typical face, cookie-cutter beauty, extra limbs, raised heels, lifted heels, tiptoe, standing on toes, floating feet, feet not touching ground, pose variation, inconsistent proportions, inconsistent height, inconsistent scale, different body size, different camera distance, distorted body, short legs, stocky body, wide torso, thick waist, heavy body, compressed body proportions, shortened figure, unbalanced body shape, large head, oversized face, big face, enlarged head, childlike proportions, cluttered background, low detail face, blurry face, bad anatomy, missing limbs, deformed hands, extra fingers, cropped feet, missing feet, uneven ground line, misaligned feet, misaligned head height, open mouth, showing teeth, teeth visible, patterned background, background objects, gradient background, heavy shadows, color cast, noise, motion blur,  watermark, low quality, compression artifacts, soft edges, bokeh background`; const fullPrompt=`${imageGenerationIntro}\n\n${characterCore}, ${en('shot')}, sharp detailed face, clear eyes, natural smile, mouth closed, no teeth showing, looking at camera, ${clothes}, pure white seamless background, completely uniform background, studio lighting, even soft lighting, diffused light, minimal shadows, slight highlight on cheekbones and nose bridge, clean crisp edges between subject and background, cutout optimized, 85mm lens, portrait photography, photorealistic, ultra high resolution, sharp details, natural skin texture, clean image, noise-free, artifact-free, --ar 2:3\n\n--no ${neg}`;
  const waistPrompt=`${imageGenerationIntro}\n\nUse the attached turnaround sheet as the main reference image.\n\nSelect only the front-facing figure on the left.\nCreate a waist-up portrait based on that front-facing figure.\n\nKeep the face, hairstyle, expression, body angle, and white camisole consistent with the selected front-facing figure.\nPrioritize the reference image over the written description.\n\nDo not use the side view or back view.\nDo not create three figures.\nDo not create a new character design.\n\n${characterCore},\n\nwaist-up shot, upper body only,\nsubject framed from upper torso to head,\ncropped above the waist,\ntight portrait framing, centered composition,\nframe ends above the waist,\nlower body completely out of frame,\nno lower body visible,\n\nfront view,\nsymmetrical front-facing composition,\nnatural upright posture, relaxed shoulders,\nshoulders level and facing forward,\nhead straight, minimal tilt,\nbalanced and stable pose, no dynamic pose,\n\nsharp detailed face, clear eyes,\nnatural smile, mouth closed, no teeth showing,\nlooking at camera,\n\nwhite plain camisole top with a tiny pale orange "OP" logo embroidery on the left chest,\nno above-knee leggings, no 4-bu length leggings,\n\npure white seamless background,\ncompletely uniform background,\n\nstudio lighting, even soft lighting, diffused light, minimal shadows,\nslight highlight on cheekbones and nose bridge,\n\n85mm lens, portrait photography, photorealistic,\nultra high resolution, extremely detailed,\nskin with natural texture, natural skin appearance,\nnatural lip texture, natural hair texture,\nclean image, noise-free, artifact-free,\n\n--ar 2:3\n\n--no generic AI beauty face, same-face syndrome, default Asian beauty face, plastic-looking smooth face, overly idealized face, generic anime face, AI-generated typical face, cookie-cutter beauty, dynamic pose, angled body, leaning pose, tilted head, turned shoulders, asymmetrical pose, lower body, full body, legs, hips, thighs, feet, above-knee leggings, 4-bu length leggings, white above-knee leggings, cutout optimized, clean silhouette, body outline emphasis, full-body framing, cropped feet, missing feet, bad anatomy, extra limbs, missing limbs, deformed hands, extra fingers, open mouth, showing teeth, patterned background, background objects, gradient background, heavy shadows, color cast, noise, motion blur,  watermark, low quality, compression artifacts, soft edges, bokeh background`;
+ const enText=isTurnaround?turnaroundPrompt:(isFull?fullPrompt:waistPrompt);
  document.getElementById('jpText').textContent=jpText;
- document.getElementById('enText').textContent=isTurnaround?turnaroundPrompt:(isFull?fullPrompt:waistPrompt);
+ document.getElementById('enText').textContent=enText;
  document.getElementById('output').classList.add('visible');
  // 三面図を生成したら、その番号を「三面図生成済み」として記録する
  // 次に三面図を生成しようとしたとき、この番号と一致すれば自動で次に進む
  if(!isTest&&isTurnaround){
   lastTurnaroundSerial=serial;
+  saveTurnaroundPromptFile(fullCode,charName,jpText,enText).then(folderName=>{
+   if(!folderName)return;
+   appendFolderNameToExcel(folderName).catch(e=>{
+    console.error(e);
+    showStatus(`⚠️ prompt.txtは作成しましたが、${PROMPT_EXCEL_FILE_NAME}への追記に失敗しました。Excelを閉じてからもう一度試してください。`);
+   });
+  }).catch(e=>{
+   console.error(e);
+   showStatus('⚠️ prompt.txtの自動作成に失敗しました。保存先の権限を確認してください。');
+  });
  }
  setTimeout(()=>document.getElementById('output').scrollIntoView({behavior:'smooth',block:'start'}),100);
 }
