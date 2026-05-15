@@ -1,0 +1,33 @@
+{
+  "name": "画像エディター",
+  "short_name": "画像エディター",
+  "description": "画像のトリミング・リサイズ・テキスト/図形追加を行うシンプルなエディター",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape-primary",
+  "background_color": "#f4f7fb",
+  "theme_color": "#ea580c",
+  "lang": "ja",
+  "categories": ["productivity", "graphics", "utilities"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

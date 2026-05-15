@@ -1,1 +1,1706 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>画像エディター</title>
 
+<!-- PWA設定 -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ea580c">
+<meta name="description" content="画像のトリミング・リサイズ・テキスト/図形追加を行うシンプルなエディター">
+
+<!-- iOS用のPWA設定 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="画像エディター">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+
+<!-- Windowsタイル用 -->
+<meta name="msapplication-TileColor" content="#ea580c">
+<meta name="msapplication-TileImage" content="icons/icon-192.png">
+
+<!-- ファビコン -->
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    background: #f4f7fb;
+    color: #1f2937;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  .container { max-width: 1400px; margin: 0 auto; }
+  h1 {
+    font-size: 22px;
+    margin-bottom: 4px;
+    color: #ea580c;
+  }
+  .subtitle {
+    font-size: 13px;
+    color: #64748b;
+  }
+  .main-layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 20px;
+  }
+  .sidebar {
+    background: white;
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+    height: fit-content;
+    max-height: calc(100vh - 80px);
+    overflow-y: auto;
+  }
+  .canvas-area {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+    min-height: 600px;
+  }
+  .section {
+    margin-bottom: 18px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .section:last-child { border-bottom: none; }
+  .section-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #475569;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  label {
+    display: block;
+    font-size: 12px;
+    color: #475569;
+    margin-bottom: 4px;
+    margin-top: 8px;
+  }
+  label.inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 0;
+  }
+  input[type="text"], input[type="number"], select {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    font-size: 13px;
+    background: white;
+  }
+  input[type="text"]:focus, input[type="number"]:focus, select:focus {
+    outline: none;
+    border-color: #ea580c;
+    box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.15);
+  }
+  input[type="color"] {
+    width: 100%;
+    height: 32px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  input[type="range"] { width: 100%; accent-color: #ea580c; }
+  button {
+    padding: 8px 12px;
+    border: 1px solid #cbd5e1;
+    background: white;
+    color: #1f2937;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.15s;
+    position: relative;
+  }
+  button:hover {
+    background: #fff7ed;
+    border-color: #ea580c;
+    color: #ea580c;
+  }
+  button.primary {
+    background: #ea580c;
+    color: white;
+    border-color: #ea580c;
+  }
+  button.primary:hover {
+    background: #c2410c;
+    border-color: #c2410c;
+    color: white;
+  }
+  button.primary:disabled { background: #ea580c; }
+  button.active {
+    background: #ffedd5;
+    border-color: #ea580c;
+    color: #c2410c;
+  }
+  button.danger { color: #dc2626; }
+  button.danger:hover { color: #b91c1c; border-color: #dc2626; background: #fef2f2; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .shortcut {
+    display: inline-block;
+    background: #e5e7eb;
+    color: #475569;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 10px;
+    margin-left: 4px;
+    font-family: monospace;
+  }
+  button.active .shortcut {
+    background: #ea580c;
+    color: white;
+  }
+  button.primary .shortcut {
+    background: rgba(255,255,255,0.3);
+    color: white;
+  }
+  .btn-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .btn-row button {
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    padding: 6px 8px;
+  }
+  .drop-zone {
+    border: 2px dashed #ea580c;
+    border-radius: 6px;
+    padding: 24px 12px;
+    text-align: center;
+    color: #64748b;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .drop-zone:hover, .drop-zone.dragover {
+    background: #fff7ed;
+    border-color: #c2410c;
+    color: #ea580c;
+  }
+  canvas {
+    display: block;
+    border: 1px solid #cbd5e1;
+    background:
+      linear-gradient(45deg, #f1f5f9 25%, transparent 25%),
+      linear-gradient(-45deg, #f1f5f9 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #f1f5f9 75%),
+      linear-gradient(-45deg, transparent 75%, #f1f5f9 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, 10px 0;
+  }
+  .canvas-wrapper {
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    overflow: auto;
+    max-height: calc(100vh - 200px);
+    background: #f8fafc;
+    padding: 12px;
+    border-radius: 4px;
+    position: relative;
+    min-height: 500px;
+  }
+  .canvas-wrapper.pan-mode { cursor: grab; }
+  .canvas-wrapper.panning { cursor: grabbing; }
+  .canvas-wrapper.pan-mode canvas { cursor: grab !important; }
+  .canvas-wrapper.panning canvas { cursor: grabbing !important; }
+  .canvas-wrapper.canvas-dragover {
+    background: #fff7ed;
+    outline: 2px dashed #ea580c;
+    outline-offset: -8px;
+  }
+  .canvas-upload-prompt {
+    width: 100%;
+    min-height: 400px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    border: 2px dashed #cbd5e1;
+    border-radius: 8px;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .canvas-upload-prompt:hover {
+    border-color: #ea580c;
+    background: #fff7ed;
+    color: #ea580c;
+  }
+  .canvas-upload-prompt .upload-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+  }
+  .canvas-upload-prompt .upload-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .canvas-upload-prompt .upload-subtitle {
+    font-size: 13px;
+  }
+  .toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e5e7eb;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .canvas-info { font-size: 12px; color: #64748b; }
+  .zoom-control {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #475569;
+  }
+  .zoom-control input[type="range"] { width: 120px; }
+  .zoom-control button {
+    padding: 3px 8px;
+    font-size: 11px;
+  }
+  .layer-list {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    padding: 4px;
+  }
+  .layer-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    cursor: pointer;
+    margin-bottom: 2px;
+  }
+  .layer-item:hover { background: #fff7ed; }
+  .layer-item.selected {
+    background: #ffedd5;
+    color: #c2410c;
+  }
+  .layer-item .del-btn {
+    border: none;
+    background: none;
+    color: #dc2626;
+    padding: 2px 6px;
+    font-size: 14px;
+  }
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #1f2937;
+    color: white;
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    z-index: 1000;
+  }
+  .toast.show { opacity: 1; }
+  .hidden { display: none !important; }
+  .row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .ratio-input {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+  }
+  .ratio-input input {
+    width: 50px;
+    text-align: center;
+  }
+  .help-box {
+    font-size: 11px;
+    color: #64748b;
+    background: #f8fafc;
+    padding: 6px 8px;
+    border-radius: 4px;
+    line-height: 1.5;
+  }
+  .status-pill {
+    display: inline-block;
+    background: #ffedd5;
+    color: #c2410c;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    margin-top: 6px;
+  }
+  .status-pill.ready { background: #d1fae5; color: #047857; }
+  /* テキスト 背景色・枠線のコンパクト2列 */
+  .deco-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .deco-box {
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    padding: 6px;
+    background: #fafbfc;
+  }
+  .deco-box label.inline {
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .deco-box input[type="color"] {
+    height: 24px;
+    margin-top: 4px;
+  }
+  .deco-box input[type="number"] {
+    margin-top: 4px;
+    font-size: 11px;
+    padding: 3px 5px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px;">
+    <div>
+      <h1>🍊 画像エディター</h1>
+      <div class="subtitle">アップロード → トリミング/リサイズ → テキスト/図形 → 保存</div>
+    </div>
+    <button id="installBtn" class="primary" style="display:none; align-items:center; gap:6px; padding:8px 14px; margin-top:4px;">
+      📲 アプリとしてインストール
+    </button>
+  </div>
+
+  <div class="main-layout">
+    <!-- サイドバー -->
+    <div class="sidebar">
+
+      <!-- 1. トリミング設定 -->
+      <div class="section">
+        <div class="section-title">1. トリミング設定</div>
+        <div class="row-2" style="margin-bottom:8px;">
+          <button class="tool-btn" data-tool="crop">トリミング<span class="shortcut">C</span></button>
+          <button id="deselectBtn">選択解除<span class="shortcut">Esc</span></button>
+        </div>
+        <label class="inline" style="margin-top:0;">
+          <input type="checkbox" id="cropFixRatio"> 縦横比を固定
+        </label>
+        <div class="ratio-input">
+          <input type="number" id="cropRatioW" value="16" min="1" disabled>
+          <span>:</span>
+          <input type="number" id="cropRatioH" value="9" min="1" disabled>
+        </div>
+        <div class="help-box" style="margin-top:8px;">
+          「トリミング」ツール(C)でキャンバス上をドラッグ
+        </div>
+        <div id="cropStatus" class="status-pill">範囲未選択</div>
+      </div>
+
+      <!-- 2. リサイズ -->
+      <div class="section">
+        <div class="section-title">2. リサイズ</div>
+
+        <label class="inline" style="margin-top:0;">
+          <input type="radio" name="resizeMode" value="pixel" checked> ピクセル指定
+        </label>
+
+        <div id="pixelGroup" style="margin-top:6px;">
+          <div class="row-2">
+            <div>
+              <label style="margin-top:0;">幅 (px)</label>
+              <input type="number" id="resizeWidth" placeholder="幅">
+            </div>
+            <div>
+              <label style="margin-top:0;">高さ (px)</label>
+              <input type="number" id="resizeHeight" placeholder="高さ">
+            </div>
+          </div>
+          <label class="inline" style="margin-top:6px;">
+            <input type="checkbox" id="keepAspectPixel" checked> 縦横比を維持
+          </label>
+        </div>
+
+        <label class="inline" style="margin-top:10px;">
+          <input type="radio" name="resizeMode" value="percent"> % 指定
+        </label>
+        <div id="percentGroup" style="margin-top:6px;">
+          <label style="margin-top:0;">倍率 (%)</label>
+          <input type="number" id="resizePercent" placeholder="50" value="50">
+          <div class="help-box" style="margin-top:4px;">
+            縦横比は自動で維持されます
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. 実行ボタン -->
+      <div class="section">
+        <div class="section-title">3. 実行</div>
+        <button id="applyCropOnly" class="primary" style="width:100%; margin-bottom:6px; background:#059669; border-color:#059669;" disabled>
+          ✂️ トリミングのみ実行<span class="shortcut">Enter</span>
+        </button>
+        <button id="applyResizeOnly" class="primary" style="width:100%; margin-bottom:6px;">
+          📏 リサイズのみ実行
+        </button>
+        <button id="applyBoth" class="primary" style="width:100%; background:#c2410c; border-color:#c2410c;" disabled>
+          ⚡ トリミング+リサイズを実行
+        </button>
+        <div class="help-box" style="margin-top:6px;">
+          「両方実行」はトリミング範囲を選択中の時のみ有効です
+        </div>
+      </div>
+
+      <!-- 6. テキスト設定 -->
+      <div class="section">
+        <div class="section-title">4. テキスト設定</div>
+        <input type="text" id="textInput" placeholder="テキストを入力">
+        <div class="row-2" style="margin-top:6px;">
+          <button class="dir-btn active" data-dir="horizontal">横書き</button>
+          <button class="dir-btn" data-dir="vertical">縦書き</button>
+        </div>
+        <label>サイズ</label>
+        <input type="number" id="textSize" value="32" min="8" max="200">
+        <label>文字色</label>
+        <input type="color" id="textColor" value="#000000">
+        <div class="deco-grid">
+          <div class="deco-box">
+            <label class="inline" style="margin-top:0;">
+              <input type="checkbox" id="textBg"> 背景色
+            </label>
+            <input type="color" id="textBgColor" value="#ffffff">
+          </div>
+          <div class="deco-box">
+            <label class="inline" style="margin-top:0;">
+              <input type="checkbox" id="textBorder"> 枠線
+            </label>
+            <input type="color" id="textBorderColor" value="#000000">
+            <input type="number" id="textBorderWidth" value="2" min="1" max="20" placeholder="太さpx">
+          </div>
+        </div>
+        <button id="addText" class="primary" style="width:100%; margin-top:8px;">テキストを追加</button>
+      </div>
+
+      <!-- 6. 図形設定・ツール -->
+      <div class="section">
+        <div class="section-title">5. 図形設定・ツール</div>
+        <label style="margin-top:0;">線の色</label>
+        <input type="color" id="shapeColor" value="#ff0000">
+        <label>線の太さ: <span id="strokeWidthLabel">4</span>px</label>
+        <input type="range" id="strokeWidth" min="1" max="20" value="4">
+        <label class="inline" style="margin-top:8px;">
+          <input type="checkbox" id="shapeFill"> 塗りつぶし
+        </label>
+        <div style="margin-top:12px; padding-top:12px; border-top:1px dashed #e5e5e5;">
+          <label style="margin-top:0; font-weight:600;">ツール</label>
+          <div class="row-2" style="margin-top:4px;">
+            <button class="tool-btn" data-tool="ellipse">〇 楕円<span class="shortcut">O</span></button>
+            <button class="tool-btn" data-tool="rect">□ 四角<span class="shortcut">R</span></button>
+          </div>
+          <div class="row-2" style="margin-top:6px;">
+            <button class="tool-btn" data-tool="arrow">→ 矢印<span class="shortcut">A</span></button>
+            <button class="tool-btn" data-tool="line">／ 線<span class="shortcut">L</span></button>
+          </div>
+          <button class="tool-btn active" data-tool="select" style="width:100%; margin-top:6px;">選択<span class="shortcut">V</span></button>
+        </div>
+      </div>
+
+      <!-- 8. レイヤー -->
+      <div class="section">
+        <div class="section-title">6. レイヤー一覧</div>
+        <div class="layer-list" id="layerList">
+          <div style="padding:8px; color:#aaa; font-size:12px; text-align:center;">レイヤーなし</div>
+        </div>
+      </div>
+
+      <!-- 9. 保存 -->
+      <div class="section">
+        <div class="section-title">7. 保存・状態管理</div>
+        <label style="margin-top:0;">ファイル名</label>
+        <input type="text" id="fileName" placeholder="note_image" value="note_image">
+        <label>形式</label>
+        <select id="fileFormat">
+          <option value="png">PNG (透過可)</option>
+          <option value="jpeg">JPEG</option>
+        </select>
+        <button id="saveBtn" class="primary" style="width:100%; margin-top:8px;">💾 ダウンロード</button>
+        <div class="row-2" style="margin-top:10px;">
+          <button id="saveState">状態保存</button>
+          <button id="loadState">復元</button>
+        </div>
+        <button id="clearAll" class="danger" style="width:100%; margin-top:6px;">すべてクリア</button>
+      </div>
+
+    </div>
+
+    <!-- キャンバス -->
+    <div class="canvas-area">
+      <div class="toolbar">
+        <div class="canvas-info" id="canvasInfo">画像をアップロードしてください</div>
+        <div class="zoom-control">
+          <span>表示</span>
+          <button id="zoomOut">−</button>
+          <input type="range" id="zoomSlider" min="10" max="200" value="100">
+          <span id="zoomLabel" style="min-width:42px; text-align:right;">100%</span>
+          <button id="zoomIn">＋</button>
+          <button id="zoomFit">画面に合わせる</button>
+          <button id="zoom100">原寸</button>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button id="undoBtn" disabled>↶ Undo<span class="shortcut">Ctrl+Z</span></button>
+          <button id="redoBtn" disabled>↷ Redo<span class="shortcut">Ctrl+Y</span></button>
+        </div>
+      </div>
+      <div class="canvas-wrapper" id="canvasWrapper">
+        <div id="canvasUploadPrompt" class="canvas-upload-prompt">
+          <div class="upload-icon">📁</div>
+          <div class="upload-title">画像をここにドラッグ&ドロップ</div>
+          <div class="upload-subtitle">またはクリックしてファイルを選択</div>
+          <input type="file" id="canvasFileInput" accept="image/*" style="display:none">
+        </div>
+        <canvas id="canvas" width="800" height="500" style="display:none;"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============== State ==============
+const state = {
+  baseImage: null,
+  baseWidth: 0,
+  baseHeight: 0,
+  layers: [],
+  selectedLayerId: null,
+  currentTool: 'select',
+  textDirection: 'horizontal',
+  cropRect: null,
+  dragging: null,
+  history: [],
+  historyIdx: -1,
+  aspectRatio: 1,
+  zoom: 1,
+  spacePressed: false,
+  panning: null, // {startX, startY, scrollLeft, scrollTop}
+};
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const canvasWrapper = document.getElementById('canvasWrapper');
+
+// ============== Utility ==============
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+function uid() { return Math.random().toString(36).slice(2, 9); }
+
+function saveHistory() {
+  state.history = state.history.slice(0, state.historyIdx + 1);
+  state.history.push({
+    layers: JSON.parse(JSON.stringify(state.layers)),
+    baseWidth: state.baseWidth,
+    baseHeight: state.baseHeight,
+    baseImageData: state.baseImage ? canvasToDataURL_base() : null,
+  });
+  state.historyIdx++;
+  if (state.history.length > 30) {
+    state.history.shift();
+    state.historyIdx--;
+  }
+  updateUndoRedo();
+}
+
+function canvasToDataURL_base() {
+  const tmp = document.createElement('canvas');
+  tmp.width = state.baseWidth;
+  tmp.height = state.baseHeight;
+  tmp.getContext('2d').putImageData(state.baseImage, 0, 0);
+  return tmp.toDataURL('image/png');
+}
+
+function updateUndoRedo() {
+  document.getElementById('undoBtn').disabled = state.historyIdx <= 0;
+  document.getElementById('redoBtn').disabled = state.historyIdx >= state.history.length - 1;
+}
+
+async function restoreFromHistory(idx) {
+  const h = state.history[idx];
+  state.layers = JSON.parse(JSON.stringify(h.layers));
+  state.baseWidth = h.baseWidth;
+  state.baseHeight = h.baseHeight;
+  if (h.baseImageData) {
+    const img = new Image();
+    await new Promise(res => {
+      img.onload = () => {
+        const tmp = document.createElement('canvas');
+        tmp.width = state.baseWidth;
+        tmp.height = state.baseHeight;
+        tmp.getContext('2d').drawImage(img, 0, 0);
+        state.baseImage = tmp.getContext('2d').getImageData(0, 0, state.baseWidth, state.baseHeight);
+        res();
+      };
+      img.src = h.baseImageData;
+    });
+  }
+  canvas.width = state.baseWidth;
+  canvas.height = state.baseHeight;
+  state.aspectRatio = state.baseWidth / state.baseHeight;
+  applyZoom();
+  render();
+  updateLayerList();
+  updateCanvasInfo();
+}
+
+// ============== Zoom (表示倍率) ==============
+function applyZoom() {
+  canvas.style.width = (state.baseWidth * state.zoom) + 'px';
+  canvas.style.height = (state.baseHeight * state.zoom) + 'px';
+  document.getElementById('zoomLabel').textContent = Math.round(state.zoom * 100) + '%';
+  document.getElementById('zoomSlider').value = Math.round(state.zoom * 100);
+}
+
+function setZoom(percent) {
+  state.zoom = Math.max(0.1, Math.min(2, percent / 100));
+  applyZoom();
+}
+
+function zoomFit() {
+  if (!state.baseImage) return;
+  const wrapW = canvasWrapper.clientWidth - 24;
+  const wrapH = canvasWrapper.clientHeight - 24;
+  const sx = wrapW / state.baseWidth;
+  const sy = wrapH / state.baseHeight;
+  const fit = Math.min(sx, sy, 2);
+  state.zoom = Math.max(0.1, fit);
+  applyZoom();
+}
+
+document.getElementById('zoomSlider').addEventListener('input', e => {
+  setZoom(parseFloat(e.target.value));
+});
+document.getElementById('zoomIn').addEventListener('click', () => setZoom(state.zoom * 100 + 10));
+document.getElementById('zoomOut').addEventListener('click', () => setZoom(state.zoom * 100 - 10));
+document.getElementById('zoom100').addEventListener('click', () => setZoom(100));
+document.getElementById('zoomFit').addEventListener('click', zoomFit);
+
+// ============== Cursor ==============
+function updateCursor() {
+  if (state.currentTool === 'select') canvas.style.cursor = 'default';
+  else canvas.style.cursor = 'crosshair';
+}
+
+// ============== Rendering ==============
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (state.baseImage) ctx.putImageData(state.baseImage, 0, 0);
+  for (const layer of state.layers) {
+    if (layer.type === 'text') drawText(layer);
+    else if (layer.type === 'shape') drawShape(layer);
+  }
+  if (state.currentTool === 'crop' && state.cropRect) drawCropOverlay();
+}
+
+function drawText(l) {
+  ctx.save();
+  ctx.font = `${l.size}px -apple-system, "Hiragino Sans", "Yu Gothic", sans-serif`;
+  ctx.textBaseline = 'top';
+
+  if (l.direction === 'vertical') {
+    const chars = [...l.text];
+    const lineHeight = l.size * 1.1;
+    const totalH = chars.length * lineHeight;
+    const w = l.size * 1.2;
+
+    if (l.bg) {
+      ctx.fillStyle = l.bgColor;
+      ctx.fillRect(l.x - 4, l.y - 2, w + 8, totalH + 4);
+    }
+    // 枠線（縦書き）: 各文字にstrokeTextを適用
+    if (l.border) {
+      ctx.strokeStyle = l.borderColor;
+      ctx.lineWidth = l.borderWidth;
+      ctx.lineJoin = 'round';
+      ctx.miterLimit = 2;
+      for (let i = 0; i < chars.length; i++) {
+        const c = chars[i];
+        if (/[ーー―−]/.test(c)) {
+          ctx.save();
+          ctx.translate(l.x + w/2, l.y + i * lineHeight + l.size / 2);
+          ctx.rotate(Math.PI / 2);
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.strokeText(c, 0, 0);
+          ctx.restore();
+        } else if (/[、。「」『』（）]/.test(c)) {
+          ctx.strokeText(c, l.x + w * 0.4, l.y + i * lineHeight - l.size * 0.1);
+        } else {
+          ctx.textAlign = 'center';
+          ctx.strokeText(c, l.x + w / 2, l.y + i * lineHeight);
+          ctx.textAlign = 'start';
+        }
+      }
+    }
+    ctx.fillStyle = l.color;
+    for (let i = 0; i < chars.length; i++) {
+      const c = chars[i];
+      if (/[ーー―−]/.test(c)) {
+        ctx.save();
+        ctx.translate(l.x + w/2, l.y + i * lineHeight + l.size / 2);
+        ctx.rotate(Math.PI / 2);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(c, 0, 0);
+        ctx.restore();
+      } else if (/[、。「」『』（）]/.test(c)) {
+        ctx.fillText(c, l.x + w * 0.4, l.y + i * lineHeight - l.size * 0.1);
+      } else {
+        ctx.textAlign = 'center';
+        ctx.fillText(c, l.x + w / 2, l.y + i * lineHeight);
+        ctx.textAlign = 'start';
+      }
+    }
+    if (state.selectedLayerId === l.id) {
+      ctx.strokeStyle = '#ea580c';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.strokeRect(l.x - 6, l.y - 4, w + 12, totalH + 8);
+      ctx.setLineDash([]);
+    }
+  } else {
+    const metrics = ctx.measureText(l.text);
+    const w = metrics.width;
+    const h = l.size * 1.2;
+    if (l.bg) {
+      ctx.fillStyle = l.bgColor;
+      ctx.fillRect(l.x - 4, l.y - 2, w + 8, h + 4);
+    }
+    // 枠線（横書き）: strokeText を先に、その上に fillText
+    if (l.border) {
+      ctx.strokeStyle = l.borderColor;
+      ctx.lineWidth = l.borderWidth;
+      ctx.lineJoin = 'round';
+      ctx.miterLimit = 2;
+      ctx.strokeText(l.text, l.x, l.y);
+    }
+    ctx.fillStyle = l.color;
+    ctx.fillText(l.text, l.x, l.y);
+    if (state.selectedLayerId === l.id) {
+      ctx.strokeStyle = '#ea580c';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.strokeRect(l.x - 6, l.y - 4, w + 12, h + 8);
+      ctx.setLineDash([]);
+    }
+  }
+  ctx.restore();
+}
+
+function getTextBounds(l) {
+  ctx.save();
+  ctx.font = `${l.size}px -apple-system, "Hiragino Sans", "Yu Gothic", sans-serif`;
+  if (l.direction === 'vertical') {
+    const chars = [...l.text];
+    const w = l.size * 1.2;
+    const h = chars.length * l.size * 1.1;
+    ctx.restore();
+    return { w, h };
+  } else {
+    const w = ctx.measureText(l.text).width;
+    const h = l.size * 1.2;
+    ctx.restore();
+    return { w, h };
+  }
+}
+
+function drawShape(l) {
+  ctx.save();
+  ctx.strokeStyle = l.color;
+  ctx.fillStyle = l.color;
+  ctx.lineWidth = l.strokeWidth;
+  const x = Math.min(l.x1, l.x2);
+  const y = Math.min(l.y1, l.y2);
+  const w = Math.abs(l.x2 - l.x1);
+  const h = Math.abs(l.y2 - l.y1);
+
+  if (l.shape === 'ellipse') {
+    ctx.beginPath();
+    ctx.ellipse(x + w/2, y + h/2, w/2, h/2, 0, 0, Math.PI * 2);
+    if (l.fill) ctx.fill();
+    ctx.stroke();
+  } else if (l.shape === 'rect') {
+    if (l.fill) ctx.fillRect(x, y, w, h);
+    ctx.strokeRect(x, y, w, h);
+  } else if (l.shape === 'line') {
+    ctx.beginPath();
+    ctx.moveTo(l.x1, l.y1);
+    ctx.lineTo(l.x2, l.y2);
+    ctx.stroke();
+  } else if (l.shape === 'arrow') {
+    drawArrow(l.x1, l.y1, l.x2, l.y2, l.strokeWidth);
+  }
+
+  if (state.selectedLayerId === l.id) {
+    ctx.strokeStyle = '#ea580c';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.strokeRect(x - 4, y - 4, w + 8, h + 8);
+    ctx.setLineDash([]);
+  }
+  ctx.restore();
+}
+
+function drawArrow(x1, y1, x2, y2, sw) {
+  const headLen = Math.max(10, sw * 3);
+  const angle = Math.atan2(y2 - y1, x2 - x1);
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - headLen * Math.cos(angle - Math.PI/6), y2 - headLen * Math.sin(angle - Math.PI/6));
+  ctx.lineTo(x2 - headLen * Math.cos(angle + Math.PI/6), y2 - headLen * Math.sin(angle + Math.PI/6));
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawCropOverlay() {
+  const r = state.cropRect;
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.fillRect(0, 0, canvas.width, r.y);
+  ctx.fillRect(0, r.y + r.h, canvas.width, canvas.height - r.y - r.h);
+  ctx.fillRect(0, r.y, r.x, r.h);
+  ctx.fillRect(r.x + r.w, r.y, canvas.width - r.x - r.w, r.h);
+  ctx.strokeStyle = '#ea580c';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 4]);
+  ctx.strokeRect(r.x, r.y, r.w, r.h);
+  ctx.restore();
+}
+
+// ============== Image loading ==============
+function loadImage(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const w = img.naturalWidth;
+      const h = img.naturalHeight;
+      canvas.width = w;
+      canvas.height = h;
+      ctx.clearRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      state.baseImage = ctx.getImageData(0, 0, w, h);
+      state.baseWidth = w;
+      state.baseHeight = h;
+      state.aspectRatio = w / h;
+      state.layers = [];
+      state.history = [];
+      state.historyIdx = -1;
+      document.getElementById('resizeWidth').value = w;
+      document.getElementById('resizeHeight').value = h;
+      // canvasを表示、プロンプトを非表示
+      document.getElementById('canvasUploadPrompt').style.display = 'none';
+      canvas.style.display = 'block';
+      // 初回は画面に合わせる
+      zoomFit();
+      saveHistory();
+      render();
+      updateCanvasInfo();
+      updateLayerList();
+      toast('画像を読み込みました');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function updateCanvasInfo() {
+  if (state.baseImage) {
+    document.getElementById('canvasInfo').textContent =
+      `${state.baseWidth} × ${state.baseHeight} px / レイヤー ${state.layers.length}個 / ツール: ${toolName(state.currentTool)}`;
+  } else {
+    document.getElementById('canvasInfo').textContent = '画像をアップロードしてください';
+  }
+  updateCropStatus();
+}
+function toolName(t) {
+  return { select:'選択', crop:'トリミング', ellipse:'楕円', rect:'四角', arrow:'矢印', line:'線' }[t] || t;
+}
+
+function updateCropStatus() {
+  const el = document.getElementById('cropStatus');
+  const hasCrop = !!state.cropRect && state.cropRect.w > 5 && state.cropRect.h > 5;
+  if (hasCrop) {
+    el.textContent = `範囲選択中: ${Math.round(state.cropRect.w)} × ${Math.round(state.cropRect.h)} px`;
+    el.classList.add('ready');
+  } else {
+    el.textContent = '範囲未選択';
+    el.classList.remove('ready');
+  }
+  document.getElementById('applyCropOnly').disabled = !hasCrop;
+  document.getElementById('applyBoth').disabled = !hasCrop;
+}
+
+// ============== Drop / file input ==============
+document.body.addEventListener('dragover', e => e.preventDefault());
+document.body.addEventListener('drop', e => {
+  e.preventDefault();
+  if (e.dataTransfer.files[0] && !state.baseImage) loadImage(e.dataTransfer.files[0]);
+});
+
+// キャンバスエリアでのアップロード
+const canvasUploadPrompt = document.getElementById('canvasUploadPrompt');
+const canvasFileInput = document.getElementById('canvasFileInput');
+canvasUploadPrompt.addEventListener('click', () => canvasFileInput.click());
+canvasFileInput.addEventListener('change', e => {
+  if (e.target.files[0]) loadImage(e.target.files[0]);
+});
+canvasWrapper.addEventListener('dragover', e => {
+  e.preventDefault();
+  canvasWrapper.classList.add('canvas-dragover');
+});
+canvasWrapper.addEventListener('dragleave', e => {
+  // 子要素間の移動でleaveが発火するため、wrapperの外に出た時だけ消す
+  if (!canvasWrapper.contains(e.relatedTarget)) {
+    canvasWrapper.classList.remove('canvas-dragover');
+  }
+});
+canvasWrapper.addEventListener('drop', e => {
+  e.preventDefault();
+  canvasWrapper.classList.remove('canvas-dragover');
+  if (e.dataTransfer.files[0]) loadImage(e.dataTransfer.files[0]);
+});
+
+// ============== Tool selection ==============
+document.querySelectorAll('.tool-btn').forEach(btn => {
+  btn.addEventListener('click', () => selectTool(btn.dataset.tool));
+});
+
+function selectTool(tool) {
+  const wasCrop = state.currentTool === 'crop';
+  state.currentTool = tool;
+  document.querySelectorAll('.tool-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tool === tool);
+  });
+  // ツールがcropから他へ切り替わってもcropRectは保持（実行ボタン使う可能性）
+  if (tool !== 'select') state.selectedLayerId = null;
+  updateCursor();
+  render();
+  updateCanvasInfo();
+  updateLayerList();
+}
+
+document.getElementById('deselectBtn').addEventListener('click', () => {
+  state.selectedLayerId = null;
+  state.cropRect = null;
+  render();
+  updateLayerList();
+  updateCanvasInfo();
+});
+
+// ============== Text direction ==============
+document.querySelectorAll('.dir-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.textDirection = btn.dataset.dir;
+  });
+});
+
+// ============== Resize mode toggle ==============
+document.querySelectorAll('input[name="resizeMode"]').forEach(r => {
+  r.addEventListener('change', () => {
+    const mode = document.querySelector('input[name="resizeMode"]:checked').value;
+    document.getElementById('pixelGroup').style.opacity = mode === 'pixel' ? '1' : '0.4';
+    document.getElementById('percentGroup').style.opacity = mode === 'percent' ? '1' : '0.4';
+  });
+});
+document.getElementById('percentGroup').style.opacity = '0.4';
+
+// ピクセル指定で縦横比連動
+document.getElementById('resizeWidth').addEventListener('input', e => {
+  if (!state.baseImage) return;
+  if (document.getElementById('keepAspectPixel').checked) {
+    const w = parseFloat(e.target.value);
+    if (w > 0) document.getElementById('resizeHeight').value = Math.round(w / state.aspectRatio);
+  }
+});
+document.getElementById('resizeHeight').addEventListener('input', e => {
+  if (!state.baseImage) return;
+  if (document.getElementById('keepAspectPixel').checked) {
+    const h = parseFloat(e.target.value);
+    if (h > 0) document.getElementById('resizeWidth').value = Math.round(h * state.aspectRatio);
+  }
+});
+
+// ============== Crop ratio ==============
+document.getElementById('cropFixRatio').addEventListener('change', e => {
+  const on = e.target.checked;
+  document.getElementById('cropRatioW').disabled = !on;
+  document.getElementById('cropRatioH').disabled = !on;
+});
+
+// ============== Core: トリミング処理 / リサイズ処理 ==============
+function executeCrop() {
+  if (!state.cropRect) return false;
+  const r = state.cropRect;
+  const cw = Math.round(r.w);
+  const ch = Math.round(r.h);
+  const tmp = document.createElement('canvas');
+  tmp.width = cw;
+  tmp.height = ch;
+  tmp.getContext('2d').drawImage(canvas, r.x, r.y, r.w, r.h, 0, 0, cw, ch);
+
+  canvas.width = cw;
+  canvas.height = ch;
+  ctx.drawImage(tmp, 0, 0);
+  state.baseImage = ctx.getImageData(0, 0, cw, ch);
+  state.baseWidth = cw;
+  state.baseHeight = ch;
+  state.aspectRatio = cw / ch;
+  state.layers = []; // bake
+  state.cropRect = null;
+  document.getElementById('resizeWidth').value = cw;
+  document.getElementById('resizeHeight').value = ch;
+  return true;
+}
+
+function executeResize() {
+  const mode = document.querySelector('input[name="resizeMode"]:checked').value;
+  let newW, newH;
+  if (mode === 'pixel') {
+    newW = parseInt(document.getElementById('resizeWidth').value);
+    newH = parseInt(document.getElementById('resizeHeight').value);
+    if (!newW || !newH) { toast('幅と高さを入力してください'); return false; }
+  } else {
+    const pct = parseFloat(document.getElementById('resizePercent').value);
+    if (!pct || pct <= 0) { toast('倍率を入力してください'); return false; }
+    newW = Math.round(state.baseWidth * pct / 100);
+    newH = Math.round(state.baseHeight * pct / 100);
+  }
+  if (newW === state.baseWidth && newH === state.baseHeight) return true; // 変化なし
+  resizeCanvas(newW, newH);
+  return true;
+}
+
+function resizeCanvas(newW, newH) {
+  const tmp = document.createElement('canvas');
+  tmp.width = state.baseWidth;
+  tmp.height = state.baseHeight;
+  tmp.getContext('2d').putImageData(state.baseImage, 0, 0);
+
+  const scaleX = newW / state.baseWidth;
+  const scaleY = newH / state.baseHeight;
+
+  canvas.width = newW;
+  canvas.height = newH;
+  ctx.drawImage(tmp, 0, 0, newW, newH);
+  state.baseImage = ctx.getImageData(0, 0, newW, newH);
+  state.baseWidth = newW;
+  state.baseHeight = newH;
+  state.aspectRatio = newW / newH;
+
+  for (const l of state.layers) {
+    if (l.type === 'text') {
+      l.x *= scaleX; l.y *= scaleY;
+      l.size *= ((scaleX + scaleY) / 2);
+    } else if (l.type === 'shape') {
+      l.x1 *= scaleX; l.x2 *= scaleX;
+      l.y1 *= scaleY; l.y2 *= scaleY;
+    }
+  }
+  document.getElementById('resizeWidth').value = newW;
+  document.getElementById('resizeHeight').value = newH;
+}
+
+// 実行ボタン
+document.getElementById('applyCropOnly').addEventListener('click', () => {
+  if (!state.baseImage) { toast('先に画像を読み込んでください'); return; }
+  if (!state.cropRect) { toast('トリミング範囲を選択してください'); return; }
+  if (executeCrop()) {
+    applyZoom();
+    saveHistory();
+    render();
+    updateCanvasInfo();
+    updateLayerList();
+    toast(`トリミング完了: ${state.baseWidth} × ${state.baseHeight} px`);
+  }
+});
+
+document.getElementById('applyResizeOnly').addEventListener('click', () => {
+  if (!state.baseImage) { toast('先に画像を読み込んでください'); return; }
+  if (executeResize()) {
+    applyZoom();
+    saveHistory();
+    render();
+    updateCanvasInfo();
+    toast(`リサイズ完了: ${state.baseWidth} × ${state.baseHeight} px`);
+  }
+});
+
+document.getElementById('applyBoth').addEventListener('click', () => {
+  if (!state.baseImage) { toast('先に画像を読み込んでください'); return; }
+  if (!state.cropRect) { toast('トリミング範囲を選択してください'); return; }
+  if (executeCrop()) {
+    if (executeResize()) {
+      applyZoom();
+      saveHistory();
+      render();
+      updateCanvasInfo();
+      updateLayerList();
+      toast(`トリミング+リサイズ完了: ${state.baseWidth} × ${state.baseHeight} px`);
+    }
+  }
+});
+
+// ============== Stroke width label ==============
+document.getElementById('strokeWidth').addEventListener('input', e => {
+  document.getElementById('strokeWidthLabel').textContent = e.target.value;
+});
+
+// ============== Add text ==============
+document.getElementById('addText').addEventListener('click', () => {
+  if (!state.baseImage) { toast('先に画像を読み込んでください'); return; }
+  const txt = document.getElementById('textInput').value.trim();
+  if (!txt) { toast('テキストを入力してください'); return; }
+  const layer = {
+    id: uid(),
+    type: 'text',
+    text: txt,
+    direction: state.textDirection,
+    x: state.baseWidth / 2 - 50,
+    y: state.baseHeight / 2 - 16,
+    size: parseInt(document.getElementById('textSize').value) || 32,
+    color: document.getElementById('textColor').value,
+    bg: document.getElementById('textBg').checked,
+    bgColor: document.getElementById('textBgColor').value,
+    border: document.getElementById('textBorder').checked,
+    borderColor: document.getElementById('textBorderColor').value,
+    borderWidth: parseInt(document.getElementById('textBorderWidth').value) || 2,
+  };
+  state.layers.push(layer);
+  state.selectedLayerId = layer.id;
+  selectTool('select');
+  saveHistory();
+  render();
+  updateLayerList();
+  updateCanvasInfo();
+});
+
+// ============== Canvas interactions ==============
+function getCanvasPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  // rect.width/heightは表示サイズ、canvas.width/heightは実サイズ
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  return {
+    x: (e.clientX - rect.left) * scaleX,
+    y: (e.clientY - rect.top) * scaleY,
+  };
+}
+
+canvas.addEventListener('mousedown', e => {
+  if (!state.baseImage) return;
+
+  // Spaceキー押下中はパン優先
+  if (state.spacePressed) {
+    state.panning = {
+      startX: e.clientX,
+      startY: e.clientY,
+      scrollLeft: canvasWrapper.scrollLeft,
+      scrollTop: canvasWrapper.scrollTop,
+    };
+    canvasWrapper.classList.add('panning');
+    e.preventDefault();
+    return;
+  }
+
+  const pos = getCanvasPos(e);
+  const tool = state.currentTool;
+
+  if (tool === 'crop') {
+    state.dragging = { type: 'crop', startX: pos.x, startY: pos.y };
+    return;
+  }
+  if (['ellipse','rect','arrow','line'].includes(tool)) {
+    state.dragging = { type: 'shape', startX: pos.x, startY: pos.y, shape: tool };
+    return;
+  }
+  if (tool === 'select') {
+    const layer = findLayerAt(pos.x, pos.y);
+    if (layer) {
+      state.selectedLayerId = layer.id;
+      state.dragging = { type: 'move', startX: pos.x, startY: pos.y, layerId: layer.id, orig: getLayerOrigin(layer) };
+    } else {
+      state.selectedLayerId = null;
+    }
+    render();
+    updateLayerList();
+  }
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (state.panning) {
+    const dx = e.clientX - state.panning.startX;
+    const dy = e.clientY - state.panning.startY;
+    canvasWrapper.scrollLeft = state.panning.scrollLeft - dx;
+    canvasWrapper.scrollTop = state.panning.scrollTop - dy;
+    return;
+  }
+  if (!state.dragging) return;
+  const pos = getCanvasPos(e);
+
+  if (state.dragging.type === 'crop') {
+    let x1 = state.dragging.startX, y1 = state.dragging.startY;
+    let x2 = pos.x, y2 = pos.y;
+    let w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
+    const fixRatio = document.getElementById('cropFixRatio').checked;
+    if (fixRatio) {
+      const rw = parseFloat(document.getElementById('cropRatioW').value) || 1;
+      const rh = parseFloat(document.getElementById('cropRatioH').value) || 1;
+      const target = rw / rh;
+      if (w / h > target) w = h * target;
+      else h = w / target;
+    }
+    state.cropRect = {
+      x: Math.min(x1, x1 + Math.sign(x2 - x1 || 1) * w),
+      y: Math.min(y1, y1 + Math.sign(y2 - y1 || 1) * h),
+      w, h,
+    };
+    updateCropStatus();
+    render();
+  } else if (state.dragging.type === 'shape') {
+    render();
+    const tmp = {
+      id: 'preview',
+      type: 'shape',
+      shape: state.dragging.shape,
+      x1: state.dragging.startX,
+      y1: state.dragging.startY,
+      x2: pos.x,
+      y2: pos.y,
+      color: document.getElementById('shapeColor').value,
+      strokeWidth: parseInt(document.getElementById('strokeWidth').value),
+      fill: document.getElementById('shapeFill').checked,
+    };
+    drawShape(tmp);
+  } else if (state.dragging.type === 'move') {
+    const dx = pos.x - state.dragging.startX;
+    const dy = pos.y - state.dragging.startY;
+    const layer = state.layers.find(l => l.id === state.dragging.layerId);
+    if (!layer) return;
+    if (layer.type === 'text') {
+      layer.x = state.dragging.orig.x + dx;
+      layer.y = state.dragging.orig.y + dy;
+    } else if (layer.type === 'shape') {
+      layer.x1 = state.dragging.orig.x1 + dx;
+      layer.y1 = state.dragging.orig.y1 + dy;
+      layer.x2 = state.dragging.orig.x2 + dx;
+      layer.y2 = state.dragging.orig.y2 + dy;
+    }
+    render();
+  }
+});
+
+canvas.addEventListener('mouseup', e => {
+  if (state.panning) {
+    state.panning = null;
+    canvasWrapper.classList.remove('panning');
+    return;
+  }
+  if (!state.dragging) return;
+  const pos = getCanvasPos(e);
+
+  if (state.dragging.type === 'shape') {
+    const dx = Math.abs(pos.x - state.dragging.startX);
+    const dy = Math.abs(pos.y - state.dragging.startY);
+    if (dx > 3 || dy > 3) {
+      const layer = {
+        id: uid(),
+        type: 'shape',
+        shape: state.dragging.shape,
+        x1: state.dragging.startX,
+        y1: state.dragging.startY,
+        x2: pos.x,
+        y2: pos.y,
+        color: document.getElementById('shapeColor').value,
+        strokeWidth: parseInt(document.getElementById('strokeWidth').value),
+        fill: document.getElementById('shapeFill').checked,
+      };
+      state.layers.push(layer);
+      state.selectedLayerId = layer.id;
+      selectTool('select');
+      saveHistory();
+      updateLayerList();
+      updateCanvasInfo();
+    }
+    render();
+  } else if (state.dragging.type === 'move') {
+    saveHistory();
+  }
+  state.dragging = null;
+});
+
+// グローバルにmousemove/mouseupを追加してcanvas外でもパン継続
+document.addEventListener('mousemove', e => {
+  if (state.panning) {
+    const dx = e.clientX - state.panning.startX;
+    const dy = e.clientY - state.panning.startY;
+    canvasWrapper.scrollLeft = state.panning.scrollLeft - dx;
+    canvasWrapper.scrollTop = state.panning.scrollTop - dy;
+  }
+});
+document.addEventListener('mouseup', () => {
+  if (state.panning) {
+    state.panning = null;
+    canvasWrapper.classList.remove('panning');
+  }
+});
+
+function findLayerAt(x, y) {
+  for (let i = state.layers.length - 1; i >= 0; i--) {
+    const l = state.layers[i];
+    if (l.type === 'text') {
+      const { w, h } = getTextBounds(l);
+      if (x >= l.x - 6 && x <= l.x + w + 6 && y >= l.y - 4 && y <= l.y + h + 4) return l;
+    } else if (l.type === 'shape') {
+      const minX = Math.min(l.x1, l.x2) - 6;
+      const maxX = Math.max(l.x1, l.x2) + 6;
+      const minY = Math.min(l.y1, l.y2) - 6;
+      const maxY = Math.max(l.y1, l.y2) + 6;
+      if (x >= minX && x <= maxX && y >= minY && y <= maxY) return l;
+    }
+  }
+  return null;
+}
+
+function getLayerOrigin(l) {
+  if (l.type === 'text') return { x: l.x, y: l.y };
+  return { x1: l.x1, y1: l.y1, x2: l.x2, y2: l.y2 };
+}
+
+// ============== Layer list ==============
+function updateLayerList() {
+  const list = document.getElementById('layerList');
+  if (state.layers.length === 0) {
+    list.innerHTML = '<div style="padding:8px; color:#aaa; font-size:12px; text-align:center;">レイヤーなし</div>';
+    return;
+  }
+  list.innerHTML = '';
+  for (let i = state.layers.length - 1; i >= 0; i--) {
+    const l = state.layers[i];
+    const div = document.createElement('div');
+    div.className = 'layer-item' + (state.selectedLayerId === l.id ? ' selected' : '');
+    const label = l.type === 'text'
+      ? `📝${l.direction === 'vertical' ? '縦' : '横'} ${l.text.slice(0, 10)}${l.text.length > 10 ? '…' : ''}`
+      : `${l.shape === 'ellipse' ? '〇' : l.shape === 'rect' ? '□' : l.shape === 'arrow' ? '→' : '／'} 図形`;
+    div.innerHTML = `<span>${label}</span><button class="del-btn">×</button>`;
+    div.addEventListener('click', e => {
+      if (e.target.classList.contains('del-btn')) {
+        state.layers = state.layers.filter(x => x.id !== l.id);
+        if (state.selectedLayerId === l.id) state.selectedLayerId = null;
+        saveHistory();
+        render();
+        updateLayerList();
+        updateCanvasInfo();
+      } else {
+        state.selectedLayerId = l.id;
+        selectTool('select');
+        render();
+        updateLayerList();
+      }
+    });
+    list.appendChild(div);
+  }
+}
+
+// ============== Save ==============
+document.getElementById('saveBtn').addEventListener('click', () => {
+  if (!state.baseImage) { toast('保存する画像がありません'); return; }
+  const name = (document.getElementById('fileName').value || 'note_image').replace(/[^\w\-]/g, '_');
+  const format = document.getElementById('fileFormat').value;
+  const prevSel = state.selectedLayerId;
+  const prevCrop = state.cropRect;
+  state.selectedLayerId = null;
+  state.cropRect = null;
+  render();
+  const dataURL = canvas.toDataURL(`image/${format}`, format === 'jpeg' ? 0.92 : undefined);
+  state.selectedLayerId = prevSel;
+  state.cropRect = prevCrop;
+  render();
+
+  const a = document.createElement('a');
+  a.href = dataURL;
+  a.download = `${name}.${format === 'jpeg' ? 'jpg' : 'png'}`;
+  a.click();
+  toast(`${a.download} を保存しました`);
+});
+
+// ============== State persistence ==============
+document.getElementById('saveState').addEventListener('click', () => {
+  if (!state.baseImage) { toast('保存する状態がありません'); return; }
+  const data = {
+    layers: state.layers,
+    baseWidth: state.baseWidth,
+    baseHeight: state.baseHeight,
+    baseImageData: canvasToDataURL_base(),
+    savedAt: new Date().toISOString(),
+  };
+  try {
+    localStorage.setItem('note_editor_state', JSON.stringify(data));
+    toast('編集状態を保存しました');
+  } catch (e) {
+    toast('保存失敗：画像が大きすぎます');
+  }
+});
+
+document.getElementById('loadState').addEventListener('click', async () => {
+  const raw = localStorage.getItem('note_editor_state');
+  if (!raw) { toast('保存された状態がありません'); return; }
+  const data = JSON.parse(raw);
+  const img = new Image();
+  await new Promise(res => {
+    img.onload = () => {
+      canvas.width = data.baseWidth;
+      canvas.height = data.baseHeight;
+      ctx.drawImage(img, 0, 0);
+      state.baseImage = ctx.getImageData(0, 0, data.baseWidth, data.baseHeight);
+      state.baseWidth = data.baseWidth;
+      state.baseHeight = data.baseHeight;
+      state.aspectRatio = data.baseWidth / data.baseHeight;
+      state.layers = data.layers;
+      state.history = [];
+      state.historyIdx = -1;
+      document.getElementById('resizeWidth').value = state.baseWidth;
+      document.getElementById('resizeHeight').value = state.baseHeight;
+      document.getElementById('canvasUploadPrompt').style.display = 'none';
+      canvas.style.display = 'block';
+      zoomFit();
+      saveHistory();
+      res();
+    };
+    img.src = data.baseImageData;
+  });
+  render();
+  updateLayerList();
+  updateCanvasInfo();
+  const savedDate = new Date(data.savedAt).toLocaleString('ja-JP');
+  toast(`復元しました (${savedDate})`);
+});
+
+document.getElementById('clearAll').addEventListener('click', () => {
+  if (!confirm('すべてクリアしますか？')) return;
+  state.baseImage = null;
+  state.layers = [];
+  state.selectedLayerId = null;
+  state.cropRect = null;
+  state.history = [];
+  state.historyIdx = -1;
+  canvas.width = 800;
+  canvas.height = 500;
+  canvas.style.width = '';
+  canvas.style.height = '';
+  canvas.style.display = 'none';
+  document.getElementById('canvasUploadPrompt').style.display = 'flex';
+  ctx.clearRect(0, 0, 800, 500);
+  updateLayerList();
+  updateCanvasInfo();
+  updateUndoRedo();
+  toast('クリアしました');
+});
+
+// ============== Undo/Redo ==============
+document.getElementById('undoBtn').addEventListener('click', async () => {
+  if (state.historyIdx > 0) {
+    state.historyIdx--;
+    await restoreFromHistory(state.historyIdx);
+    updateUndoRedo();
+  }
+});
+document.getElementById('redoBtn').addEventListener('click', async () => {
+  if (state.historyIdx < state.history.length - 1) {
+    state.historyIdx++;
+    await restoreFromHistory(state.historyIdx);
+    updateUndoRedo();
+  }
+});
+
+// ============== Keyboard shortcuts ==============
+const shortcutMap = {
+  'v': 'select',
+  'c': 'crop',
+  'o': 'ellipse',
+  'r': 'rect',
+  'a': 'arrow',
+  'l': 'line',
+};
+
+document.addEventListener('keydown', e => {
+  const inField = ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName);
+
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+    e.preventDefault();
+    document.getElementById('undoBtn').click();
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+    e.preventDefault();
+    document.getElementById('redoBtn').click();
+    return;
+  }
+
+  if (inField) return;
+
+  // Space: パン（手のひら）モード
+  if (e.code === 'Space' && !e.repeat) {
+    e.preventDefault();
+    state.spacePressed = true;
+    canvasWrapper.classList.add('pan-mode');
+    return;
+  }
+
+  if (e.key === 'Escape') {
+    state.selectedLayerId = null;
+    state.cropRect = null;
+    render();
+    updateLayerList();
+    updateCanvasInfo();
+    return;
+  }
+
+  if (e.key === 'Enter' && state.cropRect) {
+    e.preventDefault();
+    document.getElementById('applyCropOnly').click();
+    return;
+  }
+
+  if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedLayerId) {
+    state.layers = state.layers.filter(l => l.id !== state.selectedLayerId);
+    state.selectedLayerId = null;
+    saveHistory();
+    render();
+    updateLayerList();
+    updateCanvasInfo();
+    return;
+  }
+
+  const key = e.key.toLowerCase();
+  if (shortcutMap[key] && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault();
+    selectTool(shortcutMap[key]);
+  }
+});
+
+document.addEventListener('keyup', e => {
+  if (e.code === 'Space') {
+    state.spacePressed = false;
+    canvasWrapper.classList.remove('pan-mode');
+    // パン中だった場合は解除
+    if (state.panning) {
+      state.panning = null;
+      canvasWrapper.classList.remove('panning');
+    }
+  }
+});
+
+// ウィンドウからフォーカスが外れたらSpace状態を解除（押しっぱなしで切替えるとロックされる対策）
+window.addEventListener('blur', () => {
+  state.spacePressed = false;
+  canvasWrapper.classList.remove('pan-mode', 'panning');
+  state.panning = null;
+});
+
+// init
+updateCanvasInfo();
+updateUndoRedo();
+updateCursor();
+
+// ============== PWA: Service Worker登録 ==============
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js')
+      .then((reg) => {
+        console.log('[PWA] Service Worker registered:', reg.scope);
+        // 更新検知
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                toast('🔄 新しいバージョンが利用可能です。再読込してください');
+              }
+            });
+          }
+        });
+      })
+      .catch((err) => {
+        console.warn('[PWA] Service Worker registration failed:', err);
+      });
+  });
+}
+
+// ============== PWA: インストールボタン ==============
+let deferredInstallPrompt = null;
+const installBtn = document.getElementById('installBtn');
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  // ブラウザの自動プロンプトを抑制
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  // インストール可能になったらボタンを表示
+  if (installBtn) {
+    installBtn.style.display = 'inline-flex';
+  }
+});
+
+if (installBtn) {
+  installBtn.addEventListener('click', async () => {
+    if (!deferredInstallPrompt) {
+      toast('既にインストール済みか、ブラウザがPWAインストールに対応していません');
+      return;
+    }
+    deferredInstallPrompt.prompt();
+    const { outcome } = await deferredInstallPrompt.userChoice;
+    if (outcome === 'accepted') {
+      toast('🎉 アプリとしてインストールしました');
+      installBtn.style.display = 'none';
+    }
+    deferredInstallPrompt = null;
+  });
+}
+
+// インストール完了検知
+window.addEventListener('appinstalled', () => {
+  if (installBtn) installBtn.style.display = 'none';
+  toast('🎉 インストール完了');
+});
+</script>
+</body>
+</html>
