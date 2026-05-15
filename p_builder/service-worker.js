@@ -11,10 +11,26 @@ const APP_SHELL = [
   "./icons/icon-192-maskable.png"
 ];
 
+const EXTERNAL_RESOURCES = [
+  "https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&family=DM+Serif+Display:ital@0;1&display=swap",
+  "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"
+];
+
+function cacheExternalResources(cache) {
+  return Promise.allSettled(
+    EXTERNAL_RESOURCES.map((url) => {
+      const request = new Request(url, { mode: "no-cors" });
+      return fetch(request).then((response) => cache.put(request, response));
+    })
+  );
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => cache.addAll(APP_SHELL))
+      .then(() => caches.open(CACHE_NAME))
+      .then((cache) => cacheExternalResources(cache))
       .then(() => self.skipWaiting())
   );
 });

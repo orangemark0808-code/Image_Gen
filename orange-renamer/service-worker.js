@@ -12,6 +12,19 @@ const APP_SHELL = [
   "./icons/icon-192-maskable.png"
 ];
 
+const EXTERNAL_RESOURCES = [
+  "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
+];
+
+function cacheExternalResources(cache) {
+  return Promise.allSettled(
+    EXTERNAL_RESOURCES.map((url) => {
+      const request = new Request(url, { mode: "no-cors" });
+      return fetch(request).then((response) => cache.put(request, response));
+    })
+  );
+}
+
 function cacheKeyFor(request) {
   const url = new URL(request.url);
   if (
@@ -27,6 +40,8 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => cache.addAll(APP_SHELL))
+      .then(() => caches.open(CACHE_NAME))
+      .then((cache) => cacheExternalResources(cache))
       .then(() => self.skipWaiting())
   );
 });
