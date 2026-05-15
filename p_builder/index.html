@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Character Sheet Prompt Builder V43</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#ff7f00">
 <link rel="icon" href="./favicon.ico" type="image/x-icon">
 <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -1297,6 +1299,13 @@ function copyBoothText(btn){
 function showToast(message){const t=document.getElementById('toast');if(!t)return;t.textContent=message;t.classList.add('visible');clearTimeout(window.__toastTimer);window.__toastTimer=setTimeout(()=>{t.classList.remove('visible')},1800)}
 function showStatus(t){const s=document.getElementById('status');if(!s)return;s.textContent=t;s.classList.add('visible')}
 function resetAll(){Object.keys(state).forEach(k=>{state[k]=Array.isArray(state[k])?[]:''});const hf=document.getElementById('hairFree');if(hf)hf.value='';document.querySelectorAll('.chip').forEach(c=>c.classList.remove('selected'));document.getElementById('output').classList.remove('visible');const status=document.getElementById('status');if(status){status.textContent='';status.classList.remove('visible')}showToast('リセットしました。');}
+if ("serviceWorker" in navigator) {
+ window.addEventListener("load", () => {
+  navigator.serviceWorker.register("./service-worker.js", { scope: "./" }).catch((error) => {
+   console.warn("[PWA] Service Worker registration failed:", error);
+  });
+ });
+}
 </script>
 </body>
 </html>
