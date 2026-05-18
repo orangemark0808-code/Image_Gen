@@ -668,7 +668,8 @@ function switchMode(mode) {
     transparentModeArea.style.display = 'none';
   } else {
     editModePanel.style.display = 'none';
-    transparentModePanel.style.display = '';
+    // CSSで #transparentModePanel に display:none が指定されているため明示的に 'block' を指定
+    transparentModePanel.style.display = 'block';
     editModeArea.style.display = 'none';
     transparentModeArea.style.display = 'flex';
   }
