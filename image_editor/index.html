@@ -261,13 +261,10 @@ canvas {
 #transparentModePanel { display: none; }
 #transparentModeArea { display: none; flex: 1; overflow: hidden; flex-direction: column; padding: 16px; }
 
-.tp-drop-zone {
-  border: 2px dashed #ea580c; border-radius: 8px;
-  padding: 20px 12px; text-align: center;
-  color: #64748b; font-size: 13px; cursor: pointer; transition: all 0.15s;
-  margin-bottom: 12px;
+.tp-toolbar {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 10px; flex-wrap: wrap; gap: 8px; flex-shrink: 0;
 }
-.tp-drop-zone:hover, .tp-drop-zone.dragover { background: #fff7ed; border-color: #c2410c; color: #ea580c; }
 
 .tp-threshold-row {
   display: flex; align-items: center; gap: 8px; margin-bottom: 4px;
@@ -288,7 +285,7 @@ canvas {
 }
 .tp-canvas-wrap {
   flex: 1; overflow: auto; border-radius: 6px;
-  display: flex; justify-content: center; align-items: flex-start;
+  display: flex; justify-content: flex-start; align-items: flex-start;
   padding: 8px;
   /* チェッカーボード背景（透過確認用） */
   background-color: #fff;
@@ -302,7 +299,7 @@ canvas {
 }
 .tp-canvas-wrap.solid-bg { background: #f8fafc; background-image: none; }
 
-.tp-before-canvas, .tp-after-canvas { max-width: 100%; max-height: 100%; display: block; }
+.tp-before-canvas, .tp-after-canvas { display: block; }
 
 /* ===== Toast ===== */
 .toast {
@@ -531,19 +528,9 @@ canvas {
     <!-- ==== TRANSPARENT MODE PANEL ==== -->
     <div id="transparentModePanel">
 
-      <!-- 画像入力 -->
+      <!-- 1. 設定 -->
       <div class="section">
-        <div class="section-title">1. 画像を選択</div>
-        <div class="tp-drop-zone" id="tpDropZone">
-          📂 ドラッグ＆ドロップ<br>またはクリックして選択
-          <input type="file" id="tpFileInput" accept="image/*" style="display:none">
-        </div>
-        <button id="tpClearBtn" class="danger" style="width:100%;" disabled>🗑 画像をクリア</button>
-      </div>
-
-      <!-- しきい値 -->
-      <div class="section">
-        <div class="section-title">2. しきい値（白判定）</div>
+        <div class="section-title">1. しきい値（白判定）</div>
         <div class="tp-threshold-row">
           <input type="range" id="tpThreshold" min="0" max="255" value="30">
           <span class="tp-threshold-val" id="tpThresholdVal">30</span>
@@ -559,13 +546,14 @@ canvas {
         </div>
         <div class="btn-row" style="margin-top:8px;">
           <button id="tpResetBtn">リセット</button>
-          <button id="tpDownloadBtn" class="primary" disabled>💾 transparent.png</button>
+          <button id="tpDownloadBtn" class="primary" disabled>PNG で保存</button>
         </div>
+        <button id="tpClearBtn" class="danger" style="width:100%; margin-top:6px;" disabled>画像をクリア</button>
       </div>
 
-      <!-- ヒント -->
+      <!-- 2. アルゴリズム -->
       <div class="section">
-        <div class="section-title">処理アルゴリズム</div>
+        <div class="section-title">2. 処理アルゴリズム</div>
         <div class="help-box">
           各ピクセルのRGB値と白(255,255,255)の
           ユークリッド距離を計算。<br>
@@ -609,21 +597,35 @@ canvas {
 
   <!-- ===== Transparent Mode Area ===== -->
   <div id="transparentModeArea">
-    <div id="tpNoImage" style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; color:#94a3b8;">
-      <div style="font-size:48px; margin-bottom:12px;">🖼</div>
-      <div style="font-size:15px; font-weight:600; margin-bottom:4px;">画像をアップロードしてください</div>
-      <div style="font-size:13px;">左のパネルからドラッグ＆ドロップまたはファイルを選択</div>
+    <!-- アップロードプロンプト（画像未読込時） -->
+    <div id="tpUploadPrompt" class="canvas-upload-prompt">
+      <div class="upload-title">画像をここにドラッグ&ドロップ</div>
+      <div class="upload-subtitle">またはクリックしてファイルを選択</div>
+      <input type="file" id="tpFileInput" accept="image/*" style="display:none">
     </div>
+    <!-- ツールバー（画像読込後） -->
+    <div class="tp-toolbar" id="tpToolbar" style="display:none;">
+      <div class="zoom-control">
+        <span>表示</span>
+        <button id="tpZoomOut">−</button>
+        <input type="range" id="tpZoomSlider" min="10" max="200" value="100">
+        <span id="tpZoomLabel" style="min-width:40px; text-align:right;">100%</span>
+        <button id="tpZoomIn">＋</button>
+        <button id="tpZoomFitBtn">画面に合わせる</button>
+        <button id="tpZoom100Btn">原寸</button>
+      </div>
+    </div>
+    <!-- プレビュー（画像読込後） -->
     <div id="tpPreviewWrap" class="tp-preview-area" style="display:none;">
       <div class="tp-panel">
         <div class="tp-label">元画像</div>
-        <div class="tp-canvas-wrap solid-bg">
+        <div class="tp-canvas-wrap solid-bg" id="tpBeforeWrap">
           <canvas id="tpBeforeCanvas" class="tp-before-canvas"></canvas>
         </div>
       </div>
       <div class="tp-panel">
         <div class="tp-label">透過後</div>
-        <div class="tp-canvas-wrap">
+        <div class="tp-canvas-wrap" id="tpAfterWrap">
           <canvas id="tpAfterCanvas" class="tp-after-canvas"></canvas>
         </div>
       </div>
@@ -808,6 +810,12 @@ document.getElementById('zoomIn').addEventListener('click', () => setZoom(editSt
 document.getElementById('zoomOut').addEventListener('click', () => setZoom(editState.zoom * 100 - 10));
 document.getElementById('zoom100').addEventListener('click', () => setZoom(100));
 document.getElementById('zoomFit').addEventListener('click', zoomFit);
+
+canvasWrapper.addEventListener('wheel', e => {
+  e.preventDefault();
+  const delta = e.deltaY < 0 ? 10 : -10;
+  setZoom(editState.zoom * 100 + delta);
+}, { passive: false });
 
 // --- Cursor ---
 function updateCursor() {
@@ -1416,20 +1424,49 @@ const tpState = {
   originalImageData: null,
   originalWidth: 0,
   originalHeight: 0,
+  zoom: 1,
 };
 
 const tpBeforeCanvas = document.getElementById('tpBeforeCanvas');
 const tpAfterCanvas = document.getElementById('tpAfterCanvas');
 const tpBeforeCtx = tpBeforeCanvas.getContext('2d');
 const tpAfterCtx = tpAfterCanvas.getContext('2d');
-const tpDropZone = document.getElementById('tpDropZone');
+const tpUploadPrompt = document.getElementById('tpUploadPrompt');
 const tpFileInput = document.getElementById('tpFileInput');
 const tpThresholdSlider = document.getElementById('tpThreshold');
 const tpThresholdVal = document.getElementById('tpThresholdVal');
 const tpDownloadBtn = document.getElementById('tpDownloadBtn');
 const tpClearBtn = document.getElementById('tpClearBtn');
 const tpPreviewWrap = document.getElementById('tpPreviewWrap');
-const tpNoImage = document.getElementById('tpNoImage');
+const tpToolbar = document.getElementById('tpToolbar');
+
+// --- TP Zoom ---
+function tpApplyZoom() {
+  const w = tpState.originalWidth * tpState.zoom;
+  const h = tpState.originalHeight * tpState.zoom;
+  tpBeforeCanvas.style.width = w + 'px';
+  tpBeforeCanvas.style.height = h + 'px';
+  tpAfterCanvas.style.width = w + 'px';
+  tpAfterCanvas.style.height = h + 'px';
+  document.getElementById('tpZoomLabel').textContent = Math.round(tpState.zoom * 100) + '%';
+  document.getElementById('tpZoomSlider').value = Math.round(tpState.zoom * 100);
+}
+
+function tpSetZoom(percent) {
+  tpState.zoom = Math.max(0.1, Math.min(2, percent / 100));
+  tpApplyZoom();
+}
+
+function tpZoomFit() {
+  if (!tpState.originalImageData) return;
+  const wrap = document.getElementById('tpBeforeWrap');
+  const wrapW = wrap.clientWidth - 16;
+  const wrapH = wrap.clientHeight - 16;
+  const sx = wrapW / tpState.originalWidth;
+  const sy = wrapH / tpState.originalHeight;
+  tpState.zoom = Math.max(0.1, Math.min(sx, sy, 2));
+  tpApplyZoom();
+}
 
 function loadTransparentImage(file) {
   const reader = new FileReader();
@@ -1442,11 +1479,13 @@ function loadTransparentImage(file) {
       tpBeforeCtx.drawImage(img, 0, 0);
       tpState.originalImageData = tpBeforeCtx.getImageData(0, 0, w, h);
       tpState.originalWidth = w; tpState.originalHeight = h;
+      tpUploadPrompt.style.display = 'none';
+      tpToolbar.style.display = 'flex';
       tpPreviewWrap.style.display = 'flex';
-      tpNoImage.style.display = 'none';
       tpDownloadBtn.disabled = false;
       tpClearBtn.disabled = false;
       applyTransparent();
+      tpZoomFit();
       toast('画像を読み込みました');
     };
     img.src = e.target.result;
@@ -1505,15 +1544,32 @@ tpThresholdSlider.addEventListener('input', () => {
 
 document.getElementById('tpAntialias').addEventListener('change', applyTransparent);
 
-// D&D
-tpDropZone.addEventListener('click', () => tpFileInput.click());
-tpDropZone.addEventListener('dragover', e => { e.preventDefault(); tpDropZone.classList.add('dragover'); });
-tpDropZone.addEventListener('dragleave', () => tpDropZone.classList.remove('dragover'));
-tpDropZone.addEventListener('drop', e => {
-  e.preventDefault(); tpDropZone.classList.remove('dragover');
+// アップロードプロンプト D&D / クリック
+tpUploadPrompt.addEventListener('click', () => tpFileInput.click());
+tpUploadPrompt.addEventListener('dragover', e => { e.preventDefault(); tpUploadPrompt.classList.add('canvas-dragover'); });
+tpUploadPrompt.addEventListener('dragleave', e => {
+  if (!tpUploadPrompt.contains(e.relatedTarget)) tpUploadPrompt.classList.remove('canvas-dragover');
+});
+tpUploadPrompt.addEventListener('drop', e => {
+  e.preventDefault(); tpUploadPrompt.classList.remove('canvas-dragover');
   if (e.dataTransfer.files[0]) loadTransparentImage(e.dataTransfer.files[0]);
 });
 tpFileInput.addEventListener('change', e => { if (e.target.files[0]) loadTransparentImage(e.target.files[0]); });
+
+// TP ズームコントロール
+document.getElementById('tpZoomSlider').addEventListener('input', e => tpSetZoom(parseFloat(e.target.value)));
+document.getElementById('tpZoomIn').addEventListener('click', () => tpSetZoom(tpState.zoom * 100 + 10));
+document.getElementById('tpZoomOut').addEventListener('click', () => tpSetZoom(tpState.zoom * 100 - 10));
+document.getElementById('tpZoom100Btn').addEventListener('click', () => tpSetZoom(100));
+document.getElementById('tpZoomFitBtn').addEventListener('click', tpZoomFit);
+
+// TP エリアのホイールズーム
+document.getElementById('transparentModeArea').addEventListener('wheel', e => {
+  if (!tpState.originalImageData) return;
+  e.preventDefault();
+  const delta = e.deltaY < 0 ? 10 : -10;
+  tpSetZoom(tpState.zoom * 100 + delta);
+}, { passive: false });
 
 // ダウンロード
 tpDownloadBtn.addEventListener('click', () => {
@@ -1536,10 +1592,14 @@ document.getElementById('tpResetBtn').addEventListener('click', () => {
 // クリア
 tpClearBtn.addEventListener('click', () => {
   tpState.originalImageData = null; tpState.originalWidth = 0; tpState.originalHeight = 0;
+  tpState.zoom = 1;
   tpBeforeCanvas.width = 0; tpBeforeCanvas.height = 0;
+  tpBeforeCanvas.style.width = ''; tpBeforeCanvas.style.height = '';
   tpAfterCanvas.width = 0; tpAfterCanvas.height = 0;
+  tpAfterCanvas.style.width = ''; tpAfterCanvas.style.height = '';
   tpPreviewWrap.style.display = 'none';
-  tpNoImage.style.display = 'flex';
+  tpToolbar.style.display = 'none';
+  tpUploadPrompt.style.display = 'flex';
   tpDownloadBtn.disabled = true; tpClearBtn.disabled = true;
   tpFileInput.value = '';
   toast('画像をクリアしました');
