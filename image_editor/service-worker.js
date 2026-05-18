@@ -2,7 +2,7 @@
 // 画像エディター PWA - オフラインキャッシュ担当
 
 // バージョン番号: HTMLや機能を更新した時はここを書き換えると古いキャッシュが破棄される
-const CACHE_VERSION = 'image-editor-v10.0.0';
+const CACHE_VERSION = 'image-editor-v11.0.0';
 
 // キャッシュ対象のファイル（相対パス）
 const CACHE_FILES = [
