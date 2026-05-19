@@ -600,6 +600,7 @@ canvas {
 
       <!-- 共通アクション -->
       <div class="section">
+        <button id="tpPreviewBtn" style="width:100%; margin-bottom:6px;" disabled>黒背景でプレビュー</button>
         <button id="tpDownloadBtn" class="primary" style="width:100%; margin-bottom:6px;" disabled>PNG で保存</button>
         <button id="tpClearBtn" class="danger" style="width:100%;" disabled>画像をクリア</button>
       </div>
@@ -671,6 +672,22 @@ canvas {
   </div>
 
 </div><!-- /app-body -->
+
+<!-- ===== 透過プレビューモーダル ===== -->
+<div id="tpPreviewModal" style="display:none; position:fixed; inset:0; z-index:200; background:rgba(0,0,0,0.88); align-items:center; justify-content:center; flex-direction:column;">
+  <div style="max-width:92vw; max-height:92vh; display:flex; flex-direction:column; background:#111; border-radius:10px; overflow:hidden; box-shadow:0 8px 40px rgba(0,0,0,0.7);">
+    <div style="padding:10px 16px; display:flex; align-items:center; justify-content:space-between; background:#1c1c1c; flex-shrink:0; gap:12px;">
+      <span style="color:#aaa; font-size:12px; font-family:monospace;">PREVIEW — 黒背景</span>
+      <div style="display:flex; gap:8px;">
+        <button id="tpPreviewSaveBtn" class="primary" style="font-size:12px; padding:5px 12px;">このまま保存</button>
+        <button id="tpPreviewCloseBtn" style="font-size:12px; padding:5px 12px;">閉じる</button>
+      </div>
+    </div>
+    <div style="overflow:auto; background:#000; flex:1; display:flex; align-items:center; justify-content:center; padding:16px; min-height:200px;">
+      <canvas id="tpPreviewCanvas" style="display:block; max-width:100%; max-height:75vh;"></canvas>
+    </div>
+  </div>
+</div>
 
 <div class="toast" id="toast"></div>
 
@@ -1467,6 +1484,7 @@ const tpState = {
   selectionMask: null,
   maskHistory: [],      // Undo 用スナップショット（最大10件）
   maskRedoHistory: [],  // Redo 用スナップショット（最大10件）
+  colorDistMap: null,   // Float32Array: 各選択ピクセルの正規化カラー距離（0=一致, 1=許容境界）
 };
 
 const tpBeforeCanvas = document.getElementById('tpBeforeCanvas');
@@ -1485,6 +1503,7 @@ const tpPreviewWrap = document.getElementById('tpPreviewWrap');
 const tpToolbar = document.getElementById('tpToolbar');
 const tpUndoBtn = document.getElementById('tpUndoBtn');
 const tpRedoBtn = document.getElementById('tpRedoBtn');
+const tpPreviewBtn = document.getElementById('tpPreviewBtn');
 
 // --- TP Zoom ---
 function tpApplyZoom() {
@@ -1532,7 +1551,7 @@ function loadTransparentImage(file) {
       tpPreviewWrap.style.display = 'flex';
       tpDownloadBtn.disabled = false;
       tpClearBtn.disabled = false;
-      document.getElementById('tpClearSelectionBtn').disabled = true;
+      updateWandSelectionBtns(false);
       if (tpState.tpMode === 'threshold') {
         applyTransparent();
       } else {
@@ -1599,25 +1618,26 @@ function applyTransparent() {
 // === WAND (自動選択) ===
 // ============================================================
 
-function floodFill(imageData, startX, startY, tolerance) {
+// colorDistOut: オプションの Float32Array（各選択ピクセルの正規化カラー距離を記録）
+function floodFill(imageData, startX, startY, tolerance, colorDistOut) {
   const { width, height, data } = imageData;
   const mask = new Uint8Array(width * height);
   const visited = new Uint8Array(width * height);
   const startPos = startY * width + startX;
   const sr = data[startPos * 4], sg = data[startPos * 4 + 1], sb = data[startPos * 4 + 2];
-  // tolerance 0〜100 を RGB チャンネル差の最大値（0〜255）にマッピング
   const t = Number(tolerance) * 2.55;
   const stack = [startPos];
   visited[startPos] = 1;
   while (stack.length > 0) {
     const pos = stack.pop();
     const pi = pos * 4;
-    // 各チャンネルの絶対差の最大値でカラー距離を判定（高速・直感的）
     const dr = Math.abs(data[pi]   - sr);
     const dg = Math.abs(data[pi+1] - sg);
     const db = Math.abs(data[pi+2] - sb);
-    if (Math.max(dr, dg, db) > t) continue;
+    const dist = Math.max(dr, dg, db);
+    if (dist > t) continue;
     mask[pos] = 1;
+    if (colorDistOut) colorDistOut[pos] = t > 0 ? dist / t : 0; // 0=一致, 1=許容境界
     const x = pos % width, y = Math.floor(pos / width);
     if (x > 0        && !visited[pos-1])     { visited[pos-1] = 1;     stack.push(pos-1); }
     if (x < width-1  && !visited[pos+1])     { visited[pos+1] = 1;     stack.push(pos+1); }
@@ -1644,6 +1664,78 @@ function renderWandPreview() {
   tpOverlayCtx.putImageData(overlayData, 0, 0);
 }
 
+// ===== 高品質アンチエイリアス用ユーティリティ =====
+
+// 選択マスクの各ピクセルから境界（非選択ピクセル）までの距離マップを BFS で計算
+function computeDistMap(mask, w, h, maxDist) {
+  const dist = new Int32Array(w * h).fill(maxDist + 1);
+  const queue = [];
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (!mask[i]) continue;
+      // 4近傍のいずれかが非選択なら境界ピクセル（距離 = 0）
+      const isBoundary =
+        (x === 0     || !mask[i-1]) ||
+        (x === w-1   || !mask[i+1]) ||
+        (y === 0     || !mask[i-w]) ||
+        (y === h-1   || !mask[i+w]);
+      if (isBoundary) { dist[i] = 0; queue.push(i); }
+    }
+  }
+  let qi = 0;
+  while (qi < queue.length) {
+    const pos = queue[qi++];
+    const d = dist[pos];
+    if (d >= maxDist) continue;
+    const x = pos % w, y = Math.floor(pos / w);
+    if (x > 0     && mask[pos-1] && dist[pos-1] > d+1) { dist[pos-1] = d+1; queue.push(pos-1); }
+    if (x < w-1   && mask[pos+1] && dist[pos+1] > d+1) { dist[pos+1] = d+1; queue.push(pos+1); }
+    if (y > 0     && mask[pos-w] && dist[pos-w] > d+1) { dist[pos-w] = d+1; queue.push(pos-w); }
+    if (y < h-1   && mask[pos+w] && dist[pos+w] > d+1) { dist[pos+w] = d+1; queue.push(pos+w); }
+  }
+  return dist;
+}
+
+// 透過ピクセルデータを生成（wandDownload・プレビュー共用）
+function buildTransparentImageData(ctx, w, h) {
+  const src = tpState.originalImageData.data;
+  const mask = tpState.selectionMask;
+  const colorDist = tpState.colorDistMap; // Float32Array or null
+  const antialias = document.getElementById('tpWandAntialias').checked;
+  const out = ctx.createImageData(w, h);
+  const d = out.data;
+
+  const featherW = 3; // 羽根ぼかし幅（ピクセル）
+  let distMap = null;
+  if (antialias) distMap = computeDistMap(mask, w, h, featherW);
+
+  for (let i = 0; i < w * h; i++) {
+    const pi = i * 4;
+    d[pi] = src[pi]; d[pi+1] = src[pi+1]; d[pi+2] = src[pi+2];
+    if (!mask[i]) {
+      d[pi+3] = src[pi+3]; // 非選択: 不透明のまま
+    } else if (!antialias) {
+      d[pi+3] = 0; // 選択・antialias OFF: 完全透明
+    } else {
+      // 方針A: 境界からの距離ベース羽根ぼかし
+      // dist=0(境界): alpha = src * featherW/(featherW+1)
+      // dist=featherW+: alpha = 0
+      const edgeDist = distMap[i];
+      const edgeAlpha = Math.round(src[pi+3] * Math.max(0, (featherW - edgeDist) / (featherW + 1)));
+
+      // 方針B: 色類似度ベースα調整（colorDistMap がある場合のみ）
+      // colorDist[i]=0(基準色と一致): alpha=0
+      // colorDist[i]=1(許容範囲境界): alpha=src
+      const colorAlpha = colorDist ? Math.round(src[pi+3] * colorDist[i]) : 0;
+
+      // 組み合わせ: より不透明な方を採用（max → 境界ピクセルの滑らかさ + 色境界の保持）
+      d[pi+3] = Math.max(edgeAlpha, colorAlpha);
+    }
+  }
+  return out;
+}
+
 function wandDownload() {
   if (!tpState.originalImageData) { toast('画像を読み込んでください'); return; }
   if (!tpState.selectionMask) { toast('選択範囲がありません'); return; }
@@ -1651,31 +1743,7 @@ function wandDownload() {
   const tmp = document.createElement('canvas');
   tmp.width = w; tmp.height = h;
   const tmpCtx = tmp.getContext('2d');
-  const src = tpState.originalImageData.data;
-  const out = tmpCtx.createImageData(w, h);
-  const d = out.data;
-  const mask = tpState.selectionMask;
-  const antialias = document.getElementById('tpWandAntialias').checked;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const i = y * w + x, pi = i * 4;
-      d[pi] = src[pi]; d[pi+1] = src[pi+1]; d[pi+2] = src[pi+2];
-      if (!mask[i]) {
-        d[pi+3] = src[pi+3];
-      } else if (!antialias) {
-        d[pi+3] = 0;
-      } else {
-        // 境界ピクセルは隣接する非選択ピクセル数に応じて半透明にフェード
-        const ls = x === 0   ? 1 : mask[i-1];
-        const rs = x === w-1 ? 1 : mask[i+1];
-        const ts = y === 0   ? 1 : mask[i-w];
-        const bs = y === h-1 ? 1 : mask[i+w];
-        const n = ls + rs + ts + bs;
-        d[pi+3] = n === 4 ? 0 : Math.round(src[pi+3] * (4 - n) / 4);
-      }
-    }
-  }
-  tmpCtx.putImageData(out, 0, 0);
+  tmpCtx.putImageData(buildTransparentImageData(tmpCtx, w, h), 0, 0);
   const a = document.createElement('a');
   a.href = tmp.toDataURL('image/png');
   a.download = 'transparent.png';
@@ -1692,7 +1760,7 @@ document.querySelectorAll('input[name="tpMode"]').forEach(radio => {
     tpState.selectionMask = null;
     tpState.maskHistory = [];
     tpState.maskRedoHistory = [];
-    document.getElementById('tpClearSelectionBtn').disabled = true;
+    updateWandSelectionBtns(false);
     updateTpHistoryBtns();
     if (tpState.originalImageData) {
       radio.value === 'threshold' ? applyTransparent() : renderWandPreview();
@@ -1704,6 +1772,12 @@ document.querySelectorAll('input[name="tpMode"]').forEach(radio => {
 function updateTpHistoryBtns() {
   tpUndoBtn.disabled = tpState.maskHistory.length === 0;
   tpRedoBtn.disabled = tpState.maskRedoHistory.length === 0;
+}
+
+// 選択関連ボタン（クリア・プレビュー）の有効/無効を更新
+function updateWandSelectionBtns(hasMask) {
+  document.getElementById('tpClearSelectionBtn').disabled = !hasMask;
+  tpPreviewBtn.disabled = !hasMask;
 }
 
 // Redo スタックをクリア（新規操作時に呼ぶ）
@@ -1720,7 +1794,7 @@ function pushMaskHistory() {
   updateTpHistoryBtns();
 }
 
-// wand: 元画像キャンバスクリック → Flood Fill で選択
+// wand: 元画像キャンバスクリック → Flood Fill で選択 + colorDist 記録
 tpBeforeCanvas.addEventListener('click', e => {
   if (tpState.tpMode !== 'wand' || !tpState.originalImageData) return;
   const rect = tpBeforeCanvas.getBoundingClientRect();
@@ -1729,28 +1803,38 @@ tpBeforeCanvas.addEventListener('click', e => {
   if (x < 0 || x >= tpState.originalWidth || y < 0 || y >= tpState.originalHeight) return;
   const pos = y * tpState.originalWidth + x;
   if (e.shiftKey && tpState.selectionMask && tpState.selectionMask[pos]) return;
-  pushMaskHistory(); // クリック前にスナップショット保存
+  pushMaskHistory();
   const tolerance = Number(document.getElementById('tpTolerance').value);
-  const newMask = floodFill(tpState.originalImageData, x, y, tolerance);
+  const newColorDist = new Float32Array(tpState.originalWidth * tpState.originalHeight);
+  const newMask = floodFill(tpState.originalImageData, x, y, tolerance, newColorDist);
   if (!e.shiftKey || !tpState.selectionMask) {
     tpState.selectionMask = newMask;
+    tpState.colorDistMap = newColorDist;
   } else {
-    for (let i = 0; i < newMask.length; i++) { if (newMask[i]) tpState.selectionMask[i] = 1; }
+    // Shift+クリック: 新規選択ピクセルのみ追加、colorDist もマージ
+    if (!tpState.colorDistMap) {
+      tpState.colorDistMap = new Float32Array(tpState.originalWidth * tpState.originalHeight);
+    }
+    for (let i = 0; i < newMask.length; i++) {
+      if (newMask[i] && !tpState.selectionMask[i]) {
+        tpState.selectionMask[i] = 1;
+        tpState.colorDistMap[i] = newColorDist[i];
+      }
+    }
   }
-  document.getElementById('tpClearSelectionBtn').disabled = false;
+  updateWandSelectionBtns(true);
   renderWandPreview();
 });
 
-// wand: Undo
+// wand: Undo（Undo/Redo では colorDistMap は再計算できないためクリア）
 function tpUndo() {
   if (tpState.maskHistory.length === 0) return;
-  // 現在のマスクを Redo スタックへ
   const cur = tpState.selectionMask ? tpState.selectionMask.slice() : null;
   tpState.maskRedoHistory.push(cur);
   if (tpState.maskRedoHistory.length > 10) tpState.maskRedoHistory.shift();
-  // Undo スタックから復元
   tpState.selectionMask = tpState.maskHistory.pop();
-  document.getElementById('tpClearSelectionBtn').disabled = !tpState.selectionMask;
+  tpState.colorDistMap = null;
+  updateWandSelectionBtns(!!tpState.selectionMask);
   updateTpHistoryBtns();
   renderWandPreview();
 }
@@ -1758,13 +1842,12 @@ function tpUndo() {
 // wand: Redo
 function tpRedo() {
   if (tpState.maskRedoHistory.length === 0) return;
-  // 現在のマスクを Undo スタックへ
   const cur = tpState.selectionMask ? tpState.selectionMask.slice() : null;
   tpState.maskHistory.push(cur);
   if (tpState.maskHistory.length > 10) tpState.maskHistory.shift();
-  // Redo スタックから復元
   tpState.selectionMask = tpState.maskRedoHistory.pop();
-  document.getElementById('tpClearSelectionBtn').disabled = !tpState.selectionMask;
+  tpState.colorDistMap = null;
+  updateWandSelectionBtns(!!tpState.selectionMask);
   updateTpHistoryBtns();
   renderWandPreview();
 }
@@ -1775,9 +1858,10 @@ tpRedoBtn.addEventListener('click', tpRedo);
 // wand: 選択範囲クリア（画像は保持）
 document.getElementById('tpClearSelectionBtn').addEventListener('click', () => {
   tpState.selectionMask = null;
+  tpState.colorDistMap = null;
   tpState.maskHistory = [];
   tpState.maskRedoHistory = [];
-  document.getElementById('tpClearSelectionBtn').disabled = true;
+  updateWandSelectionBtns(false);
   updateTpHistoryBtns();
   renderWandPreview();
   toast('選択範囲をクリアしました');
@@ -1837,6 +1921,42 @@ tpDownloadBtn.addEventListener('click', () => {
   }
 });
 
+// ===== プレビューモーダル =====
+const tpPreviewModal = document.getElementById('tpPreviewModal');
+const tpPreviewCanvas = document.getElementById('tpPreviewCanvas');
+
+function showTpPreview() {
+  if (!tpState.originalImageData || !tpState.selectionMask) return;
+  const w = tpState.originalWidth, h = tpState.originalHeight;
+  const tmp = document.createElement('canvas');
+  tmp.width = w; tmp.height = h;
+  const tmpCtx = tmp.getContext('2d');
+  tmpCtx.putImageData(buildTransparentImageData(tmpCtx, w, h), 0, 0);
+  // 黒背景の上に透過PNGを描画
+  tpPreviewCanvas.width = w; tpPreviewCanvas.height = h;
+  const pCtx = tpPreviewCanvas.getContext('2d');
+  pCtx.fillStyle = '#000000';
+  pCtx.fillRect(0, 0, w, h);
+  pCtx.drawImage(tmp, 0, 0);
+  tpPreviewModal.style.display = 'flex';
+}
+
+document.getElementById('tpPreviewBtn').addEventListener('click', showTpPreview);
+
+document.getElementById('tpPreviewCloseBtn').addEventListener('click', () => {
+  tpPreviewModal.style.display = 'none';
+});
+
+document.getElementById('tpPreviewSaveBtn').addEventListener('click', () => {
+  tpPreviewModal.style.display = 'none';
+  wandDownload();
+});
+
+// モーダル外クリックで閉じる
+tpPreviewModal.addEventListener('click', e => {
+  if (e.target === tpPreviewModal) tpPreviewModal.style.display = 'none';
+});
+
 // リセット
 document.getElementById('tpResetBtn').addEventListener('click', () => {
   tpThresholdSlider.value = 30;
@@ -1859,8 +1979,9 @@ tpClearBtn.addEventListener('click', () => {
   tpUploadPrompt.style.display = 'flex';
   tpState.maskHistory = [];
   tpState.maskRedoHistory = [];
+  tpState.colorDistMap = null;
   tpDownloadBtn.disabled = true; tpClearBtn.disabled = true;
-  document.getElementById('tpClearSelectionBtn').disabled = true;
+  updateWandSelectionBtns(false);
   updateTpHistoryBtns();
   tpFileInput.value = '';
   toast('画像をクリアしました');
@@ -1891,7 +2012,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-19-07'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-19-08'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
