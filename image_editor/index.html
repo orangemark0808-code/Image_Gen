@@ -528,40 +528,82 @@ canvas {
     <!-- ==== TRANSPARENT MODE PANEL ==== -->
     <div id="transparentModePanel">
 
-      <!-- 1. 設定 -->
+      <!-- モード切替 -->
       <div class="section">
-        <div class="section-title">1. しきい値（白判定）</div>
-        <div class="tp-threshold-row">
-          <input type="range" id="tpThreshold" min="0" max="255" value="30">
-          <span class="tp-threshold-val" id="tpThresholdVal">30</span>
-        </div>
-        <div class="help-box">
-          小さい値：純白のみ透過<br>
-          大きい値：薄いグレーも透過
-        </div>
-        <div style="margin-top:8px;">
-          <label class="inline">
-            <input type="checkbox" id="tpAntialias" checked> アンチエイリアス（境界をなめらかに）
-          </label>
-        </div>
-        <div class="btn-row" style="margin-top:8px;">
-          <button id="tpResetBtn">リセット</button>
-          <button id="tpDownloadBtn" class="primary" disabled>PNG で保存</button>
-        </div>
-        <button id="tpClearBtn" class="danger" style="width:100%; margin-top:6px;" disabled>画像をクリア</button>
+        <div class="section-title">透過方法</div>
+        <label class="inline" style="display:block; margin-top:4px;">
+          <input type="radio" name="tpMode" value="wand" checked>
+          自動選択（クリックで選択）
+        </label>
+        <label class="inline" style="display:block; margin-top:6px;">
+          <input type="radio" name="tpMode" value="threshold">
+          しきい値（白系を一括透過）
+        </label>
       </div>
 
-      <!-- 2. アルゴリズム -->
-      <div class="section">
-        <div class="section-title">2. 処理アルゴリズム</div>
-        <div class="help-box">
-          各ピクセルのRGB値と白(255,255,255)の
-          ユークリッド距離を計算。<br>
-          距離がしきい値以下のピクセルを透過。
-          アンチエイリアス有効時は境界付近を
-          なめらかにフェードします。
+      <!-- 自動選択 UI -->
+      <div id="tpWandSection">
+        <div class="section">
+          <div class="section-title">1. 使い方</div>
+          <div class="help-box">
+            透過したい部分をクリックしてください。<br>
+            Shift+クリックで領域を追加できます。
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">2. 設定</div>
+          <label style="margin-top:0;">許容範囲: <span id="tpToleranceVal">30</span></label>
+          <input type="range" id="tpTolerance" min="0" max="100" value="30">
+          <div class="help-box" style="margin-top:4px;">
+            小: クリックした色に近い色のみ<br>
+            大: 似た色も広く含める
+          </div>
+          <div style="margin-top:8px;">
+            <label class="inline">
+              <input type="checkbox" id="tpWandAntialias" checked> アンチエイリアス
+            </label>
+          </div>
+          <button id="tpClearSelectionBtn" style="width:100%; margin-top:8px;" disabled>選択範囲をクリア</button>
         </div>
       </div>
+
+      <!-- しきい値 UI -->
+      <div id="tpThresholdSection" style="display:none;">
+        <div class="section">
+          <div class="section-title">1. しきい値（白判定）</div>
+          <div class="tp-threshold-row">
+            <input type="range" id="tpThreshold" min="0" max="255" value="30">
+            <span class="tp-threshold-val" id="tpThresholdVal">30</span>
+          </div>
+          <div class="help-box">
+            小さい値：純白のみ透過<br>
+            大きい値：薄いグレーも透過
+          </div>
+          <div style="margin-top:8px;">
+            <label class="inline">
+              <input type="checkbox" id="tpAntialias" checked> アンチエイリアス（境界をなめらかに）
+            </label>
+          </div>
+          <button id="tpResetBtn" style="width:100%; margin-top:8px;">リセット</button>
+        </div>
+        <div class="section">
+          <div class="section-title">2. 処理アルゴリズム</div>
+          <div class="help-box">
+            各ピクセルのRGB値と白(255,255,255)の
+            ユークリッド距離を計算。<br>
+            距離がしきい値以下のピクセルを透過。
+            アンチエイリアス有効時は境界付近を
+            なめらかにフェードします。
+          </div>
+        </div>
+      </div>
+
+      <!-- 共通アクション -->
+      <div class="section">
+        <button id="tpDownloadBtn" class="primary" style="width:100%; margin-bottom:6px;" disabled>PNG で保存</button>
+        <button id="tpClearBtn" class="danger" style="width:100%;" disabled>画像をクリア</button>
+      </div>
+
     </div><!-- /transparentModePanel -->
 
   </aside><!-- /sidebar -->
@@ -1425,6 +1467,8 @@ const tpState = {
   originalWidth: 0,
   originalHeight: 0,
   zoom: 1,
+  tpMode: 'wand',
+  selectionMask: null,
 };
 
 const tpBeforeCanvas = document.getElementById('tpBeforeCanvas');
@@ -1479,12 +1523,18 @@ function loadTransparentImage(file) {
       tpBeforeCtx.drawImage(img, 0, 0);
       tpState.originalImageData = tpBeforeCtx.getImageData(0, 0, w, h);
       tpState.originalWidth = w; tpState.originalHeight = h;
+      tpState.selectionMask = null;
       tpUploadPrompt.style.display = 'none';
       tpToolbar.style.display = 'flex';
       tpPreviewWrap.style.display = 'flex';
       tpDownloadBtn.disabled = false;
       tpClearBtn.disabled = false;
-      applyTransparent();
+      document.getElementById('tpClearSelectionBtn').disabled = true;
+      if (tpState.tpMode === 'threshold') {
+        applyTransparent();
+      } else {
+        renderWandPreview();
+      }
       tpZoomFit();
       toast('画像を読み込みました');
     };
@@ -1536,6 +1586,151 @@ function applyTransparent() {
   tpAfterCtx.putImageData(out, 0, 0);
 }
 
+// ============================================================
+// === WAND (自動選択) ===
+// ============================================================
+
+function floodFill(imageData, startX, startY, tolerance) {
+  const { width, height, data } = imageData;
+  const mask = new Uint8Array(width * height);
+  const visited = new Uint8Array(width * height);
+  const startPos = startY * width + startX;
+  const sr = data[startPos * 4], sg = data[startPos * 4 + 1], sb = data[startPos * 4 + 2];
+  const t = tolerance / 100 * Math.sqrt(3 * 255 * 255);
+  const stack = [startPos];
+  visited[startPos] = 1;
+  while (stack.length > 0) {
+    const pos = stack.pop();
+    const pi = pos * 4;
+    const dr = data[pi] - sr, dg = data[pi+1] - sg, db = data[pi+2] - sb;
+    if (Math.sqrt(dr*dr + dg*dg + db*db) > t) continue;
+    mask[pos] = 1;
+    const x = pos % width, y = Math.floor(pos / width);
+    if (x > 0        && !visited[pos-1])     { visited[pos-1] = 1;     stack.push(pos-1); }
+    if (x < width-1  && !visited[pos+1])     { visited[pos+1] = 1;     stack.push(pos+1); }
+    if (y > 0        && !visited[pos-width]) { visited[pos-width] = 1; stack.push(pos-width); }
+    if (y < height-1 && !visited[pos+width]) { visited[pos+width] = 1; stack.push(pos+width); }
+  }
+  return mask;
+}
+
+function renderWandPreview() {
+  if (!tpState.originalImageData) return;
+  const w = tpState.originalWidth, h = tpState.originalHeight;
+  const src = tpState.originalImageData.data;
+  const out = tpAfterCtx.createImageData(w, h);
+  const d = out.data;
+  const mask = tpState.selectionMask;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x, pi = i * 4;
+      d[pi] = src[pi]; d[pi+1] = src[pi+1]; d[pi+2] = src[pi+2]; d[pi+3] = src[pi+3];
+      if (!mask || !mask[i]) continue;
+      const isBoundary = (
+        (x === 0     || !mask[i-1]) || (x === w-1 || !mask[i+1]) ||
+        (y === 0     || !mask[i-w]) || (y === h-1 || !mask[i+w])
+      );
+      if (isBoundary) {
+        const v = (x + y) % 8 < 4 ? 0 : 255;
+        d[pi] = v; d[pi+1] = v; d[pi+2] = v; d[pi+3] = 255;
+      } else {
+        d[pi]   = Math.min(255, src[pi] + 40);
+        d[pi+1] = Math.round(src[pi+1] * 0.85);
+        d[pi+2] = Math.round(src[pi+2] * 0.85);
+        d[pi+3] = src[pi+3];
+      }
+    }
+  }
+  tpAfterCtx.putImageData(out, 0, 0);
+}
+
+function wandDownload() {
+  if (!tpState.originalImageData) { toast('画像を読み込んでください'); return; }
+  if (!tpState.selectionMask) { toast('選択範囲がありません'); return; }
+  const w = tpState.originalWidth, h = tpState.originalHeight;
+  const tmp = document.createElement('canvas');
+  tmp.width = w; tmp.height = h;
+  const tmpCtx = tmp.getContext('2d');
+  const src = tpState.originalImageData.data;
+  const out = tmpCtx.createImageData(w, h);
+  const d = out.data;
+  const mask = tpState.selectionMask;
+  const antialias = document.getElementById('tpWandAntialias').checked;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x, pi = i * 4;
+      d[pi] = src[pi]; d[pi+1] = src[pi+1]; d[pi+2] = src[pi+2];
+      if (!mask[i]) {
+        d[pi+3] = src[pi+3];
+      } else if (!antialias) {
+        d[pi+3] = 0;
+      } else {
+        // 境界ピクセルは隣接する非選択ピクセル数に応じて半透明にフェード
+        const ls = x === 0   ? 1 : mask[i-1];
+        const rs = x === w-1 ? 1 : mask[i+1];
+        const ts = y === 0   ? 1 : mask[i-w];
+        const bs = y === h-1 ? 1 : mask[i+w];
+        const n = ls + rs + ts + bs;
+        d[pi+3] = n === 4 ? 0 : Math.round(src[pi+3] * (4 - n) / 4);
+      }
+    }
+  }
+  tmpCtx.putImageData(out, 0, 0);
+  const a = document.createElement('a');
+  a.href = tmp.toDataURL('image/png');
+  a.download = 'transparent.png';
+  a.click();
+  toast('transparent.png を保存しました');
+}
+
+// モード切替 → マスクリセット・UIスイッチ
+document.querySelectorAll('input[name="tpMode"]').forEach(radio => {
+  radio.addEventListener('change', () => {
+    tpState.tpMode = radio.value;
+    document.getElementById('tpWandSection').style.display      = radio.value === 'wand'      ? 'block' : 'none';
+    document.getElementById('tpThresholdSection').style.display = radio.value === 'threshold' ? 'block' : 'none';
+    tpState.selectionMask = null;
+    document.getElementById('tpClearSelectionBtn').disabled = true;
+    if (tpState.originalImageData) {
+      radio.value === 'threshold' ? applyTransparent() : renderWandPreview();
+    }
+  });
+});
+
+// wand: 元画像キャンバスクリック → Flood Fill で選択
+tpBeforeCanvas.addEventListener('click', e => {
+  if (tpState.tpMode !== 'wand' || !tpState.originalImageData) return;
+  const rect = tpBeforeCanvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - rect.left) * (tpBeforeCanvas.width  / rect.width));
+  const y = Math.floor((e.clientY - rect.top)  * (tpBeforeCanvas.height / rect.height));
+  if (x < 0 || x >= tpState.originalWidth || y < 0 || y >= tpState.originalHeight) return;
+  const pos = y * tpState.originalWidth + x;
+  // Shift+クリックで既選択済みピクセルをクリックした場合は何もしない
+  if (e.shiftKey && tpState.selectionMask && tpState.selectionMask[pos]) return;
+  const tolerance = parseInt(document.getElementById('tpTolerance').value);
+  const newMask = floodFill(tpState.originalImageData, x, y, tolerance);
+  if (!e.shiftKey || !tpState.selectionMask) {
+    tpState.selectionMask = newMask;
+  } else {
+    for (let i = 0; i < newMask.length; i++) { if (newMask[i]) tpState.selectionMask[i] = 1; }
+  }
+  document.getElementById('tpClearSelectionBtn').disabled = false;
+  renderWandPreview();
+});
+
+// wand: 選択範囲クリア（画像は保持）
+document.getElementById('tpClearSelectionBtn').addEventListener('click', () => {
+  tpState.selectionMask = null;
+  document.getElementById('tpClearSelectionBtn').disabled = true;
+  renderWandPreview();
+  toast('選択範囲をクリアしました');
+});
+
+// wand: toleranceスライダーは表示更新のみ（次クリック時に適用）
+document.getElementById('tpTolerance').addEventListener('input', e => {
+  document.getElementById('tpToleranceVal').textContent = e.target.value;
+});
+
 // スライダー操作 → リアルタイム反映
 tpThresholdSlider.addEventListener('input', () => {
   tpThresholdVal.textContent = tpThresholdSlider.value;
@@ -1571,14 +1766,18 @@ document.getElementById('transparentModeArea').addEventListener('wheel', e => {
   tpSetZoom(tpState.zoom * 100 + delta);
 }, { passive: false });
 
-// ダウンロード
+// ダウンロード（モードによって処理を分岐）
 tpDownloadBtn.addEventListener('click', () => {
   if (!tpState.originalImageData) return;
-  const a = document.createElement('a');
-  a.href = tpAfterCanvas.toDataURL('image/png');
-  a.download = 'transparent.png';
-  a.click();
-  toast('transparent.png を保存しました');
+  if (tpState.tpMode === 'wand') {
+    wandDownload();
+  } else {
+    const a = document.createElement('a');
+    a.href = tpAfterCanvas.toDataURL('image/png');
+    a.download = 'transparent.png';
+    a.click();
+    toast('transparent.png を保存しました');
+  }
 });
 
 // リセット
@@ -1592,7 +1791,7 @@ document.getElementById('tpResetBtn').addEventListener('click', () => {
 // クリア
 tpClearBtn.addEventListener('click', () => {
   tpState.originalImageData = null; tpState.originalWidth = 0; tpState.originalHeight = 0;
-  tpState.zoom = 1;
+  tpState.zoom = 1; tpState.selectionMask = null;
   tpBeforeCanvas.width = 0; tpBeforeCanvas.height = 0;
   tpBeforeCanvas.style.width = ''; tpBeforeCanvas.style.height = '';
   tpAfterCanvas.width = 0; tpAfterCanvas.height = 0;
@@ -1601,6 +1800,7 @@ tpClearBtn.addEventListener('click', () => {
   tpToolbar.style.display = 'none';
   tpUploadPrompt.style.display = 'flex';
   tpDownloadBtn.disabled = true; tpClearBtn.disabled = true;
+  document.getElementById('tpClearSelectionBtn').disabled = true;
   tpFileInput.value = '';
   toast('画像をクリアしました');
 });
