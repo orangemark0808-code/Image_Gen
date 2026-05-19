@@ -283,6 +283,11 @@ canvas {
 .tp-preview-area {
   flex: 1; display: flex; overflow: hidden;
 }
+/* 透過タブのパンモード カーソル */
+.tp-canvas-wrap.pan-mode { cursor: grab; }
+.tp-canvas-wrap.panning  { cursor: grabbing; }
+.tp-canvas-wrap.pan-mode canvas { cursor: grab !important; }
+.tp-canvas-wrap.panning  canvas { cursor: grabbing !important; }
 .tp-canvas-wrap {
   flex: 1; overflow: auto; border-radius: 6px;
   display: flex; justify-content: flex-start; align-items: flex-start;
@@ -616,7 +621,7 @@ canvas {
       <div class="zoom-control">
         <span>表示</span>
         <button id="zoomOut">−</button>
-        <input type="range" id="zoomSlider" min="10" max="200" value="100">
+        <input type="range" id="zoomSlider" min="10" max="400" value="100">
         <span id="zoomLabel" style="min-width:40px; text-align:right;">100%</span>
         <button id="zoomIn">＋</button>
         <button id="zoomFit">画面に合わせる</button>
@@ -651,7 +656,7 @@ canvas {
       <div class="zoom-control">
         <span>表示</span>
         <button id="tpZoomOut">−</button>
-        <input type="range" id="tpZoomSlider" min="10" max="200" value="100">
+        <input type="range" id="tpZoomSlider" min="10" max="400" value="100">
         <span id="tpZoomLabel" style="min-width:40px; text-align:right;">100%</span>
         <button id="tpZoomIn">＋</button>
         <button id="tpZoomFitBtn">画面に合わせる</button>
@@ -846,7 +851,7 @@ function applyZoom() {
 }
 
 function setZoom(percent) {
-  editState.zoom = Math.max(0.1, Math.min(2, percent / 100));
+  editState.zoom = Math.max(0.1, Math.min(4, percent / 100));
   applyZoom();
 }
 
@@ -856,7 +861,7 @@ function zoomFit() {
   const wrapH = canvasWrapper.clientHeight - 24;
   const sx = wrapW / editState.baseWidth;
   const sy = wrapH / editState.baseHeight;
-  editState.zoom = Math.max(0.1, Math.min(sx, sy, 2));
+  editState.zoom = Math.max(0.1, Math.min(sx, sy, 4));
   applyZoom();
 }
 
@@ -1319,9 +1324,14 @@ document.addEventListener('mousemove', e => {
     canvasWrapper.scrollLeft = editState.panning.scrollLeft - (e.clientX - editState.panning.startX);
     canvasWrapper.scrollTop = editState.panning.scrollTop - (e.clientY - editState.panning.startY);
   }
+  if (tpState.tpPanning) {
+    tpBeforeWrap.scrollLeft = tpState.tpPanning.scrollLeft - (e.clientX - tpState.tpPanning.startX);
+    tpBeforeWrap.scrollTop  = tpState.tpPanning.scrollTop  - (e.clientY - tpState.tpPanning.startY);
+  }
 });
 document.addEventListener('mouseup', () => {
   if (editState.panning) { editState.panning = null; canvasWrapper.classList.remove('panning'); }
+  if (tpState.tpPanning) { tpState.tpPanning = null; tpBeforeWrap.classList.remove('panning'); }
 });
 
 function findLayerAt(x, y) {
@@ -1450,7 +1460,12 @@ document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); document.getElementById('undoBtn').click(); return; }
   if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); document.getElementById('redoBtn').click(); return; }
   if (inField) return;
-  if (e.code === 'Space' && !e.repeat) { e.preventDefault(); editState.spacePressed = true; canvasWrapper.classList.add('pan-mode'); return; }
+  if (e.code === 'Space' && !e.repeat) {
+    e.preventDefault();
+    editState.spacePressed = true; canvasWrapper.classList.add('pan-mode');
+    tpState.tpSpacePressed = true;  tpBeforeWrap.classList.add('pan-mode');
+    return;
+  }
   if (e.key === 'Escape') { editState.selectedLayerId = null; editState.cropRect = null; render(); updateLayerList(); updateCanvasInfo(); return; }
   if (e.key === 'Enter' && editState.cropRect) { e.preventDefault(); document.getElementById('applyCropOnly').click(); return; }
   if ((e.key === 'Delete' || e.key === 'Backspace') && editState.selectedLayerId) {
@@ -1465,11 +1480,15 @@ document.addEventListener('keyup', e => {
   if (e.code === 'Space') {
     editState.spacePressed = false; canvasWrapper.classList.remove('pan-mode');
     if (editState.panning) { editState.panning = null; canvasWrapper.classList.remove('panning'); }
+    tpState.tpSpacePressed = false; tpBeforeWrap.classList.remove('pan-mode');
+    if (tpState.tpPanning) { tpState.tpPanning = null; tpBeforeWrap.classList.remove('panning'); }
   }
 });
 window.addEventListener('blur', () => {
   editState.spacePressed = false;
   canvasWrapper.classList.remove('pan-mode', 'panning'); editState.panning = null;
+  tpState.tpSpacePressed = false;
+  tpBeforeWrap.classList.remove('pan-mode', 'panning'); tpState.tpPanning = null;
 });
 
 // ============================================================
@@ -1485,8 +1504,11 @@ const tpState = {
   maskHistory: [],      // Undo 用スナップショット（最大10件）
   maskRedoHistory: [],  // Redo 用スナップショット（最大10件）
   colorDistMap: null,   // Float32Array: 各選択ピクセルの正規化カラー距離（0=一致, 1=許容境界）
+  tpSpacePressed: false,
+  tpPanning: null,
 };
 
+const tpBeforeWrap = document.getElementById('tpBeforeWrap');
 const tpBeforeCanvas = document.getElementById('tpBeforeCanvas');
 const tpAfterCanvas = document.getElementById('tpAfterCanvas');
 const tpOverlayCanvas = document.getElementById('tpOverlayCanvas');
@@ -1518,18 +1540,17 @@ function tpApplyZoom() {
 }
 
 function tpSetZoom(percent) {
-  tpState.zoom = Math.max(0.1, Math.min(2, percent / 100));
+  tpState.zoom = Math.max(0.1, Math.min(4, percent / 100));
   tpApplyZoom();
 }
 
 function tpZoomFit() {
   if (!tpState.originalImageData) return;
-  const wrap = document.getElementById('tpBeforeWrap');
-  const wrapW = wrap.clientWidth - 16;
-  const wrapH = wrap.clientHeight - 16;
+  const wrapW = tpBeforeWrap.clientWidth - 16;
+  const wrapH = tpBeforeWrap.clientHeight - 16;
   const sx = wrapW / tpState.originalWidth;
   const sy = wrapH / tpState.originalHeight;
-  tpState.zoom = Math.max(0.1, Math.min(sx, sy, 2));
+  tpState.zoom = Math.max(0.1, Math.min(sx, sy, 4));
   tpApplyZoom();
 }
 
@@ -1794,8 +1815,21 @@ function pushMaskHistory() {
   updateTpHistoryBtns();
 }
 
+// 透過タブ: スペース+ドラッグでパン
+tpBeforeWrap.addEventListener('mousedown', e => {
+  if (tpState.tpSpacePressed && tpState.originalImageData) {
+    tpState.tpPanning = {
+      startX: e.clientX, startY: e.clientY,
+      scrollLeft: tpBeforeWrap.scrollLeft, scrollTop: tpBeforeWrap.scrollTop,
+    };
+    tpBeforeWrap.classList.add('panning');
+    e.preventDefault();
+  }
+});
+
 // wand: 元画像キャンバスクリック → Flood Fill で選択 + colorDist 記録
 tpBeforeCanvas.addEventListener('click', e => {
+  if (tpState.tpSpacePressed) return; // スペースパン中はクリック選択しない
   if (tpState.tpMode !== 'wand' || !tpState.originalImageData) return;
   const rect = tpBeforeCanvas.getBoundingClientRect();
   const x = Math.floor((e.clientX - rect.left) * (tpBeforeCanvas.width  / rect.width));
@@ -2012,7 +2046,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-19-08'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-19-09'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
