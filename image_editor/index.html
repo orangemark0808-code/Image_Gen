@@ -39,6 +39,12 @@ body {
 }
 .app-title { font-size: 18px; font-weight: 700; color: #ea580c; }
 .app-subtitle { font-size: 12px; color: #64748b; }
+.version-badge {
+  font-family: 'DM Mono', 'Courier New', monospace;
+  font-size: 11px; font-weight: 400;
+  color: rgba(58, 42, 26, 0.45);
+  margin-left: 6px;
+}
 
 .app-body {
   display: flex;
@@ -286,9 +292,10 @@ canvas {
 .tp-canvas-inner {
   position: relative; display: inline-block; line-height: 0;
 }
-.tp-before-canvas { display: block; }
+.tp-before-canvas { display: block; background: #ffffff; }
 .tp-overlay-canvas {
   position: absolute; top: 0; left: 0; pointer-events: none;
+  background: transparent;
 }
 
 /* ===== Toast ===== */
@@ -347,7 +354,7 @@ canvas {
   <div style="display:flex; align-items:center; gap:10px;">
     <button class="hamburger-btn" id="hamburgerBtn" aria-label="メニュー">☰</button>
     <div>
-      <div class="app-title">画像エディター</div>
+      <div class="app-title">画像エディター<span class="version-badge" id="appVersion"></span></div>
       <div class="app-subtitle">Team Ohana</div>
     </div>
   </div>
@@ -552,7 +559,10 @@ canvas {
               <input type="checkbox" id="tpWandAntialias" checked> アンチエイリアス
             </label>
           </div>
-          <button id="tpClearSelectionBtn" style="width:100%; margin-top:8px;" disabled>選択範囲をクリア</button>
+          <div style="display:flex; gap:6px; margin-top:8px;">
+            <button id="tpUndoBtn" style="flex:1;" disabled>↶ 戻る</button>
+            <button id="tpClearSelectionBtn" style="flex:1;" disabled>クリア</button>
+          </div>
         </div>
       </div>
 
@@ -1454,6 +1464,7 @@ const tpState = {
   zoom: 1,
   tpMode: 'wand',
   selectionMask: null,
+  maskHistory: [],   // Undo 用スナップショット（最大10件）
 };
 
 const tpBeforeCanvas = document.getElementById('tpBeforeCanvas');
@@ -1470,6 +1481,7 @@ const tpDownloadBtn = document.getElementById('tpDownloadBtn');
 const tpClearBtn = document.getElementById('tpClearBtn');
 const tpPreviewWrap = document.getElementById('tpPreviewWrap');
 const tpToolbar = document.getElementById('tpToolbar');
+const tpUndoBtn = document.getElementById('tpUndoBtn');
 
 // --- TP Zoom ---
 function tpApplyZoom() {
@@ -1668,19 +1680,36 @@ function wandDownload() {
   toast('transparent.png を保存しました');
 }
 
-// モード切替 → マスクリセット・UIスイッチ
+// モード切替 → マスクリセット・Undoクリア・UIスイッチ
 document.querySelectorAll('input[name="tpMode"]').forEach(radio => {
   radio.addEventListener('change', () => {
     tpState.tpMode = radio.value;
     document.getElementById('tpWandSection').style.display      = radio.value === 'wand'      ? 'block' : 'none';
     document.getElementById('tpThresholdSection').style.display = radio.value === 'threshold' ? 'block' : 'none';
     tpState.selectionMask = null;
+    tpState.maskHistory = [];
     document.getElementById('tpClearSelectionBtn').disabled = true;
+    updateTpUndoBtn();
     if (tpState.originalImageData) {
       radio.value === 'threshold' ? applyTransparent() : renderWandPreview();
     }
   });
 });
+
+// Undo ボタンの有効/無効を更新
+function updateTpUndoBtn() {
+  tpUndoBtn.disabled = tpState.maskHistory.length === 0;
+}
+
+// 現在の selectionMask をヒストリに保存（最大10件）
+function pushMaskHistory() {
+  if (tpState.selectionMask) {
+    const snap = tpState.selectionMask.slice(); // Uint8Array のコピー
+    tpState.maskHistory.push(snap);
+    if (tpState.maskHistory.length > 10) tpState.maskHistory.shift();
+  }
+  updateTpUndoBtn();
+}
 
 // wand: 元画像キャンバスクリック → Flood Fill で選択
 tpBeforeCanvas.addEventListener('click', e => {
@@ -1690,9 +1719,9 @@ tpBeforeCanvas.addEventListener('click', e => {
   const y = Math.floor((e.clientY - rect.top)  * (tpBeforeCanvas.height / rect.height));
   if (x < 0 || x >= tpState.originalWidth || y < 0 || y >= tpState.originalHeight) return;
   const pos = y * tpState.originalWidth + x;
-  // Shift+クリックで既選択済みピクセルをクリックした場合は何もしない
   if (e.shiftKey && tpState.selectionMask && tpState.selectionMask[pos]) return;
-  const tolerance = parseInt(document.getElementById('tpTolerance').value);
+  pushMaskHistory(); // クリック前にスナップショット保存
+  const tolerance = Number(document.getElementById('tpTolerance').value);
   const newMask = floodFill(tpState.originalImageData, x, y, tolerance);
   if (!e.shiftKey || !tpState.selectionMask) {
     tpState.selectionMask = newMask;
@@ -1703,10 +1732,21 @@ tpBeforeCanvas.addEventListener('click', e => {
   renderWandPreview();
 });
 
+// wand: Undo
+tpUndoBtn.addEventListener('click', () => {
+  const prev = tpState.maskHistory.pop();
+  tpState.selectionMask = prev !== undefined ? prev : null;
+  document.getElementById('tpClearSelectionBtn').disabled = !tpState.selectionMask;
+  updateTpUndoBtn();
+  renderWandPreview();
+});
+
 // wand: 選択範囲クリア（画像は保持）
 document.getElementById('tpClearSelectionBtn').addEventListener('click', () => {
   tpState.selectionMask = null;
+  tpState.maskHistory = [];
   document.getElementById('tpClearSelectionBtn').disabled = true;
+  updateTpUndoBtn();
   renderWandPreview();
   toast('選択範囲をクリアしました');
 });
@@ -1785,11 +1825,19 @@ tpClearBtn.addEventListener('click', () => {
   tpPreviewWrap.style.display = 'none';
   tpToolbar.style.display = 'none';
   tpUploadPrompt.style.display = 'flex';
+  tpState.maskHistory = [];
   tpDownloadBtn.disabled = true; tpClearBtn.disabled = true;
   document.getElementById('tpClearSelectionBtn').disabled = true;
+  updateTpUndoBtn();
   tpFileInput.value = '';
   toast('画像をクリアしました');
 });
+
+// ============================================================
+// === VERSION ===
+// ============================================================
+const APP_VERSION = '2026-05-19-06'; // service-worker.js の CACHE_VERSION と一致させること
+document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
 // === PWA ===
