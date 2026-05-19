@@ -275,31 +275,21 @@ canvas {
 }
 
 .tp-preview-area {
-  flex: 1; display: flex; gap: 12px; overflow: hidden;
-}
-.tp-panel {
-  flex: 1; display: flex; flex-direction: column; min-width: 0;
-}
-.tp-label {
-  font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px; text-align: center;
+  flex: 1; display: flex; overflow: hidden;
 }
 .tp-canvas-wrap {
   flex: 1; overflow: auto; border-radius: 6px;
   display: flex; justify-content: flex-start; align-items: flex-start;
   padding: 8px;
-  /* チェッカーボード背景（透過確認用） */
-  background-color: #fff;
-  background-image:
-    linear-gradient(45deg, #ddd 25%, transparent 25%),
-    linear-gradient(-45deg, #ddd 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #ddd 75%),
-    linear-gradient(-45deg, transparent 75%, #ddd 75%);
-  background-size: 16px 16px;
-  background-position: 0 0, 0 8px, 8px -8px, 8px 0;
+  background: #f8fafc;
 }
-.tp-canvas-wrap.solid-bg { background: #f8fafc; background-image: none; }
-
-.tp-before-canvas, .tp-after-canvas { display: block; }
+.tp-canvas-inner {
+  position: relative; display: inline-block; line-height: 0;
+}
+.tp-before-canvas { display: block; }
+.tp-overlay-canvas {
+  position: absolute; top: 0; left: 0; pointer-events: none;
+}
 
 /* ===== Toast ===== */
 .toast {
@@ -347,7 +337,6 @@ canvas {
   .hamburger-btn { display: block; }
 
   .canvas-area, #transparentModeArea { padding: 10px; }
-  .tp-preview-area { flex-direction: column; }
 }
 </style>
 </head>
@@ -659,19 +648,15 @@ canvas {
     </div>
     <!-- プレビュー（画像読込後） -->
     <div id="tpPreviewWrap" class="tp-preview-area" style="display:none;">
-      <div class="tp-panel">
-        <div class="tp-label">元画像</div>
-        <div class="tp-canvas-wrap solid-bg" id="tpBeforeWrap">
+      <div class="tp-canvas-wrap" id="tpBeforeWrap">
+        <div class="tp-canvas-inner" id="tpCanvasInner">
           <canvas id="tpBeforeCanvas" class="tp-before-canvas"></canvas>
-        </div>
-      </div>
-      <div class="tp-panel">
-        <div class="tp-label">透過後</div>
-        <div class="tp-canvas-wrap" id="tpAfterWrap">
-          <canvas id="tpAfterCanvas" class="tp-after-canvas"></canvas>
+          <canvas id="tpOverlayCanvas" class="tp-overlay-canvas"></canvas>
         </div>
       </div>
     </div>
+    <!-- 計算用（非表示）：thresholdモードのPNG保存に使用 -->
+    <canvas id="tpAfterCanvas" style="display:none;"></canvas>
   </div>
 
 </div><!-- /app-body -->
@@ -1473,8 +1458,10 @@ const tpState = {
 
 const tpBeforeCanvas = document.getElementById('tpBeforeCanvas');
 const tpAfterCanvas = document.getElementById('tpAfterCanvas');
+const tpOverlayCanvas = document.getElementById('tpOverlayCanvas');
 const tpBeforeCtx = tpBeforeCanvas.getContext('2d');
 const tpAfterCtx = tpAfterCanvas.getContext('2d');
+const tpOverlayCtx = tpOverlayCanvas.getContext('2d');
 const tpUploadPrompt = document.getElementById('tpUploadPrompt');
 const tpFileInput = document.getElementById('tpFileInput');
 const tpThresholdSlider = document.getElementById('tpThreshold');
@@ -1490,8 +1477,8 @@ function tpApplyZoom() {
   const h = tpState.originalHeight * tpState.zoom;
   tpBeforeCanvas.style.width = w + 'px';
   tpBeforeCanvas.style.height = h + 'px';
-  tpAfterCanvas.style.width = w + 'px';
-  tpAfterCanvas.style.height = h + 'px';
+  tpOverlayCanvas.style.width = w + 'px';
+  tpOverlayCanvas.style.height = h + 'px';
   document.getElementById('tpZoomLabel').textContent = Math.round(tpState.zoom * 100) + '%';
   document.getElementById('tpZoomSlider').value = Math.round(tpState.zoom * 100);
 }
@@ -1520,6 +1507,7 @@ function loadTransparentImage(file) {
       const w = img.naturalWidth; const h = img.naturalHeight;
       tpBeforeCanvas.width = w; tpBeforeCanvas.height = h;
       tpAfterCanvas.width = w; tpAfterCanvas.height = h;
+      tpOverlayCanvas.width = w; tpOverlayCanvas.height = h;
       tpBeforeCtx.drawImage(img, 0, 0);
       tpState.originalImageData = tpBeforeCtx.getImageData(0, 0, w, h);
       tpState.originalWidth = w; tpState.originalHeight = h;
@@ -1584,6 +1572,16 @@ function applyTransparent() {
     outData[i] = r; outData[i+1] = g; outData[i+2] = b; outData[i+3] = newAlpha;
   }
   tpAfterCtx.putImageData(out, 0, 0);
+
+  // 透過対象ピクセルを元画像上で赤オーバーレイ表示
+  const overlayData = tpOverlayCtx.createImageData(w, h);
+  const od = overlayData.data;
+  for (let i = 0; i < outData.length; i += 4) {
+    if (outData[i+3] < srcData[i+3] * 0.5) {
+      od[i] = 255; od[i+1] = 100; od[i+2] = 100; od[i+3] = 89;
+    }
+  }
+  tpOverlayCtx.putImageData(overlayData, 0, 0);
 }
 
 // ============================================================
@@ -1617,31 +1615,18 @@ function floodFill(imageData, startX, startY, tolerance) {
 function renderWandPreview() {
   if (!tpState.originalImageData) return;
   const w = tpState.originalWidth, h = tpState.originalHeight;
-  const src = tpState.originalImageData.data;
-  const out = tpAfterCtx.createImageData(w, h);
-  const d = out.data;
+  tpOverlayCtx.clearRect(0, 0, w, h);
   const mask = tpState.selectionMask;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const i = y * w + x, pi = i * 4;
-      d[pi] = src[pi]; d[pi+1] = src[pi+1]; d[pi+2] = src[pi+2]; d[pi+3] = src[pi+3];
-      if (!mask || !mask[i]) continue;
-      const isBoundary = (
-        (x === 0     || !mask[i-1]) || (x === w-1 || !mask[i+1]) ||
-        (y === 0     || !mask[i-w]) || (y === h-1 || !mask[i+w])
-      );
-      if (isBoundary) {
-        const v = (x + y) % 8 < 4 ? 0 : 255;
-        d[pi] = v; d[pi+1] = v; d[pi+2] = v; d[pi+3] = 255;
-      } else {
-        d[pi]   = Math.min(255, src[pi] + 40);
-        d[pi+1] = Math.round(src[pi+1] * 0.85);
-        d[pi+2] = Math.round(src[pi+2] * 0.85);
-        d[pi+3] = src[pi+3];
-      }
+  if (!mask) return;
+  const overlayData = tpOverlayCtx.createImageData(w, h);
+  const od = overlayData.data;
+  for (let i = 0; i < mask.length; i++) {
+    if (mask[i]) {
+      const pi = i * 4;
+      od[pi] = 255; od[pi+1] = 100; od[pi+2] = 100; od[pi+3] = 89;
     }
   }
-  tpAfterCtx.putImageData(out, 0, 0);
+  tpOverlayCtx.putImageData(overlayData, 0, 0);
 }
 
 function wandDownload() {
@@ -1795,7 +1780,8 @@ tpClearBtn.addEventListener('click', () => {
   tpBeforeCanvas.width = 0; tpBeforeCanvas.height = 0;
   tpBeforeCanvas.style.width = ''; tpBeforeCanvas.style.height = '';
   tpAfterCanvas.width = 0; tpAfterCanvas.height = 0;
-  tpAfterCanvas.style.width = ''; tpAfterCanvas.style.height = '';
+  tpOverlayCanvas.width = 0; tpOverlayCanvas.height = 0;
+  tpOverlayCanvas.style.width = ''; tpOverlayCanvas.style.height = '';
   tpPreviewWrap.style.display = 'none';
   tpToolbar.style.display = 'none';
   tpUploadPrompt.style.display = 'flex';
