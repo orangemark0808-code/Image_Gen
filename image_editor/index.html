@@ -1542,19 +1542,20 @@ function applyTransparent() {
   if (!tpState.originalImageData) return;
   const src = tpState.originalImageData;
   const w = tpState.originalWidth; const h = tpState.originalHeight;
-  const out = tpAfterCtx.createImageData(w, h);
-  const threshold = parseInt(tpThresholdSlider.value);
+  const threshold = Number(tpThresholdSlider.value);
   const antialias = document.getElementById('tpAntialias').checked;
-  // 最大距離（白から黒）= sqrt(3 * 255^2) ≈ 441.67
-  const maxDist = Math.sqrt(3 * 255 * 255);
-  // しきい値を実ユークリッド空間へ変換
+  const maxDist = Math.sqrt(3 * 255 * 255); // ≈ 441.67
   const t = threshold / 255 * maxDist;
-  // アンチエイリアスのマージン（しきい値の25%、最小8）
   const margin = Math.max(8, t * 0.25);
 
-  const srcData = src.data; const outData = out.data;
+  const out = tpAfterCtx.createImageData(w, h);
+  const overlay = tpOverlayCtx.createImageData(w, h);
+  const srcData = src.data;
+  const outData = out.data;
+  const od = overlay.data;
+
   for (let i = 0; i < srcData.length; i += 4) {
-    const r = srcData[i]; const g = srcData[i+1]; const b = srcData[i+2]; const a = srcData[i+3];
+    const r = srcData[i], g = srcData[i+1], b = srcData[i+2], a = srcData[i+3];
     const dist = Math.sqrt((255-r)*(255-r) + (255-g)*(255-g) + (255-b)*(255-b));
     let newAlpha;
     if (!antialias) {
@@ -1565,23 +1566,18 @@ function applyTransparent() {
       } else if (dist >= t) {
         newAlpha = a;
       } else {
-        // マージン内：0からaへ線形補間
         newAlpha = Math.round(((dist - (t - margin)) / margin) * a);
       }
     }
     outData[i] = r; outData[i+1] = g; outData[i+2] = b; outData[i+3] = newAlpha;
-  }
-  tpAfterCtx.putImageData(out, 0, 0);
-
-  // 透過対象ピクセルを元画像上で赤オーバーレイ表示
-  const overlayData = tpOverlayCtx.createImageData(w, h);
-  const od = overlayData.data;
-  for (let i = 0; i < outData.length; i += 4) {
-    if (outData[i+3] < srcData[i+3] * 0.5) {
+    // dist < t のピクセルを赤ハイライト（アンチエイリアス境界を含む全透過対象）
+    if (dist < t) {
       od[i] = 255; od[i+1] = 100; od[i+2] = 100; od[i+3] = 89;
     }
   }
-  tpOverlayCtx.putImageData(overlayData, 0, 0);
+  tpAfterCtx.putImageData(out, 0, 0);
+  tpOverlayCtx.clearRect(0, 0, w, h);
+  tpOverlayCtx.putImageData(overlay, 0, 0);
 }
 
 // ============================================================
@@ -1594,14 +1590,18 @@ function floodFill(imageData, startX, startY, tolerance) {
   const visited = new Uint8Array(width * height);
   const startPos = startY * width + startX;
   const sr = data[startPos * 4], sg = data[startPos * 4 + 1], sb = data[startPos * 4 + 2];
-  const t = tolerance / 100 * Math.sqrt(3 * 255 * 255);
+  // tolerance 0〜100 を RGB チャンネル差の最大値（0〜255）にマッピング
+  const t = Number(tolerance) * 2.55;
   const stack = [startPos];
   visited[startPos] = 1;
   while (stack.length > 0) {
     const pos = stack.pop();
     const pi = pos * 4;
-    const dr = data[pi] - sr, dg = data[pi+1] - sg, db = data[pi+2] - sb;
-    if (Math.sqrt(dr*dr + dg*dg + db*db) > t) continue;
+    // 各チャンネルの絶対差の最大値でカラー距離を判定（高速・直感的）
+    const dr = Math.abs(data[pi]   - sr);
+    const dg = Math.abs(data[pi+1] - sg);
+    const db = Math.abs(data[pi+2] - sb);
+    if (Math.max(dr, dg, db) > t) continue;
     mask[pos] = 1;
     const x = pos % width, y = Math.floor(pos / width);
     if (x > 0        && !visited[pos-1])     { visited[pos-1] = 1;     stack.push(pos-1); }
