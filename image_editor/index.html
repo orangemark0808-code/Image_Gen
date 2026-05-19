@@ -533,8 +533,12 @@ canvas {
       <div class="section">
         <div class="section-title">透過方法</div>
         <label class="inline" style="display:block; margin-top:4px;">
-          <input type="radio" name="tpMode" value="wand" checked>
-          自動選択（クリックで選択）
+          <input type="radio" name="tpMode" value="colorSelect" checked>
+          色域選択（類似色を全選択）
+        </label>
+        <label class="inline" style="display:block; margin-top:6px;">
+          <input type="radio" name="tpMode" value="wand">
+          自動選択（隣接領域を選択）
         </label>
         <label class="inline" style="display:block; margin-top:6px;">
           <input type="radio" name="tpMode" value="threshold">
@@ -542,13 +546,13 @@ canvas {
         </label>
       </div>
 
-      <!-- 自動選択 UI -->
+      <!-- 色域選択・自動選択 共通UI -->
       <div id="tpWandSection">
         <div class="section">
           <div class="section-title">1. 使い方</div>
-          <div class="help-box">
-            透過したい部分をクリックしてください。<br>
-            Shift+クリックで領域を追加できます。
+          <div id="tpModeHelpBox" class="help-box">
+            クリックした色と似た色を画像全体から拾います。背景の透過に最適です。<br>
+            Shift+クリックで2色目も追加できます。
           </div>
         </div>
         <div class="section">
@@ -1319,19 +1323,30 @@ canvas.addEventListener('mouseup', e => {
   editState.dragging = null;
 });
 
+let tpPanRaf = null; // rAF ID for tp pan batching
 document.addEventListener('mousemove', e => {
   if (editState.panning) {
     canvasWrapper.scrollLeft = editState.panning.scrollLeft - (e.clientX - editState.panning.startX);
     canvasWrapper.scrollTop = editState.panning.scrollTop - (e.clientY - editState.panning.startY);
   }
   if (tpState.tpPanning) {
-    tpBeforeWrap.scrollLeft = tpState.tpPanning.scrollLeft - (e.clientX - tpState.tpPanning.startX);
-    tpBeforeWrap.scrollTop  = tpState.tpPanning.scrollTop  - (e.clientY - tpState.tpPanning.startY);
+    // rAF でスクロール更新をバッチ化 → レイアウト計算を1フレーム1回に抑える
+    const sl = tpState.tpPanning.scrollLeft - (e.clientX - tpState.tpPanning.startX);
+    const st = tpState.tpPanning.scrollTop  - (e.clientY - tpState.tpPanning.startY);
+    if (tpPanRaf) cancelAnimationFrame(tpPanRaf);
+    tpPanRaf = requestAnimationFrame(() => {
+      tpBeforeWrap.scrollLeft = sl;
+      tpBeforeWrap.scrollTop  = st;
+      tpPanRaf = null;
+    });
   }
 });
 document.addEventListener('mouseup', () => {
   if (editState.panning) { editState.panning = null; canvasWrapper.classList.remove('panning'); }
-  if (tpState.tpPanning) { tpState.tpPanning = null; tpBeforeWrap.classList.remove('panning'); }
+  if (tpState.tpPanning) {
+    tpState.tpPanning = null; tpBeforeWrap.classList.remove('panning');
+    if (tpPanRaf) { cancelAnimationFrame(tpPanRaf); tpPanRaf = null; }
+  }
 });
 
 function findLayerAt(x, y) {
@@ -1499,7 +1514,7 @@ const tpState = {
   originalWidth: 0,
   originalHeight: 0,
   zoom: 1,
-  tpMode: 'wand',
+  tpMode: 'colorSelect',
   selectionMask: null,
   maskHistory: [],      // Undo 用スナップショット（最大10件）
   maskRedoHistory: [],  // Redo 用スナップショット（最大10件）
@@ -1639,6 +1654,28 @@ function applyTransparent() {
 // === WAND (自動選択) ===
 // ============================================================
 
+// 色域選択: 画像全体を走査してクリック色と類似するピクセルをすべて選択（隣接条件なし）
+function colorSelect(imageData, clickX, clickY, tolerance, colorDistOut) {
+  const { width, height, data } = imageData;
+  const mask = new Uint8Array(width * height);
+  const startPos = clickY * width + clickX;
+  const sr = data[startPos * 4], sg = data[startPos * 4 + 1], sb = data[startPos * 4 + 2];
+  const t = Number(tolerance) * 2.55;
+  for (let i = 0; i < width * height; i++) {
+    const pi = i * 4;
+    const dist = Math.max(
+      Math.abs(data[pi]   - sr),
+      Math.abs(data[pi+1] - sg),
+      Math.abs(data[pi+2] - sb)
+    );
+    if (dist <= t) {
+      mask[i] = 1;
+      if (colorDistOut) colorDistOut[i] = t > 0 ? dist / t : 0;
+    }
+  }
+  return mask;
+}
+
 // colorDistOut: オプションの Float32Array（各選択ピクセルの正規化カラー距離を記録）
 function floodFill(imageData, startX, startY, tolerance, colorDistOut) {
   const { width, height, data } = imageData;
@@ -1773,12 +1810,22 @@ function wandDownload() {
 }
 
 // モード切替 → マスクリセット・Undoクリア・UIスイッチ
+const TP_MODE_HELP = {
+  colorSelect: 'クリックした色と似た色を画像全体から拾います。背景の透過に最適です。<br>Shift+クリックで2色目も追加できます。',
+  wand:        'クリックした点から繋がった隣接領域を選択します。<br>Shift+クリックで領域を追加できます。',
+};
+
 document.querySelectorAll('input[name="tpMode"]').forEach(radio => {
   radio.addEventListener('change', () => {
     tpState.tpMode = radio.value;
-    document.getElementById('tpWandSection').style.display      = radio.value === 'wand'      ? 'block' : 'none';
+    const isClickMode = radio.value === 'colorSelect' || radio.value === 'wand';
+    document.getElementById('tpWandSection').style.display      = isClickMode         ? 'block' : 'none';
     document.getElementById('tpThresholdSection').style.display = radio.value === 'threshold' ? 'block' : 'none';
+    if (isClickMode) {
+      document.getElementById('tpModeHelpBox').innerHTML = TP_MODE_HELP[radio.value] || '';
+    }
     tpState.selectionMask = null;
+    tpState.colorDistMap = null;
     tpState.maskHistory = [];
     tpState.maskRedoHistory = [];
     updateWandSelectionBtns(false);
@@ -1827,10 +1874,11 @@ tpBeforeWrap.addEventListener('mousedown', e => {
   }
 });
 
-// wand: 元画像キャンバスクリック → Flood Fill で選択 + colorDist 記録
+// 色域選択・自動選択: クリックで選択 + colorDist 記録
 tpBeforeCanvas.addEventListener('click', e => {
   if (tpState.tpSpacePressed) return; // スペースパン中はクリック選択しない
-  if (tpState.tpMode !== 'wand' || !tpState.originalImageData) return;
+  const isClickMode = tpState.tpMode === 'colorSelect' || tpState.tpMode === 'wand';
+  if (!isClickMode || !tpState.originalImageData) return;
   const rect = tpBeforeCanvas.getBoundingClientRect();
   const x = Math.floor((e.clientX - rect.left) * (tpBeforeCanvas.width  / rect.width));
   const y = Math.floor((e.clientY - rect.top)  * (tpBeforeCanvas.height / rect.height));
@@ -1840,7 +1888,10 @@ tpBeforeCanvas.addEventListener('click', e => {
   pushMaskHistory();
   const tolerance = Number(document.getElementById('tpTolerance').value);
   const newColorDist = new Float32Array(tpState.originalWidth * tpState.originalHeight);
-  const newMask = floodFill(tpState.originalImageData, x, y, tolerance, newColorDist);
+  // 色域選択: 画像全体走査 / 自動選択: 隣接Flood Fill
+  const newMask = tpState.tpMode === 'colorSelect'
+    ? colorSelect(tpState.originalImageData, x, y, tolerance, newColorDist)
+    : floodFill(tpState.originalImageData, x, y, tolerance, newColorDist);
   if (!e.shiftKey || !tpState.selectionMask) {
     tpState.selectionMask = newMask;
     tpState.colorDistMap = newColorDist;
@@ -1944,7 +1995,7 @@ document.getElementById('transparentModeArea').addEventListener('wheel', e => {
 // ダウンロード（モードによって処理を分岐）
 tpDownloadBtn.addEventListener('click', () => {
   if (!tpState.originalImageData) return;
-  if (tpState.tpMode === 'wand') {
+  if (tpState.tpMode === 'wand' || tpState.tpMode === 'colorSelect') {
     wandDownload();
   } else {
     const a = document.createElement('a');
@@ -2046,7 +2097,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-19-09'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-19-10'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
