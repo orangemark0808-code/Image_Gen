@@ -42,7 +42,7 @@ body {
 .version-badge {
   font-family: 'DM Mono', 'Courier New', monospace;
   font-size: 11px; font-weight: 400;
-  color: rgba(58, 42, 26, 0.45);
+  color: rgba(58, 42, 26, 0.85);
   margin-left: 6px;
 }
 
@@ -561,6 +561,7 @@ canvas {
           </div>
           <div style="display:flex; gap:6px; margin-top:8px;">
             <button id="tpUndoBtn" style="flex:1;" disabled>↶ 戻る</button>
+            <button id="tpRedoBtn" style="flex:1;" disabled>進む ↷</button>
             <button id="tpClearSelectionBtn" style="flex:1;" disabled>クリア</button>
           </div>
         </div>
@@ -1464,7 +1465,8 @@ const tpState = {
   zoom: 1,
   tpMode: 'wand',
   selectionMask: null,
-  maskHistory: [],   // Undo 用スナップショット（最大10件）
+  maskHistory: [],      // Undo 用スナップショット（最大10件）
+  maskRedoHistory: [],  // Redo 用スナップショット（最大10件）
 };
 
 const tpBeforeCanvas = document.getElementById('tpBeforeCanvas');
@@ -1482,6 +1484,7 @@ const tpClearBtn = document.getElementById('tpClearBtn');
 const tpPreviewWrap = document.getElementById('tpPreviewWrap');
 const tpToolbar = document.getElementById('tpToolbar');
 const tpUndoBtn = document.getElementById('tpUndoBtn');
+const tpRedoBtn = document.getElementById('tpRedoBtn');
 
 // --- TP Zoom ---
 function tpApplyZoom() {
@@ -1688,27 +1691,33 @@ document.querySelectorAll('input[name="tpMode"]').forEach(radio => {
     document.getElementById('tpThresholdSection').style.display = radio.value === 'threshold' ? 'block' : 'none';
     tpState.selectionMask = null;
     tpState.maskHistory = [];
+    tpState.maskRedoHistory = [];
     document.getElementById('tpClearSelectionBtn').disabled = true;
-    updateTpUndoBtn();
+    updateTpHistoryBtns();
     if (tpState.originalImageData) {
       radio.value === 'threshold' ? applyTransparent() : renderWandPreview();
     }
   });
 });
 
-// Undo ボタンの有効/無効を更新
-function updateTpUndoBtn() {
+// Undo/Redo ボタンの有効/無効を更新
+function updateTpHistoryBtns() {
   tpUndoBtn.disabled = tpState.maskHistory.length === 0;
+  tpRedoBtn.disabled = tpState.maskRedoHistory.length === 0;
 }
 
-// 現在の selectionMask をヒストリに保存（最大10件）
+// Redo スタックをクリア（新規操作時に呼ぶ）
+function clearRedoHistory() {
+  tpState.maskRedoHistory = [];
+}
+
+// 現在の selectionMask を Undo スタックに保存（最大10件）
 function pushMaskHistory() {
-  if (tpState.selectionMask) {
-    const snap = tpState.selectionMask.slice(); // Uint8Array のコピー
-    tpState.maskHistory.push(snap);
-    if (tpState.maskHistory.length > 10) tpState.maskHistory.shift();
-  }
-  updateTpUndoBtn();
+  const snap = tpState.selectionMask ? tpState.selectionMask.slice() : null;
+  tpState.maskHistory.push(snap);
+  if (tpState.maskHistory.length > 10) tpState.maskHistory.shift();
+  clearRedoHistory(); // 新規操作で Redo スタックはクリア
+  updateTpHistoryBtns();
 }
 
 // wand: 元画像キャンバスクリック → Flood Fill で選択
@@ -1733,20 +1742,43 @@ tpBeforeCanvas.addEventListener('click', e => {
 });
 
 // wand: Undo
-tpUndoBtn.addEventListener('click', () => {
-  const prev = tpState.maskHistory.pop();
-  tpState.selectionMask = prev !== undefined ? prev : null;
+function tpUndo() {
+  if (tpState.maskHistory.length === 0) return;
+  // 現在のマスクを Redo スタックへ
+  const cur = tpState.selectionMask ? tpState.selectionMask.slice() : null;
+  tpState.maskRedoHistory.push(cur);
+  if (tpState.maskRedoHistory.length > 10) tpState.maskRedoHistory.shift();
+  // Undo スタックから復元
+  tpState.selectionMask = tpState.maskHistory.pop();
   document.getElementById('tpClearSelectionBtn').disabled = !tpState.selectionMask;
-  updateTpUndoBtn();
+  updateTpHistoryBtns();
   renderWandPreview();
-});
+}
+
+// wand: Redo
+function tpRedo() {
+  if (tpState.maskRedoHistory.length === 0) return;
+  // 現在のマスクを Undo スタックへ
+  const cur = tpState.selectionMask ? tpState.selectionMask.slice() : null;
+  tpState.maskHistory.push(cur);
+  if (tpState.maskHistory.length > 10) tpState.maskHistory.shift();
+  // Redo スタックから復元
+  tpState.selectionMask = tpState.maskRedoHistory.pop();
+  document.getElementById('tpClearSelectionBtn').disabled = !tpState.selectionMask;
+  updateTpHistoryBtns();
+  renderWandPreview();
+}
+
+tpUndoBtn.addEventListener('click', tpUndo);
+tpRedoBtn.addEventListener('click', tpRedo);
 
 // wand: 選択範囲クリア（画像は保持）
 document.getElementById('tpClearSelectionBtn').addEventListener('click', () => {
   tpState.selectionMask = null;
   tpState.maskHistory = [];
+  tpState.maskRedoHistory = [];
   document.getElementById('tpClearSelectionBtn').disabled = true;
-  updateTpUndoBtn();
+  updateTpHistoryBtns();
   renderWandPreview();
   toast('選択範囲をクリアしました');
 });
@@ -1826,17 +1858,40 @@ tpClearBtn.addEventListener('click', () => {
   tpToolbar.style.display = 'none';
   tpUploadPrompt.style.display = 'flex';
   tpState.maskHistory = [];
+  tpState.maskRedoHistory = [];
   tpDownloadBtn.disabled = true; tpClearBtn.disabled = true;
   document.getElementById('tpClearSelectionBtn').disabled = true;
-  updateTpUndoBtn();
+  updateTpHistoryBtns();
   tpFileInput.value = '';
   toast('画像をクリアしました');
 });
 
 // ============================================================
+// === KEYBOARD SHORTCUTS ===
+// ============================================================
+document.addEventListener('keydown', e => {
+  // input / textarea にフォーカスがある時は無視
+  const tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+  // 透過タブが開いている時のみ有効
+  if (currentMode !== 'transparent') return;
+
+  const ctrl = e.ctrlKey || e.metaKey; // Ctrl (Win/Linux) / Cmd (Mac)
+  if (!ctrl) return;
+
+  if (e.shiftKey && e.key === 'Z') {
+    e.preventDefault();
+    tpRedo();
+  } else if (!e.shiftKey && e.key === 'z') {
+    e.preventDefault();
+    tpUndo();
+  }
+});
+
+// ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-19-06'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-19-07'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
