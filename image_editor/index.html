@@ -533,11 +533,11 @@ canvas {
       <div class="section">
         <div class="section-title">透過方法</div>
         <label class="inline" style="display:block; margin-top:4px;">
-          <input type="radio" name="tpMode" value="colorSelect" checked>
+          <input type="radio" name="tpMode" value="colorSelect">
           色域選択（類似色を全選択）
         </label>
         <label class="inline" style="display:block; margin-top:6px;">
-          <input type="radio" name="tpMode" value="wand">
+          <input type="radio" name="tpMode" value="wand" checked>
           自動選択（隣接領域を選択）
         </label>
         <label class="inline" style="display:block; margin-top:6px;">
@@ -551,8 +551,8 @@ canvas {
         <div class="section">
           <div class="section-title">1. 使い方</div>
           <div id="tpModeHelpBox" class="help-box">
-            クリックした色と似た色を画像全体から拾います。背景の透過に最適です。<br>
-            Shift+クリックで2色目も追加できます。
+            クリックした点から繋がった隣接領域を選択します。<br>
+            Shift+クリックで領域を追加できます。
           </div>
         </div>
         <div class="section">
@@ -1475,10 +1475,12 @@ document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); document.getElementById('undoBtn').click(); return; }
   if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); document.getElementById('redoBtn').click(); return; }
   if (inField) return;
-  if (e.code === 'Space' && !e.repeat) {
-    e.preventDefault();
-    editState.spacePressed = true; canvasWrapper.classList.add('pan-mode');
-    tpState.tpSpacePressed = true;  tpBeforeWrap.classList.add('pan-mode');
+  if (e.code === 'Space') {
+    e.preventDefault(); // リピート中も常にスクロール抑制
+    if (!e.repeat) {
+      editState.spacePressed = true; canvasWrapper.classList.add('pan-mode');
+      tpState.tpSpacePressed = true;  tpBeforeWrap.classList.add('pan-mode');
+    }
     return;
   }
   if (e.key === 'Escape') { editState.selectedLayerId = null; editState.cropRect = null; render(); updateLayerList(); updateCanvasInfo(); return; }
@@ -1514,7 +1516,7 @@ const tpState = {
   originalWidth: 0,
   originalHeight: 0,
   zoom: 1,
-  tpMode: 'colorSelect',
+  tpMode: 'wand',
   selectionMask: null,
   maskHistory: [],      // Undo 用スナップショット（最大10件）
   maskRedoHistory: [],  // Redo 用スナップショット（最大10件）
@@ -1711,14 +1713,39 @@ function renderWandPreview() {
   tpOverlayCtx.clearRect(0, 0, w, h);
   const mask = tpState.selectionMask;
   if (!mask) return;
+
+  // 選択範囲内を薄い赤でオーバーレイ
   const overlayData = tpOverlayCtx.createImageData(w, h);
   const od = overlayData.data;
   for (let i = 0; i < mask.length; i++) {
     if (mask[i]) {
       const pi = i * 4;
-      od[pi] = 255; od[pi+1] = 100; od[pi+2] = 100; od[pi+3] = 89;
+      od[pi] = 255; od[pi+1] = 0; od[pi+2] = 0; od[pi+3] = 25; // rgba(255,0,0,0.1)
     }
   }
+
+  // 境界ピクセルに白黒交互ダッシュを描画（4px白 + 4px黒）
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (!mask[i]) continue;
+      // 4近傍のいずれかが非選択 → 境界ピクセル
+      const isBoundary =
+        (x === 0     || !mask[i - 1]) ||
+        (x === w - 1 || !mask[i + 1]) ||
+        (y === 0     || !mask[i - w]) ||
+        (y === h - 1 || !mask[i + w]);
+      if (!isBoundary) continue;
+      const pi = i * 4;
+      // (x+y) % 8 で白黒を交互切替（4pxずつ）
+      if ((x + y) % 8 < 4) {
+        od[pi] = 255; od[pi+1] = 255; od[pi+2] = 255; od[pi+3] = 255;
+      } else {
+        od[pi] = 0; od[pi+1] = 0; od[pi+2] = 0; od[pi+3] = 255;
+      }
+    }
+  }
+
   tpOverlayCtx.putImageData(overlayData, 0, 0);
 }
 
@@ -2097,7 +2124,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-19-10'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-20-01'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
