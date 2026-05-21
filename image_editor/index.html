@@ -466,33 +466,9 @@ canvas {
 
       <!-- 4. テキスト -->
       <div class="section">
-        <div class="section-title">4. テキスト設定</div>
-        <input type="text" id="textInput" placeholder="テキストを入力">
-        <div class="row-2" style="margin-top:6px;">
-          <button class="dir-btn active" data-dir="horizontal">横書き</button>
-          <button class="dir-btn" data-dir="vertical">縦書き</button>
-        </div>
-        <label style="margin-top:8px;">フォント</label>
-        <select id="textFont" style="width:100%; padding:5px 6px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; background:white;"></select>
-        <label style="margin-top:8px; font-family:'DM Mono','Courier New',monospace; font-size:10px; font-weight:700; letter-spacing:0.5px; color:#475569; text-transform:uppercase;">SIZE: <span id="textSizeLabel">32</span> px</label>
-        <div style="display:flex; align-items:center; gap:6px;">
-          <input type="range" id="textSizeSlider" min="8" max="200" value="32" style="flex:1;">
-          <input type="number" id="textSize" value="32" min="8" max="200" style="width:56px;">
-        </div>
-        <label>文字色</label>
-        <input type="color" id="textColor" value="#000000">
-        <div class="deco-grid">
-          <div class="deco-box">
-            <label class="inline" style="margin-top:0;"><input type="checkbox" id="textBg"> 背景色</label>
-            <input type="color" id="textBgColor" value="#ffffff">
-          </div>
-          <div class="deco-box">
-            <label class="inline" style="margin-top:0;"><input type="checkbox" id="textBorder"> 枠線</label>
-            <input type="color" id="textBorderColor" value="#000000">
-            <input type="number" id="textBorderWidth" value="2" min="1" max="20" placeholder="太さpx">
-          </div>
-        </div>
-        <button id="addText" class="primary" style="width:100%; margin-top:8px;">テキストを追加</button>
+        <div class="section-title">4. テキスト</div>
+        <button id="addText" class="primary" style="width:100%; margin-bottom:6px;">テキストを追加</button>
+        <button id="editTextBtn" style="width:100%; display:none;">選択中のテキストを編集</button>
       </div>
 
       <!-- 5. 図形 -->
@@ -733,6 +709,53 @@ canvas {
   </div>
 </div>
 
+<!-- ===== Text Edit Modal ===== -->
+<div id="textModal" style="display:none; position:fixed; inset:0; z-index:150; background:rgba(0,0,0,0.45); align-items:center; justify-content:center;">
+  <div style="width:480px; max-width:96vw; max-height:90vh; display:flex; flex-direction:column; background:#fff; border-radius:10px; overflow:hidden; box-shadow:0 8px 40px rgba(0,0,0,0.18);">
+    <div style="padding:12px 16px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #e5e7eb; flex-shrink:0;">
+      <span id="textModalTitle" style="font-size:11px; font-weight:700; font-family:'DM Mono','Courier New',monospace; text-transform:uppercase; letter-spacing:0.5px; color:#475569;">TEXT — 新規追加</span>
+      <button id="textModalCloseBtn" style="font-size:12px; padding:3px 9px;">✕</button>
+    </div>
+    <div style="overflow-y:auto; padding:14px; flex:1;">
+      <label style="margin-top:0;">テキスト</label>
+      <textarea id="textInput" rows="3" placeholder="テキストを入力&#10;改行も可能です" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; resize:vertical; font-family:inherit; line-height:1.5;"></textarea>
+      <label style="margin-top:10px;">方向</label>
+      <div class="row-2">
+        <button class="dir-btn active" data-dir="horizontal">横書き</button>
+        <button class="dir-btn" data-dir="vertical">縦書き</button>
+      </div>
+      <label style="margin-top:10px;">フォント</label>
+      <select id="textFont" style="width:100%; padding:5px 6px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; background:white;"></select>
+      <label style="margin-top:10px; font-family:'DM Mono','Courier New',monospace; font-size:10px; font-weight:700; letter-spacing:0.5px; color:#475569; text-transform:uppercase;">SIZE: <span id="textSizeLabel">32</span> px</label>
+      <div style="display:flex; align-items:center; gap:6px;">
+        <input type="range" id="textSizeSlider" min="8" max="200" value="32" style="flex:1; accent-color:#ea580c;">
+        <input type="number" id="textSize" value="32" min="8" max="200" style="width:56px; padding:5px 6px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px;">
+      </div>
+      <label style="margin-top:10px; font-family:'DM Mono','Courier New',monospace; font-size:10px; font-weight:700; letter-spacing:0.5px; color:#475569; text-transform:uppercase;">LETTER SPACING: <span id="textLetterSpacingLabel">0</span> px</label>
+      <input type="range" id="textLetterSpacing" min="0" max="20" value="0" step="1" style="width:100%; accent-color:#ea580c;">
+      <label style="margin-top:10px; font-family:'DM Mono','Courier New',monospace; font-size:10px; font-weight:700; letter-spacing:0.5px; color:#475569; text-transform:uppercase;">LINE HEIGHT: <span id="textLineHeightLabel">1.4</span></label>
+      <input type="range" id="textLineHeight" min="1.0" max="3.0" value="1.4" step="0.1" style="width:100%; accent-color:#ea580c;">
+      <label style="margin-top:10px;">文字色</label>
+      <input type="color" id="textColor" value="#000000" style="width:100%; height:30px; border:1px solid #cbd5e1; border-radius:4px; cursor:pointer;">
+      <div class="deco-grid" style="margin-top:10px;">
+        <div class="deco-box">
+          <label class="inline" style="margin-top:0;"><input type="checkbox" id="textBg"> 背景色</label>
+          <input type="color" id="textBgColor" value="#ffffff">
+        </div>
+        <div class="deco-box">
+          <label class="inline" style="margin-top:0;"><input type="checkbox" id="textBorder"> 枠線</label>
+          <input type="color" id="textBorderColor" value="#000000">
+          <input type="number" id="textBorderWidth" value="2" min="1" max="20" placeholder="太さpx">
+        </div>
+      </div>
+    </div>
+    <div style="padding:10px 16px; display:flex; gap:8px; justify-content:flex-end; border-top:1px solid #e5e7eb; flex-shrink:0;">
+      <button id="textModalCancelBtn" style="padding:7px 16px;">キャンセル</button>
+      <button id="textModalSubmitBtn" class="primary" style="padding:7px 20px;">追加</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -746,6 +769,34 @@ function toast(msg) {
   setTimeout(() => t.classList.remove('show'), 2500);
 }
 function uid() { return Math.random().toString(36).slice(2, 9); }
+
+// dataURL をファイル保存する（showSaveFilePicker 対応・キャンセル時はトースト出さない）
+async function downloadFile(dataURL, filename) {
+  const ext = filename.split('.').pop().toLowerCase();
+  const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'image/png';
+  if (window.showSaveFilePicker) {
+    try {
+      const fh = await showSaveFilePicker({
+        suggestedName: filename,
+        types: [{ description: 'Image', accept: { [mime]: ['.' + ext] } }],
+      });
+      const writable = await fh.createWritable();
+      const b64 = dataURL.split(',')[1];
+      const binary = atob(b64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      await writable.write(new Blob([bytes], { type: mime }));
+      await writable.close();
+      toast(`${filename} を保存しました`);
+    } catch (e) {
+      if (e.name !== 'AbortError') toast('保存に失敗しました');
+    }
+  } else {
+    const a = document.createElement('a');
+    a.href = dataURL; a.download = filename; a.click();
+    toast(`${filename} を保存しました`);
+  }
+}
 
 // ============================================================
 // === FONT DEFINITIONS ===
@@ -961,35 +1012,45 @@ function drawText(l) {
   ctx.save();
   ctx.font = `${l.size}px ${getFontCSS(l.font || 'system')}`;
   ctx.textBaseline = 'top';
+  // letter-spacing（ネイティブ対応ブラウザ向け）
+  if ('letterSpacing' in ctx) ctx.letterSpacing = `${l.letterSpacing ?? 0}px`;
+
   if (l.direction === 'vertical') {
     const chars = [...l.text];
-    const lineHeight = l.size * 1.1;
-    const totalH = chars.length * lineHeight;
+    const lh = l.size * (l.lineHeight ?? 1.1);
+    const ls = l.letterSpacing ?? 0;
+    const charStep = lh + ls;
+    const totalH = chars.length * charStep;
     const w = l.size * 1.2;
     if (l.bg) { ctx.fillStyle = l.bgColor; ctx.fillRect(l.x - 4, l.y - 2, w + 8, totalH + 4); }
     if (l.border) {
       ctx.strokeStyle = l.borderColor; ctx.lineWidth = l.borderWidth;
       ctx.lineJoin = 'round'; ctx.miterLimit = 2;
-      chars.forEach((c, i) => strokeVertChar(ctx, c, l.x, l.y, i, lineHeight, w, l.size));
+      chars.forEach((c, i) => strokeVertChar(ctx, c, l.x, l.y, i, charStep, w, l.size));
     }
     ctx.fillStyle = l.color;
-    chars.forEach((c, i) => fillVertChar(ctx, c, l.x, l.y, i, lineHeight, w, l.size));
+    chars.forEach((c, i) => fillVertChar(ctx, c, l.x, l.y, i, charStep, w, l.size));
     if (editState.selectedLayerId === l.id) {
       ctx.strokeStyle = '#ea580c'; ctx.lineWidth = 2; ctx.setLineDash([4,4]);
       ctx.strokeRect(l.x - 6, l.y - 4, w + 12, totalH + 8); ctx.setLineDash([]);
     }
   } else {
-    const metrics = ctx.measureText(l.text);
-    const w = metrics.width; const h = l.size * 1.2;
-    if (l.bg) { ctx.fillStyle = l.bgColor; ctx.fillRect(l.x - 4, l.y - 2, w + 8, h + 4); }
+    // 横書き: 改行対応
+    const lines = l.text.split('\n');
+    const lineH = l.size * (l.lineHeight ?? 1.4);
+    const totalH = lines.length * lineH;
+    const maxW = lines.reduce((m, line) => Math.max(m, ctx.measureText(line).width), 0);
+    if (l.bg) { ctx.fillStyle = l.bgColor; ctx.fillRect(l.x - 4, l.y - 2, maxW + 8, totalH + 4); }
     if (l.border) {
       ctx.strokeStyle = l.borderColor; ctx.lineWidth = l.borderWidth;
-      ctx.lineJoin = 'round'; ctx.miterLimit = 2; ctx.strokeText(l.text, l.x, l.y);
+      ctx.lineJoin = 'round'; ctx.miterLimit = 2;
+      lines.forEach((line, i) => ctx.strokeText(line, l.x, l.y + i * lineH));
     }
-    ctx.fillStyle = l.color; ctx.fillText(l.text, l.x, l.y);
+    ctx.fillStyle = l.color;
+    lines.forEach((line, i) => ctx.fillText(line, l.x, l.y + i * lineH));
     if (editState.selectedLayerId === l.id) {
       ctx.strokeStyle = '#ea580c'; ctx.lineWidth = 2; ctx.setLineDash([4,4]);
-      ctx.strokeRect(l.x - 6, l.y - 4, w + 12, h + 8); ctx.setLineDash([]);
+      ctx.strokeRect(l.x - 6, l.y - 4, maxW + 12, totalH + 8); ctx.setLineDash([]);
     }
   }
   ctx.restore();
@@ -1022,11 +1083,15 @@ function fillVertChar(ctx, c, lx, ly, i, lineHeight, w, size) {
 function getTextBounds(l) {
   ctx.save();
   ctx.font = `${l.size}px ${getFontCSS(l.font || 'system')}`;
+  if ('letterSpacing' in ctx) ctx.letterSpacing = `${l.letterSpacing ?? 0}px`;
   let w, h;
   if (l.direction === 'vertical') {
-    w = l.size * 1.2; h = [...l.text].length * l.size * 1.1;
+    const charStep = l.size * (l.lineHeight ?? 1.1) + (l.letterSpacing ?? 0);
+    w = l.size * 1.2; h = [...l.text].length * charStep;
   } else {
-    w = ctx.measureText(l.text).width; h = l.size * 1.2;
+    const lines = l.text.split('\n');
+    w = lines.reduce((m, line) => Math.max(m, ctx.measureText(line).width), 0);
+    h = lines.length * l.size * (l.lineHeight ?? 1.4);
   }
   ctx.restore();
   return { w, h };
@@ -1167,15 +1232,12 @@ document.getElementById('deselectBtn').addEventListener('click', () => {
   render(); updateLayerList(); updateCanvasInfo();
 });
 
-// --- Text direction ---
+// --- Text direction（モーダル内のdir-btnのみ。選択レイヤーへのリアルタイム同期はモーダルsubmitで行う）---
 document.querySelectorAll('.dir-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     editState.textDirection = btn.dataset.dir;
-    // 選択中のテキストレイヤーにもリアルタイム反映
-    const layer = editState.layers.find(l => l.id === editState.selectedLayerId && l.type === 'text');
-    if (layer) { layer.direction = btn.dataset.dir; saveHistory(); render(); }
   });
 });
 
@@ -1275,45 +1337,85 @@ document.getElementById('strokeWidth').addEventListener('input', e => {
   document.getElementById('strokeWidthLabel').textContent = e.target.value;
 });
 
-// フォントサイズ: スライダー ↔ 数値入力 双方向バインド
+// ============================================================
+// === TEXT MODAL ===
+// ============================================================
+const textModal = document.getElementById('textModal');
+const textModalState = { mode: 'add', editLayerId: null };
+
+// モーダル内 SIZE スライダー ↔ 数値入力 双方向バインド
 document.getElementById('textSizeSlider').addEventListener('input', e => {
   document.getElementById('textSize').value = e.target.value;
   document.getElementById('textSizeLabel').textContent = e.target.value;
-  syncSelectedTextSize(parseInt(e.target.value));
 });
 document.getElementById('textSize').addEventListener('input', e => {
   const v = Math.max(8, Math.min(200, parseInt(e.target.value) || 32));
   document.getElementById('textSizeSlider').value = v;
   document.getElementById('textSizeLabel').textContent = v;
-  syncSelectedTextSize(v);
 });
 
-function syncSelectedTextSize(size) {
-  const layer = editState.layers.find(l => l.id === editState.selectedLayerId && l.type === 'text');
-  if (!layer) return;
-  layer.size = size;
-  render();
+// LETTER SPACING ラベル更新
+document.getElementById('textLetterSpacing').addEventListener('input', e => {
+  document.getElementById('textLetterSpacingLabel').textContent = e.target.value;
+});
+
+// LINE HEIGHT ラベル更新
+document.getElementById('textLineHeight').addEventListener('input', e => {
+  document.getElementById('textLineHeightLabel').textContent = parseFloat(e.target.value).toFixed(1);
+});
+
+function openTextModal(mode, layer) {
+  textModalState.mode = mode;
+  textModalState.editLayerId = layer ? layer.id : null;
+  document.getElementById('textModalTitle').textContent = mode === 'edit' ? 'TEXT — 編集' : 'TEXT — 新規追加';
+  document.getElementById('textModalSubmitBtn').textContent = mode === 'edit' ? '更新' : '追加';
+
+  // フィールドに値をセット
+  const ti = document.getElementById('textInput');
+  const dir = mode === 'edit' ? (layer.direction || 'horizontal') : editState.textDirection;
+  const size = mode === 'edit' ? (layer.size || 32) : 32;
+  const ls = mode === 'edit' ? (layer.letterSpacing ?? 0) : 0;
+  const lh = mode === 'edit' ? (layer.lineHeight ?? 1.4) : 1.4;
+
+  ti.value = mode === 'edit' ? layer.text : '';
+  document.querySelectorAll('.dir-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.dir === dir);
+  });
+  editState.textDirection = dir;
+  document.getElementById('textFont').value     = mode === 'edit' ? (layer.font || 'system') : 'system';
+  document.getElementById('textSizeSlider').value = size;
+  document.getElementById('textSize').value       = size;
+  document.getElementById('textSizeLabel').textContent = size;
+  document.getElementById('textLetterSpacing').value   = ls;
+  document.getElementById('textLetterSpacingLabel').textContent = ls;
+  document.getElementById('textLineHeight').value      = lh;
+  document.getElementById('textLineHeightLabel').textContent    = parseFloat(lh).toFixed(1);
+  document.getElementById('textColor').value      = mode === 'edit' ? layer.color : '#000000';
+  document.getElementById('textBg').checked       = mode === 'edit' ? !!layer.bg : false;
+  document.getElementById('textBgColor').value    = mode === 'edit' ? (layer.bgColor || '#ffffff') : '#ffffff';
+  document.getElementById('textBorder').checked   = mode === 'edit' ? !!layer.border : false;
+  document.getElementById('textBorderColor').value = mode === 'edit' ? (layer.borderColor || '#000000') : '#000000';
+  document.getElementById('textBorderWidth').value = mode === 'edit' ? (layer.borderWidth || 2) : 2;
+
+  textModal.style.display = 'flex';
+  ti.focus();
 }
 
-// フォント選択: 選択中レイヤーにリアルタイム反映
-document.getElementById('textFont').addEventListener('change', () => {
-  const layer = editState.layers.find(l => l.id === editState.selectedLayerId && l.type === 'text');
-  if (!layer) return;
-  layer.font = document.getElementById('textFont').value;
-  render();
-});
+function closeTextModal() {
+  textModal.style.display = 'none';
+}
 
-// --- Add text ---
-document.getElementById('addText').addEventListener('click', () => {
-  if (!editState.baseImage) { toast('先に画像を読み込んでください'); return; }
+function submitTextModal() {
   const txt = document.getElementById('textInput').value.trim();
   if (!txt) { toast('テキストを入力してください'); return; }
-  const layer = {
-    id: uid(), type: 'text', text: txt,
+
+  const props = {
+    text: txt,
     direction: editState.textDirection,
-    x: editState.baseWidth / 2 - 50, y: editState.baseHeight / 2 - 16,
     size: parseInt(document.getElementById('textSize').value) || 32,
     font: document.getElementById('textFont').value,
+    letterSpacing: parseInt(document.getElementById('textLetterSpacing').value) || 0,
+    lineHeight: parseFloat(document.getElementById('textLineHeight').value) || 1.4,
     color: document.getElementById('textColor').value,
     bg: document.getElementById('textBg').checked,
     bgColor: document.getElementById('textBgColor').value,
@@ -1321,9 +1423,49 @@ document.getElementById('addText').addEventListener('click', () => {
     borderColor: document.getElementById('textBorderColor').value,
     borderWidth: parseInt(document.getElementById('textBorderWidth').value) || 2,
   };
-  editState.layers.push(layer);
-  editState.selectedLayerId = layer.id;
-  selectTool('select'); saveHistory(); render(); updateLayerList(); updateCanvasInfo();
+
+  if (textModalState.mode === 'edit') {
+    const layer = editState.layers.find(l => l.id === textModalState.editLayerId);
+    if (layer) Object.assign(layer, props);
+  } else {
+    const layer = {
+      id: uid(), type: 'text',
+      x: editState.baseWidth / 2 - 50, y: editState.baseHeight / 2 - 16,
+      ...props,
+    };
+    editState.layers.push(layer);
+    editState.selectedLayerId = layer.id;
+    selectTool('select');
+  }
+  closeTextModal();
+  saveHistory(); render(); updateLayerList(); updateCanvasInfo();
+}
+
+// モーダル open/close/submit
+document.getElementById('addText').addEventListener('click', () => {
+  if (!editState.baseImage) { toast('先に画像を読み込んでください'); return; }
+  openTextModal('add', null);
+});
+document.getElementById('editTextBtn').addEventListener('click', () => {
+  const layer = editState.layers.find(l => l.id === editState.selectedLayerId && l.type === 'text');
+  if (!layer) return;
+  openTextModal('edit', layer);
+});
+document.getElementById('textModalSubmitBtn').addEventListener('click', submitTextModal);
+document.getElementById('textModalCancelBtn').addEventListener('click', closeTextModal);
+document.getElementById('textModalCloseBtn').addEventListener('click', closeTextModal);
+textModal.addEventListener('click', e => { if (e.target === textModal) closeTextModal(); });
+
+// キャンバスダブルクリック → テキストレイヤー編集モーダル
+canvas.addEventListener('dblclick', e => {
+  if (!editState.baseImage) return;
+  const pos = getCanvasPos(e);
+  const layer = findLayerAt(pos.x, pos.y);
+  if (layer && layer.type === 'text') {
+    editState.selectedLayerId = layer.id;
+    render(); updateLayerList();
+    openTextModal('edit', layer);
+  }
 });
 
 // --- Canvas interactions ---
@@ -1465,6 +1607,7 @@ function updateLayerList() {
   const list = document.getElementById('layerList');
   if (editState.layers.length === 0) {
     list.innerHTML = '<div style="padding:8px; color:#aaa; font-size:12px; text-align:center;">レイヤーなし</div>';
+    document.getElementById('editTextBtn').style.display = 'none';
     return;
   }
   list.innerHTML = '';
@@ -1473,18 +1616,29 @@ function updateLayerList() {
     const div = document.createElement('div');
     div.className = 'layer-item' + (editState.selectedLayerId === l.id ? ' selected' : '');
     const lbl = l.type === 'text'
-      ? `📝${l.direction === 'vertical' ? '縦' : '横'} ${l.text.slice(0,10)}${l.text.length > 10 ? '…' : ''}`
+      ? `T ${l.direction === 'vertical' ? '縦' : '横'} ${l.text.slice(0,10)}${l.text.length > 10 ? '…' : ''}`
       : `${l.shape === 'ellipse' ? '〇' : l.shape === 'rect' ? '□' : l.shape === 'arrow' ? '→' : '／'} 図形`;
-    div.innerHTML = `<span>${lbl}</span><button class="del-btn">×</button>`;
+    const editBtn = l.type === 'text'
+      ? `<button class="edit-layer-btn" style="border:none; background:none; color:#ea580c; padding:2px 6px; font-size:12px; cursor:pointer;">編集</button>`
+      : '';
+    div.innerHTML = `<span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${lbl}</span>${editBtn}<button class="del-btn">×</button>`;
     div.addEventListener('click', ev => {
       if (ev.target.classList.contains('del-btn')) {
         editState.layers = editState.layers.filter(x => x.id !== l.id);
         if (editState.selectedLayerId === l.id) editState.selectedLayerId = null;
         saveHistory(); render(); updateLayerList(); updateCanvasInfo();
-      } else { editState.selectedLayerId = l.id; selectTool('select'); render(); updateLayerList(); }
+      } else if (ev.target.classList.contains('edit-layer-btn')) {
+        editState.selectedLayerId = l.id; selectTool('select'); render(); updateLayerList();
+        openTextModal('edit', l);
+      } else {
+        editState.selectedLayerId = l.id; selectTool('select'); render(); updateLayerList();
+      }
     });
     list.appendChild(div);
   }
+  // サイドバーの「編集」ボタン表示切替
+  const selLayer = editState.layers.find(l => l.id === editState.selectedLayerId && l.type === 'text');
+  document.getElementById('editTextBtn').style.display = selLayer ? 'block' : 'none';
 }
 
 // --- Save ---
@@ -1496,9 +1650,7 @@ document.getElementById('saveBtn').addEventListener('click', () => {
   editState.selectedLayerId = null; editState.cropRect = null; render();
   const dataURL = canvas.toDataURL(`image/${format}`, format === 'jpeg' ? 0.92 : undefined);
   editState.selectedLayerId = prevSel; editState.cropRect = prevCrop; render();
-  const a = document.createElement('a');
-  a.href = dataURL; a.download = `${name}.${format === 'jpeg' ? 'jpg' : 'png'}`; a.click();
-  toast(`${a.download} を保存しました`);
+  downloadFile(dataURL, `${name}.${format === 'jpeg' ? 'jpg' : 'png'}`);
 });
 
 // --- State persistence ---
@@ -1943,11 +2095,7 @@ function wandDownload() {
   tmp.width = w; tmp.height = h;
   const tmpCtx = tmp.getContext('2d');
   tmpCtx.putImageData(buildTransparentImageData(tmpCtx, w, h), 0, 0);
-  const a = document.createElement('a');
-  a.href = tmp.toDataURL('image/png');
-  a.download = 'transparent.png';
-  a.click();
-  toast('transparent.png を保存しました');
+  downloadFile(tmp.toDataURL('image/png'), 'transparent.png');
 }
 
 // モード切替 → マスクリセット・Undoクリア・UIスイッチ
@@ -2148,11 +2296,7 @@ tpDownloadBtn.addEventListener('click', () => {
   if (tpState.tpMode === 'wand' || tpState.tpMode === 'colorSelect') {
     wandDownload();
   } else {
-    const a = document.createElement('a');
-    a.href = tpAfterCanvas.toDataURL('image/png');
-    a.download = 'transparent.png';
-    a.click();
-    toast('transparent.png を保存しました');
+    downloadFile(tpAfterCanvas.toDataURL('image/png'), 'transparent.png');
   }
 });
 
@@ -2347,7 +2491,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-21-02'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-21-03'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
