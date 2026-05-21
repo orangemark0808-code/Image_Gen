@@ -710,45 +710,58 @@ canvas {
 </div>
 
 <!-- ===== Text Edit Modal ===== -->
-<div id="textModal" style="display:none; position:fixed; inset:0; z-index:150; background:rgba(0,0,0,0.45); align-items:center; justify-content:center;">
-  <div style="width:480px; max-width:96vw; max-height:90vh; display:flex; flex-direction:column; background:#fff; border-radius:10px; overflow:hidden; box-shadow:0 8px 40px rgba(0,0,0,0.18);">
+<div id="textModal" style="display:none; position:fixed; inset:0; z-index:150; background:rgba(0,0,0,0.45); align-items:center; justify-content:center; padding:10px;">
+  <div style="width:800px; max-width:98vw; max-height:92vh; display:flex; flex-direction:column; background:#fff; border-radius:10px; overflow:hidden; box-shadow:0 8px 40px rgba(0,0,0,0.18);">
+    <!-- ヘッダー -->
     <div style="padding:12px 16px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #e5e7eb; flex-shrink:0;">
       <span id="textModalTitle" style="font-size:11px; font-weight:700; font-family:'DM Mono','Courier New',monospace; text-transform:uppercase; letter-spacing:0.5px; color:#475569;">TEXT — 新規追加</span>
       <button id="textModalCloseBtn" style="font-size:12px; padding:3px 9px;">✕</button>
     </div>
-    <div style="overflow-y:auto; padding:14px; flex:1;">
-      <label style="margin-top:0;">テキスト</label>
-      <textarea id="textInput" rows="3" placeholder="テキストを入力&#10;改行も可能です" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; resize:vertical; font-family:inherit; line-height:1.5;"></textarea>
-      <label style="margin-top:10px;">方向</label>
-      <div class="row-2">
-        <button class="dir-btn active" data-dir="horizontal">横書き</button>
-        <button class="dir-btn" data-dir="vertical">縦書き</button>
-      </div>
-      <label style="margin-top:10px;">フォント</label>
-      <select id="textFont" style="width:100%; padding:5px 6px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; background:white;"></select>
-      <label style="margin-top:10px; font-family:'DM Mono','Courier New',monospace; font-size:10px; font-weight:700; letter-spacing:0.5px; color:#475569; text-transform:uppercase;">SIZE: <span id="textSizeLabel">32</span> px</label>
-      <div style="display:flex; align-items:center; gap:6px;">
-        <input type="range" id="textSizeSlider" min="8" max="200" value="32" style="flex:1; accent-color:#ea580c;">
-        <input type="number" id="textSize" value="32" min="8" max="200" style="width:56px; padding:5px 6px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px;">
-      </div>
-      <label style="margin-top:10px; font-family:'DM Mono','Courier New',monospace; font-size:10px; font-weight:700; letter-spacing:0.5px; color:#475569; text-transform:uppercase;">LETTER SPACING: <span id="textLetterSpacingLabel">0</span> px</label>
-      <input type="range" id="textLetterSpacing" min="0" max="20" value="0" step="1" style="width:100%; accent-color:#ea580c;">
-      <label style="margin-top:10px; font-family:'DM Mono','Courier New',monospace; font-size:10px; font-weight:700; letter-spacing:0.5px; color:#475569; text-transform:uppercase;">LINE HEIGHT: <span id="textLineHeightLabel">1.4</span></label>
-      <input type="range" id="textLineHeight" min="1.0" max="3.0" value="1.4" step="0.1" style="width:100%; accent-color:#ea580c;">
-      <label style="margin-top:10px;">文字色</label>
-      <input type="color" id="textColor" value="#000000" style="width:100%; height:30px; border:1px solid #cbd5e1; border-radius:4px; cursor:pointer;">
-      <div class="deco-grid" style="margin-top:10px;">
-        <div class="deco-box">
-          <label class="inline" style="margin-top:0;"><input type="checkbox" id="textBg"> 背景色</label>
-          <input type="color" id="textBgColor" value="#ffffff">
+    <!-- 2カラムボディ -->
+    <div style="display:flex; flex-wrap:wrap; flex:1; overflow:hidden; min-height:0;">
+      <!-- 左：設定パネル -->
+      <div style="min-width:280px; flex:1; overflow-y:auto; padding:14px; border-right:1px solid #e5e7eb;">
+        <label style="margin-top:0;">テキスト</label>
+        <textarea id="textInput" rows="3" placeholder="テキストを入力&#10;改行も可能です" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; resize:vertical; font-family:inherit; line-height:1.5;"></textarea>
+        <label style="margin-top:10px;">方向</label>
+        <div class="row-2">
+          <button class="dir-btn active" data-dir="horizontal">横書き</button>
+          <button class="dir-btn" data-dir="vertical">縦書き</button>
         </div>
-        <div class="deco-box">
-          <label class="inline" style="margin-top:0;"><input type="checkbox" id="textBorder"> 枠線</label>
-          <input type="color" id="textBorderColor" value="#000000">
-          <input type="number" id="textBorderWidth" value="2" min="1" max="20" placeholder="太さpx">
+        <label style="margin-top:10px;">フォント</label>
+        <select id="textFont" style="width:100%; padding:5px 6px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; background:white;"></select>
+        <label style="margin-top:10px; font-family:'DM Mono','Courier New',monospace; font-size:10px; font-weight:700; letter-spacing:0.5px; color:#475569; text-transform:uppercase;">SIZE: <span id="textSizeLabel">32</span> px</label>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <input type="range" id="textSizeSlider" min="8" max="200" value="32" style="flex:1; accent-color:#ea580c;">
+          <input type="number" id="textSize" value="32" min="8" max="200" style="width:56px; padding:5px 6px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px;">
+        </div>
+        <label style="margin-top:10px; font-family:'DM Mono','Courier New',monospace; font-size:10px; font-weight:700; letter-spacing:0.5px; color:#475569; text-transform:uppercase;">LETTER SPACING: <span id="textLetterSpacingLabel">0</span> px</label>
+        <input type="range" id="textLetterSpacing" min="0" max="20" value="0" step="1" style="width:100%; accent-color:#ea580c;">
+        <label style="margin-top:10px; font-family:'DM Mono','Courier New',monospace; font-size:10px; font-weight:700; letter-spacing:0.5px; color:#475569; text-transform:uppercase;">LINE HEIGHT: <span id="textLineHeightLabel">1.4</span></label>
+        <input type="range" id="textLineHeight" min="1.0" max="3.0" value="1.4" step="0.1" style="width:100%; accent-color:#ea580c;">
+        <label style="margin-top:10px;">文字色</label>
+        <input type="color" id="textColor" value="#000000" style="width:100%; height:30px; border:1px solid #cbd5e1; border-radius:4px; cursor:pointer;">
+        <div class="deco-grid" style="margin-top:10px;">
+          <div class="deco-box">
+            <label class="inline" style="margin-top:0;"><input type="checkbox" id="textBg"> 背景色</label>
+            <input type="color" id="textBgColor" value="#ffffff">
+          </div>
+          <div class="deco-box">
+            <label class="inline" style="margin-top:0;"><input type="checkbox" id="textBorder"> 枠線</label>
+            <input type="color" id="textBorderColor" value="#000000">
+            <input type="number" id="textBorderWidth" value="2" min="1" max="20" placeholder="太さpx">
+          </div>
+        </div>
+      </div>
+      <!-- 右：プレビューエリア -->
+      <div style="min-width:220px; flex:1; display:flex; flex-direction:column; background:#f8fafc; padding:12px; align-items:center; overflow:auto;">
+        <div style="font-size:10px; font-weight:700; font-family:'DM Mono','Courier New',monospace; text-transform:uppercase; letter-spacing:0.5px; color:#94a3b8; margin-bottom:10px; align-self:flex-start;">PREVIEW</div>
+        <div style="flex:1; display:flex; align-items:center; justify-content:center; width:100%;">
+          <canvas id="textPreviewCanvas" style="border:1px solid #e5e7eb; border-radius:4px; max-width:100%;"></canvas>
         </div>
       </div>
     </div>
+    <!-- フッター -->
     <div style="padding:10px 16px; display:flex; gap:8px; justify-content:flex-end; border-top:1px solid #e5e7eb; flex-shrink:0;">
       <button id="textModalCancelBtn" style="padding:7px 16px;">キャンセル</button>
       <button id="textModalSubmitBtn" class="primary" style="padding:7px 20px;">追加</button>
@@ -1008,52 +1021,67 @@ function render() {
   if (editState.currentTool === 'crop' && editState.cropRect) drawCropOverlay();
 }
 
-function drawText(l) {
-  ctx.save();
-  ctx.font = `${l.size}px ${getFontCSS(l.font || 'system')}`;
-  ctx.textBaseline = 'top';
-  // letter-spacing（ネイティブ対応ブラウザ向け）
-  if ('letterSpacing' in ctx) ctx.letterSpacing = `${l.letterSpacing ?? 0}px`;
+// tCtx を省略するとメインcanvasのctxを使用（プレビュー描画でも流用可能）
+function drawText(l, tCtx) {
+  if (!tCtx) tCtx = ctx;
+  tCtx.save();
+  tCtx.font = `${l.size}px ${getFontCSS(l.font || 'system')}`;
+  tCtx.textBaseline = 'top';
+  if ('letterSpacing' in tCtx) tCtx.letterSpacing = `${l.letterSpacing ?? 0}px`;
 
   if (l.direction === 'vertical') {
-    const chars = [...l.text];
+    // \n を列区切りとして扱い、右→左方向に列を並べる（日本語縦書き）
+    const columns = l.text.split('\n');
     const lh = l.size * (l.lineHeight ?? 1.1);
     const ls = l.letterSpacing ?? 0;
     const charStep = lh + ls;
-    const totalH = chars.length * charStep;
-    const w = l.size * 1.2;
-    if (l.bg) { ctx.fillStyle = l.bgColor; ctx.fillRect(l.x - 4, l.y - 2, w + 8, totalH + 4); }
-    if (l.border) {
-      ctx.strokeStyle = l.borderColor; ctx.lineWidth = l.borderWidth;
-      ctx.lineJoin = 'round'; ctx.miterLimit = 2;
-      chars.forEach((c, i) => strokeVertChar(ctx, c, l.x, l.y, i, charStep, w, l.size));
+    const colW = l.size * 1.2;
+    const colGap = Math.max(4, l.size * 0.2);
+    const colStep = colW + colGap;
+    const nCols = columns.length;
+    const totalW = nCols * colStep - colGap;
+    const maxH = Math.max(...columns.map(col => [...col].length)) * charStep;
+
+    if (l.bg) {
+      tCtx.fillStyle = l.bgColor;
+      tCtx.fillRect(l.x - 4, l.y - 2, totalW + 8, maxH + 4);
     }
-    ctx.fillStyle = l.color;
-    chars.forEach((c, i) => fillVertChar(ctx, c, l.x, l.y, i, charStep, w, l.size));
-    if (editState.selectedLayerId === l.id) {
-      ctx.strokeStyle = '#ea580c'; ctx.lineWidth = 2; ctx.setLineDash([4,4]);
-      ctx.strokeRect(l.x - 6, l.y - 4, w + 12, totalH + 8); ctx.setLineDash([]);
+    columns.forEach((col, ci) => {
+      // 1列目（ci=0）が右端、列が増えるほど左にずれる
+      const colX = l.x + (nCols - 1 - ci) * colStep;
+      const chars = [...col];
+      if (l.border) {
+        tCtx.strokeStyle = l.borderColor; tCtx.lineWidth = l.borderWidth;
+        tCtx.lineJoin = 'round'; tCtx.miterLimit = 2;
+        chars.forEach((c, i) => strokeVertChar(tCtx, c, colX, l.y, i, charStep, colW, l.size));
+      }
+      tCtx.fillStyle = l.color;
+      chars.forEach((c, i) => fillVertChar(tCtx, c, colX, l.y, i, charStep, colW, l.size));
+    });
+    if (tCtx === ctx && editState.selectedLayerId === l.id) {
+      tCtx.strokeStyle = '#ea580c'; tCtx.lineWidth = 2; tCtx.setLineDash([4,4]);
+      tCtx.strokeRect(l.x - 6, l.y - 4, totalW + 12, maxH + 8); tCtx.setLineDash([]);
     }
   } else {
-    // 横書き: 改行対応
+    // 横書き: \n 改行対応
     const lines = l.text.split('\n');
     const lineH = l.size * (l.lineHeight ?? 1.4);
     const totalH = lines.length * lineH;
-    const maxW = lines.reduce((m, line) => Math.max(m, ctx.measureText(line).width), 0);
-    if (l.bg) { ctx.fillStyle = l.bgColor; ctx.fillRect(l.x - 4, l.y - 2, maxW + 8, totalH + 4); }
+    const maxW = lines.reduce((m, line) => Math.max(m, tCtx.measureText(line).width), 0);
+    if (l.bg) { tCtx.fillStyle = l.bgColor; tCtx.fillRect(l.x - 4, l.y - 2, maxW + 8, totalH + 4); }
     if (l.border) {
-      ctx.strokeStyle = l.borderColor; ctx.lineWidth = l.borderWidth;
-      ctx.lineJoin = 'round'; ctx.miterLimit = 2;
-      lines.forEach((line, i) => ctx.strokeText(line, l.x, l.y + i * lineH));
+      tCtx.strokeStyle = l.borderColor; tCtx.lineWidth = l.borderWidth;
+      tCtx.lineJoin = 'round'; tCtx.miterLimit = 2;
+      lines.forEach((line, i) => tCtx.strokeText(line, l.x, l.y + i * lineH));
     }
-    ctx.fillStyle = l.color;
-    lines.forEach((line, i) => ctx.fillText(line, l.x, l.y + i * lineH));
-    if (editState.selectedLayerId === l.id) {
-      ctx.strokeStyle = '#ea580c'; ctx.lineWidth = 2; ctx.setLineDash([4,4]);
-      ctx.strokeRect(l.x - 6, l.y - 4, maxW + 12, totalH + 8); ctx.setLineDash([]);
+    tCtx.fillStyle = l.color;
+    lines.forEach((line, i) => tCtx.fillText(line, l.x, l.y + i * lineH));
+    if (tCtx === ctx && editState.selectedLayerId === l.id) {
+      tCtx.strokeStyle = '#ea580c'; tCtx.lineWidth = 2; tCtx.setLineDash([4,4]);
+      tCtx.strokeRect(l.x - 6, l.y - 4, maxW + 12, totalH + 8); tCtx.setLineDash([]);
     }
   }
-  ctx.restore();
+  tCtx.restore();
 }
 
 function strokeVertChar(ctx, c, lx, ly, i, lineHeight, w, size) {
@@ -1086,8 +1114,14 @@ function getTextBounds(l) {
   if ('letterSpacing' in ctx) ctx.letterSpacing = `${l.letterSpacing ?? 0}px`;
   let w, h;
   if (l.direction === 'vertical') {
+    const columns = l.text.split('\n');
     const charStep = l.size * (l.lineHeight ?? 1.1) + (l.letterSpacing ?? 0);
-    w = l.size * 1.2; h = [...l.text].length * charStep;
+    const colW = l.size * 1.2;
+    const colGap = Math.max(4, l.size * 0.2);
+    const colStep = colW + colGap;
+    const maxChars = Math.max(...columns.map(col => [...col].length));
+    w = columns.length * colStep - colGap;
+    h = maxChars * charStep;
   } else {
     const lines = l.text.split('\n');
     w = lines.reduce((m, line) => Math.max(m, ctx.measureText(line).width), 0);
@@ -1238,6 +1272,7 @@ document.querySelectorAll('.dir-btn').forEach(btn => {
     document.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     editState.textDirection = btn.dataset.dir;
+    updateTextPreview();
   });
 });
 
@@ -1343,25 +1378,68 @@ document.getElementById('strokeWidth').addEventListener('input', e => {
 const textModal = document.getElementById('textModal');
 const textModalState = { mode: 'add', editLayerId: null };
 
+// ===== テキストプレビュー =====
+function updateTextPreview() {
+  const pvCanvas = document.getElementById('textPreviewCanvas');
+  if (!pvCanvas) return;
+  const pvCtx = pvCanvas.getContext('2d');
+
+  const txt = document.getElementById('textInput').value || 'プレビューテキスト';
+  const tmpLayer = {
+    id: '__preview__', type: 'text',
+    text: txt,
+    direction: editState.textDirection,
+    size: parseInt(document.getElementById('textSize').value) || 32,
+    font: document.getElementById('textFont').value,
+    letterSpacing: parseInt(document.getElementById('textLetterSpacing').value) || 0,
+    lineHeight: parseFloat(document.getElementById('textLineHeight').value) || 1.4,
+    color: document.getElementById('textColor').value,
+    bg: document.getElementById('textBg').checked,
+    bgColor: document.getElementById('textBgColor').value,
+    border: document.getElementById('textBorder').checked,
+    borderColor: document.getElementById('textBorderColor').value,
+    borderWidth: parseInt(document.getElementById('textBorderWidth').value) || 2,
+    x: 0, y: 0,
+  };
+
+  const { w, h } = getTextBounds(tmpLayer);
+  const pad = 20;
+  const cw = Math.max(200, Math.ceil(w) + pad * 2);
+  const ch = Math.max(200, Math.ceil(h) + pad * 2);
+  pvCanvas.width = cw;
+  pvCanvas.height = ch;
+
+  pvCtx.fillStyle = '#ffffff';
+  pvCtx.fillRect(0, 0, cw, ch);
+
+  tmpLayer.x = pad;
+  tmpLayer.y = pad;
+  drawText(tmpLayer, pvCtx);
+}
+
 // モーダル内 SIZE スライダー ↔ 数値入力 双方向バインド
 document.getElementById('textSizeSlider').addEventListener('input', e => {
   document.getElementById('textSize').value = e.target.value;
   document.getElementById('textSizeLabel').textContent = e.target.value;
+  updateTextPreview();
 });
 document.getElementById('textSize').addEventListener('input', e => {
   const v = Math.max(8, Math.min(200, parseInt(e.target.value) || 32));
   document.getElementById('textSizeSlider').value = v;
   document.getElementById('textSizeLabel').textContent = v;
+  updateTextPreview();
 });
 
 // LETTER SPACING ラベル更新
 document.getElementById('textLetterSpacing').addEventListener('input', e => {
   document.getElementById('textLetterSpacingLabel').textContent = e.target.value;
+  updateTextPreview();
 });
 
 // LINE HEIGHT ラベル更新
 document.getElementById('textLineHeight').addEventListener('input', e => {
   document.getElementById('textLineHeightLabel').textContent = parseFloat(e.target.value).toFixed(1);
+  updateTextPreview();
 });
 
 function openTextModal(mode, layer) {
@@ -1399,6 +1477,8 @@ function openTextModal(mode, layer) {
 
   textModal.style.display = 'flex';
   ti.focus();
+  // 初期プレビュー描画
+  requestAnimationFrame(updateTextPreview);
 }
 
 function closeTextModal() {
@@ -1440,6 +1520,16 @@ function submitTextModal() {
   closeTextModal();
   saveHistory(); render(); updateLayerList(); updateCanvasInfo();
 }
+
+// テキスト入力・各コントロール変更時にプレビュー更新
+document.getElementById('textInput').addEventListener('input', updateTextPreview);
+document.getElementById('textFont').addEventListener('change', updateTextPreview);
+document.getElementById('textColor').addEventListener('input', updateTextPreview);
+document.getElementById('textBg').addEventListener('change', updateTextPreview);
+document.getElementById('textBgColor').addEventListener('input', updateTextPreview);
+document.getElementById('textBorder').addEventListener('change', updateTextPreview);
+document.getElementById('textBorderColor').addEventListener('input', updateTextPreview);
+document.getElementById('textBorderWidth').addEventListener('input', updateTextPreview);
 
 // モーダル open/close/submit
 document.getElementById('addText').addEventListener('click', () => {
@@ -2491,7 +2581,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-21-03'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-21-04'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
