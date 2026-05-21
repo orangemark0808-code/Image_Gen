@@ -12,6 +12,9 @@
 <meta name="apple-mobile-web-app-title" content="画像エディター">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Yomogi&display=swap" rel="stylesheet">
 <style>
 /* ===== Reset & Base ===== */
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -297,7 +300,17 @@ canvas {
 .tp-canvas-inner {
   position: relative; display: inline-block; line-height: 0;
 }
-.tp-before-canvas { display: block; background: #ffffff; }
+.tp-before-canvas {
+  display: block;
+  background:
+    linear-gradient(45deg, #f1f5f9 25%, transparent 25%),
+    linear-gradient(-45deg, #f1f5f9 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #f1f5f9 75%),
+    linear-gradient(-45deg, transparent 75%, #f1f5f9 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, 10px 0;
+  background-color: #ffffff;
+}
 .tp-overlay-canvas {
   position: absolute; top: 0; left: 0; pointer-events: none;
   background: transparent;
@@ -459,8 +472,13 @@ canvas {
           <button class="dir-btn active" data-dir="horizontal">横書き</button>
           <button class="dir-btn" data-dir="vertical">縦書き</button>
         </div>
-        <label>サイズ</label>
-        <input type="number" id="textSize" value="32" min="8" max="200">
+        <label style="margin-top:8px;">フォント</label>
+        <select id="textFont" style="width:100%; padding:5px 6px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; background:white;"></select>
+        <label style="margin-top:8px; font-family:'DM Mono','Courier New',monospace; font-size:10px; font-weight:700; letter-spacing:0.5px; color:#475569; text-transform:uppercase;">SIZE: <span id="textSizeLabel">32</span> px</label>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <input type="range" id="textSizeSlider" min="8" max="200" value="32" style="flex:1;">
+          <input type="number" id="textSize" value="32" min="8" max="200" style="width:56px;">
+        </div>
         <label>文字色</label>
         <input type="color" id="textColor" value="#000000">
         <div class="deco-grid">
@@ -562,6 +580,12 @@ canvas {
           <div class="help-box" style="margin-top:4px;">
             小: クリックした色に近い色のみ<br>
             大: 似た色も広く含める
+          </div>
+          <label style="margin-top:10px; font-family:'DM Mono','Courier New',monospace; font-size:10px; font-weight:700; letter-spacing:0.5px; color:#475569; text-transform:uppercase;">EDGE SHRINK: <span id="tpShrinkVal">1</span> px</label>
+          <input type="range" id="tpShrink" min="0" max="5" value="1">
+          <div class="help-box" style="margin-top:4px;">
+            0: 削らない（ふちが残る）<br>
+            5: 強めに削る（ふち残り対策）
           </div>
           <div style="margin-top:8px;">
             <label class="inline">
@@ -684,16 +708,27 @@ canvas {
 
 <!-- ===== 透過プレビューモーダル ===== -->
 <div id="tpPreviewModal" style="display:none; position:fixed; inset:0; z-index:200; background:rgba(0,0,0,0.88); align-items:center; justify-content:center; flex-direction:column;">
-  <div style="max-width:92vw; max-height:92vh; display:flex; flex-direction:column; background:#111; border-radius:10px; overflow:hidden; box-shadow:0 8px 40px rgba(0,0,0,0.7);">
-    <div style="padding:10px 16px; display:flex; align-items:center; justify-content:space-between; background:#1c1c1c; flex-shrink:0; gap:12px;">
-      <span style="color:#aaa; font-size:12px; font-family:monospace;">PREVIEW — 黒背景</span>
-      <div style="display:flex; gap:8px;">
+  <div style="width:92vw; max-width:1200px; height:88vh; display:flex; flex-direction:column; background:#111; border-radius:10px; overflow:hidden; box-shadow:0 8px 40px rgba(0,0,0,0.7);">
+    <!-- ヘッダー：タイトル＋ズームコントロール＋アクション -->
+    <div style="padding:8px 14px; display:flex; align-items:center; justify-content:space-between; background:#1c1c1c; flex-shrink:0; gap:10px; flex-wrap:wrap;">
+      <span style="color:#aaa; font-size:11px; font-family:monospace; white-space:nowrap;">PREVIEW — 黒背景</span>
+      <div class="zoom-control" style="flex:1; justify-content:center; gap:6px; min-width:200px;">
+        <span style="color:#aaa; font-size:11px;">表示</span>
+        <button id="tpPvZoomOut" style="padding:2px 7px; font-size:11px; background:#333; border-color:#555; color:#ccc;">−</button>
+        <input type="range" id="tpPvZoomSlider" min="25" max="400" value="100" style="width:90px; accent-color:#ea580c;">
+        <button id="tpPvZoomIn" style="padding:2px 7px; font-size:11px; background:#333; border-color:#555; color:#ccc;">+</button>
+        <span id="tpPvZoomLabel" style="min-width:38px; text-align:right; font-size:12px; color:#ea580c; font-family:monospace;">100%</span>
+        <button id="tpPvZoomFitBtn" style="padding:2px 8px; font-size:11px; background:#333; border-color:#555; color:#ccc; white-space:nowrap;">画面に合わせる</button>
+        <button id="tpPvZoom100Btn" style="padding:2px 8px; font-size:11px; background:#333; border-color:#555; color:#ccc;">原寸</button>
+      </div>
+      <div style="display:flex; gap:8px; flex-shrink:0;">
         <button id="tpPreviewSaveBtn" class="primary" style="font-size:12px; padding:5px 12px;">このまま保存</button>
-        <button id="tpPreviewCloseBtn" style="font-size:12px; padding:5px 12px;">閉じる</button>
+        <button id="tpPreviewCloseBtn" style="font-size:12px; padding:5px 12px; background:#333; border-color:#555; color:#ccc;">閉じる</button>
       </div>
     </div>
-    <div style="overflow:auto; background:#000; flex:1; display:flex; align-items:center; justify-content:center; padding:16px; min-height:200px;">
-      <canvas id="tpPreviewCanvas" style="display:block; max-width:100%; max-height:75vh;"></canvas>
+    <!-- 画像エリア：スクロール可 -->
+    <div id="tpPvImageWrap" style="overflow:auto; background:#000; flex:1; display:flex; align-items:flex-start; justify-content:flex-start; padding:16px;">
+      <canvas id="tpPreviewCanvas" style="display:block; flex-shrink:0;"></canvas>
     </div>
   </div>
 </div>
@@ -711,6 +746,31 @@ function toast(msg) {
   setTimeout(() => t.classList.remove('show'), 2500);
 }
 function uid() { return Math.random().toString(36).slice(2, 9); }
+
+// ============================================================
+// === FONT DEFINITIONS ===
+// ============================================================
+const FONT_LIST = [
+  { value: 'system', label: 'システムデフォルト', css: '-apple-system, "Hiragino Sans", "Yu Gothic", sans-serif' },
+  { value: 'yomogi', label: 'Yomogi（手書き風）',  css: "'Yomogi', cursive" },
+];
+
+// フォント選択プルダウンを動的生成
+(function buildFontSelect() {
+  const sel = document.getElementById('textFont');
+  FONT_LIST.forEach(f => {
+    const opt = document.createElement('option');
+    opt.value = f.value;
+    opt.textContent = f.label;
+    opt.style.fontFamily = f.css;
+    sel.appendChild(opt);
+  });
+})();
+
+function getFontCSS(value) {
+  const f = FONT_LIST.find(f => f.value === value);
+  return f ? f.css : FONT_LIST[0].css;
+}
 
 // ============================================================
 // === MODE SWITCHING ===
@@ -899,7 +959,7 @@ function render() {
 
 function drawText(l) {
   ctx.save();
-  ctx.font = `${l.size}px -apple-system, "Hiragino Sans", "Yu Gothic", sans-serif`;
+  ctx.font = `${l.size}px ${getFontCSS(l.font || 'system')}`;
   ctx.textBaseline = 'top';
   if (l.direction === 'vertical') {
     const chars = [...l.text];
@@ -961,7 +1021,7 @@ function fillVertChar(ctx, c, lx, ly, i, lineHeight, w, size) {
 
 function getTextBounds(l) {
   ctx.save();
-  ctx.font = `${l.size}px -apple-system, "Hiragino Sans", "Yu Gothic", sans-serif`;
+  ctx.font = `${l.size}px ${getFontCSS(l.font || 'system')}`;
   let w, h;
   if (l.direction === 'vertical') {
     w = l.size * 1.2; h = [...l.text].length * l.size * 1.1;
@@ -1212,6 +1272,34 @@ document.getElementById('strokeWidth').addEventListener('input', e => {
   document.getElementById('strokeWidthLabel').textContent = e.target.value;
 });
 
+// フォントサイズ: スライダー ↔ 数値入力 双方向バインド
+document.getElementById('textSizeSlider').addEventListener('input', e => {
+  document.getElementById('textSize').value = e.target.value;
+  document.getElementById('textSizeLabel').textContent = e.target.value;
+  syncSelectedTextSize(parseInt(e.target.value));
+});
+document.getElementById('textSize').addEventListener('input', e => {
+  const v = Math.max(8, Math.min(200, parseInt(e.target.value) || 32));
+  document.getElementById('textSizeSlider').value = v;
+  document.getElementById('textSizeLabel').textContent = v;
+  syncSelectedTextSize(v);
+});
+
+function syncSelectedTextSize(size) {
+  const layer = editState.layers.find(l => l.id === editState.selectedLayerId && l.type === 'text');
+  if (!layer) return;
+  layer.size = size;
+  render();
+}
+
+// フォント選択: 選択中レイヤーにリアルタイム反映
+document.getElementById('textFont').addEventListener('change', () => {
+  const layer = editState.layers.find(l => l.id === editState.selectedLayerId && l.type === 'text');
+  if (!layer) return;
+  layer.font = document.getElementById('textFont').value;
+  render();
+});
+
 // --- Add text ---
 document.getElementById('addText').addEventListener('click', () => {
   if (!editState.baseImage) { toast('先に画像を読み込んでください'); return; }
@@ -1222,6 +1310,7 @@ document.getElementById('addText').addEventListener('click', () => {
     direction: editState.textDirection,
     x: editState.baseWidth / 2 - 50, y: editState.baseHeight / 2 - 16,
     size: parseInt(document.getElementById('textSize').value) || 32,
+    font: document.getElementById('textFont').value,
     color: document.getElementById('textColor').value,
     bg: document.getElementById('textBg').checked,
     bgColor: document.getElementById('textBgColor').value,
@@ -1707,12 +1796,32 @@ function floodFill(imageData, startX, startY, tolerance, colorDistOut) {
   return mask;
 }
 
+// マスクを radius px 分 erode（内側に侵食）して新しいマスクを返す
+function erodeMask(mask, w, h, radius) {
+  if (radius <= 0) return mask;
+  // computeDistMap を流用: 境界からの距離が radius 未満のピクセルを非選択にする
+  const dist = computeDistMap(mask, w, h, radius);
+  const out = new Uint8Array(w * h);
+  for (let i = 0; i < out.length; i++) {
+    if (mask[i] && dist[i] >= radius) out[i] = 1;
+  }
+  return out;
+}
+
+// 表示・保存に使う有効マスク（erode適用済み）を返す
+function getEffectiveMask() {
+  const radius = parseInt(document.getElementById('tpShrink').value) || 0;
+  return erodeMask(tpState.selectionMask, tpState.originalWidth, tpState.originalHeight, radius);
+}
+
 function renderWandPreview() {
   if (!tpState.originalImageData) return;
   const w = tpState.originalWidth, h = tpState.originalHeight;
   tpOverlayCtx.clearRect(0, 0, w, h);
-  const mask = tpState.selectionMask;
-  if (!mask) return;
+  if (!tpState.selectionMask) return;
+
+  // erode適用済みマスクを使ってプレビュー描画
+  const mask = getEffectiveMask();
 
   // 選択範囲内を薄い赤でオーバーレイ
   const overlayData = tpOverlayCtx.createImageData(w, h);
@@ -1785,7 +1894,8 @@ function computeDistMap(mask, w, h, maxDist) {
 // 透過ピクセルデータを生成（wandDownload・プレビュー共用）
 function buildTransparentImageData(ctx, w, h) {
   const src = tpState.originalImageData.data;
-  const mask = tpState.selectionMask;
+  // erode適用済みマスクを使用
+  const mask = getEffectiveMask();
   const colorDist = tpState.colorDistMap; // Float32Array or null
   const antialias = document.getElementById('tpWandAntialias').checked;
   const out = ctx.createImageData(w, h);
@@ -1984,6 +2094,15 @@ document.getElementById('tpTolerance').addEventListener('input', e => {
   document.getElementById('tpToleranceVal').textContent = e.target.value;
 });
 
+// EDGE SHRINK スライダー: 変更時にプレビューを debounce 付きで更新
+let tpShrinkTimer = null;
+document.getElementById('tpShrink').addEventListener('input', e => {
+  document.getElementById('tpShrinkVal').textContent = e.target.value;
+  if (!tpState.selectionMask) return;
+  clearTimeout(tpShrinkTimer);
+  tpShrinkTimer = setTimeout(renderWandPreview, 100);
+});
+
 // スライダー操作 → リアルタイム反映
 tpThresholdSlider.addEventListener('input', () => {
   tpThresholdVal.textContent = tpThresholdSlider.value;
@@ -2036,6 +2155,32 @@ tpDownloadBtn.addEventListener('click', () => {
 // ===== プレビューモーダル =====
 const tpPreviewModal = document.getElementById('tpPreviewModal');
 const tpPreviewCanvas = document.getElementById('tpPreviewCanvas');
+const tpPvImageWrap  = document.getElementById('tpPvImageWrap');
+
+// プレビューモーダル専用ズーム状態
+const tpPvState = { zoom: 1 };
+
+function tpPvApplyZoom() {
+  const w = tpPreviewCanvas.width;
+  const h = tpPreviewCanvas.height;
+  tpPreviewCanvas.style.width  = Math.round(w * tpPvState.zoom) + 'px';
+  tpPreviewCanvas.style.height = Math.round(h * tpPvState.zoom) + 'px';
+  document.getElementById('tpPvZoomLabel').textContent = Math.round(tpPvState.zoom * 100) + '%';
+  document.getElementById('tpPvZoomSlider').value = Math.round(tpPvState.zoom * 100);
+}
+
+function tpPvSetZoom(percent) {
+  tpPvState.zoom = Math.max(0.25, Math.min(4, percent / 100));
+  tpPvApplyZoom();
+}
+
+function tpPvZoomFit() {
+  const wrapW = tpPvImageWrap.clientWidth  - 32;
+  const wrapH = tpPvImageWrap.clientHeight - 32;
+  const sx = wrapW / tpPreviewCanvas.width;
+  const sy = wrapH / tpPreviewCanvas.height;
+  tpPvSetZoom(Math.min(sx, sy, 1) * 100);
+}
 
 function showTpPreview() {
   if (!tpState.originalImageData || !tpState.selectionMask) return;
@@ -2046,11 +2191,15 @@ function showTpPreview() {
   tmpCtx.putImageData(buildTransparentImageData(tmpCtx, w, h), 0, 0);
   // 黒背景の上に透過PNGを描画
   tpPreviewCanvas.width = w; tpPreviewCanvas.height = h;
+  tpPreviewCanvas.style.width  = '';
+  tpPreviewCanvas.style.height = '';
   const pCtx = tpPreviewCanvas.getContext('2d');
   pCtx.fillStyle = '#000000';
   pCtx.fillRect(0, 0, w, h);
   pCtx.drawImage(tmp, 0, 0);
   tpPreviewModal.style.display = 'flex';
+  // 初期ズーム: 画面に合わせる
+  requestAnimationFrame(() => tpPvZoomFit());
 }
 
 document.getElementById('tpPreviewBtn').addEventListener('click', showTpPreview);
@@ -2063,6 +2212,19 @@ document.getElementById('tpPreviewSaveBtn').addEventListener('click', () => {
   tpPreviewModal.style.display = 'none';
   wandDownload();
 });
+
+// プレビューズーム操作
+document.getElementById('tpPvZoomSlider').addEventListener('input', e => tpPvSetZoom(parseFloat(e.target.value)));
+document.getElementById('tpPvZoomIn').addEventListener('click',  () => tpPvSetZoom(tpPvState.zoom * 100 + 10));
+document.getElementById('tpPvZoomOut').addEventListener('click', () => tpPvSetZoom(tpPvState.zoom * 100 - 10));
+document.getElementById('tpPvZoom100Btn').addEventListener('click', () => tpPvSetZoom(100));
+document.getElementById('tpPvZoomFitBtn').addEventListener('click', tpPvZoomFit);
+
+// ホイールズーム
+tpPvImageWrap.addEventListener('wheel', e => {
+  e.preventDefault();
+  tpPvSetZoom(tpPvState.zoom * 100 + (e.deltaY < 0 ? 10 : -10));
+}, { passive: false });
 
 // モーダル外クリックで閉じる
 tpPreviewModal.addEventListener('click', e => {
@@ -2124,7 +2286,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-20-01'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-21-01'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
