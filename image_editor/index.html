@@ -1173,6 +1173,9 @@ document.querySelectorAll('.dir-btn').forEach(btn => {
     document.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     editState.textDirection = btn.dataset.dir;
+    // 選択中のテキストレイヤーにもリアルタイム反映
+    const layer = editState.layers.find(l => l.id === editState.selectedLayerId && l.type === 'text');
+    if (layer) { layer.direction = btn.dataset.dir; saveHistory(); render(); }
   });
 });
 
@@ -1551,6 +1554,7 @@ document.getElementById('clearAll').addEventListener('click', () => {
 // --- Undo/Redo ---
 document.getElementById('undoBtn').addEventListener('click', async () => {
   if (editState.historyIdx > 0) { editState.historyIdx--; await restoreFromHistory(editState.historyIdx); updateUndoRedo(); }
+  else { toast('これ以上戻れません'); }
 });
 document.getElementById('redoBtn').addEventListener('click', async () => {
   if (editState.historyIdx < editState.history.length - 1) { editState.historyIdx++; await restoreFromHistory(editState.historyIdx); updateUndoRedo(); }
@@ -2050,7 +2054,7 @@ tpBeforeCanvas.addEventListener('click', e => {
 
 // wand: Undo（Undo/Redo では colorDistMap は再計算できないためクリア）
 function tpUndo() {
-  if (tpState.maskHistory.length === 0) return;
+  if (tpState.maskHistory.length === 0) { toast('これ以上戻れません'); return; }
   const cur = tpState.selectionMask ? tpState.selectionMask.slice() : null;
   tpState.maskRedoHistory.push(cur);
   if (tpState.maskRedoHistory.length > 10) tpState.maskRedoHistory.shift();
@@ -2157,8 +2161,8 @@ const tpPreviewModal = document.getElementById('tpPreviewModal');
 const tpPreviewCanvas = document.getElementById('tpPreviewCanvas');
 const tpPvImageWrap  = document.getElementById('tpPvImageWrap');
 
-// プレビューモーダル専用ズーム状態
-const tpPvState = { zoom: 1 };
+// プレビューモーダル専用状態（ズーム＋パン）
+const tpPvState = { zoom: 1, spacePressed: false, panning: null };
 
 function tpPvApplyZoom() {
   const w = tpPreviewCanvas.width;
@@ -2182,6 +2186,60 @@ function tpPvZoomFit() {
   tpPvSetZoom(Math.min(sx, sy, 1) * 100);
 }
 
+// プレビューモーダル Spaceパン: キーボードハンドラ
+function tpPvKeydown(e) {
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (!e.repeat) {
+      tpPvState.spacePressed = true;
+      tpPvImageWrap.style.cursor = 'grab';
+    }
+  }
+}
+function tpPvKeyup(e) {
+  if (e.code === 'Space') {
+    tpPvState.spacePressed = false;
+    tpPvState.panning = null;
+    tpPvImageWrap.style.cursor = '';
+  }
+}
+
+function tpPvOpenModal() {
+  window.addEventListener('keydown', tpPvKeydown, { passive: false });
+  window.addEventListener('keyup',   tpPvKeyup);
+}
+function tpPvCloseModal() {
+  window.removeEventListener('keydown', tpPvKeydown);
+  window.removeEventListener('keyup',   tpPvKeyup);
+  tpPvState.spacePressed = false;
+  tpPvState.panning = null;
+  tpPvImageWrap.style.cursor = '';
+}
+
+// プレビューモーダル Spaceパン: マウスイベント
+tpPvImageWrap.addEventListener('mousedown', e => {
+  if (tpPvState.spacePressed) {
+    tpPvState.panning = {
+      startX: e.clientX, startY: e.clientY,
+      scrollLeft: tpPvImageWrap.scrollLeft,
+      scrollTop:  tpPvImageWrap.scrollTop,
+    };
+    tpPvImageWrap.style.cursor = 'grabbing';
+    e.preventDefault();
+  }
+});
+tpPvImageWrap.addEventListener('mousemove', e => {
+  if (!tpPvState.panning) return;
+  tpPvImageWrap.scrollLeft = tpPvState.panning.scrollLeft - (e.clientX - tpPvState.panning.startX);
+  tpPvImageWrap.scrollTop  = tpPvState.panning.scrollTop  - (e.clientY - tpPvState.panning.startY);
+});
+tpPvImageWrap.addEventListener('mouseup',   () => {
+  if (tpPvState.panning) { tpPvState.panning = null; tpPvImageWrap.style.cursor = tpPvState.spacePressed ? 'grab' : ''; }
+});
+tpPvImageWrap.addEventListener('mouseleave', () => {
+  if (tpPvState.panning) { tpPvState.panning = null; tpPvImageWrap.style.cursor = ''; }
+});
+
 function showTpPreview() {
   if (!tpState.originalImageData || !tpState.selectionMask) return;
   const w = tpState.originalWidth, h = tpState.originalHeight;
@@ -2198,6 +2256,7 @@ function showTpPreview() {
   pCtx.fillRect(0, 0, w, h);
   pCtx.drawImage(tmp, 0, 0);
   tpPreviewModal.style.display = 'flex';
+  tpPvOpenModal();
   // 初期ズーム: 画面に合わせる
   requestAnimationFrame(() => tpPvZoomFit());
 }
@@ -2206,10 +2265,12 @@ document.getElementById('tpPreviewBtn').addEventListener('click', showTpPreview)
 
 document.getElementById('tpPreviewCloseBtn').addEventListener('click', () => {
   tpPreviewModal.style.display = 'none';
+  tpPvCloseModal();
 });
 
 document.getElementById('tpPreviewSaveBtn').addEventListener('click', () => {
   tpPreviewModal.style.display = 'none';
+  tpPvCloseModal();
   wandDownload();
 });
 
@@ -2228,7 +2289,7 @@ tpPvImageWrap.addEventListener('wheel', e => {
 
 // モーダル外クリックで閉じる
 tpPreviewModal.addEventListener('click', e => {
-  if (e.target === tpPreviewModal) tpPreviewModal.style.display = 'none';
+  if (e.target === tpPreviewModal) { tpPreviewModal.style.display = 'none'; tpPvCloseModal(); }
 });
 
 // リセット
@@ -2286,7 +2347,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-21-01'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-21-02'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
