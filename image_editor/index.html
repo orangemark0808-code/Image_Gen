@@ -479,6 +479,16 @@ canvas {
       <!-- 2. リサイズ -->
       <div class="section" id="sec-resize">
         <div class="section-title">RESIZE</div>
+        <!-- TARGET -->
+        <div style="margin-bottom:10px; padding-bottom:10px; border-bottom:1px dashed #e8e2d8;">
+          <div style="font-family:'DM Mono',monospace; font-size:11px; letter-spacing:.08em; color:#8a7060; margin-bottom:6px;">TARGET</div>
+          <label class="inline" style="margin-top:0;">
+            <input type="radio" name="resizeTarget" value="canvas" checked> 画像全体（キャンバスも変更）
+          </label>
+          <label class="inline" style="margin-top:4px;">
+            <input type="radio" name="resizeTarget" value="layer"> 選択中のレイヤーのみ
+          </label>
+        </div>
         <label class="inline" style="margin-top:0;">
           <input type="radio" name="resizeMode" value="pixel"> ピクセル指定
         </label>
@@ -505,6 +515,7 @@ canvas {
           <input type="number" id="resizePercent" placeholder="50" value="50">
           <div class="help-box" style="margin-top:4px;">縦横比は自動で維持されます</div>
         </div>
+        <button id="doResizeBtn" class="primary" style="width:100%; margin-top:14px; height:48px; background:#FF7F00; border-color:#FF7F00; border-radius:14px; box-shadow:none; font-size:15px; font-weight:600;">リサイズ実行</button>
       </div>
 
       <!-- 3. 実行 -->
@@ -1444,15 +1455,43 @@ document.querySelectorAll('input[name="resizeMode"]').forEach(r => {
 });
 document.getElementById('pixelGroup').style.opacity = '0.4';
 
+// TARGET 選択に応じたアスペクト比を返す
+function getResizeAspectRatio() {
+  const target = document.querySelector('input[name="resizeTarget"]:checked').value;
+  if (target === 'layer') {
+    const sel = editState.layers.find(l => l.id === editState.selectedLayerId && l.type === 'image');
+    if (sel && sel.h > 0) return sel.w / sel.h;
+  }
+  return editState.aspectRatio;
+}
+
+// TARGET 切替時に入力欄の値を更新
+document.querySelectorAll('input[name="resizeTarget"]').forEach(r => {
+  r.addEventListener('change', () => {
+    const target = document.querySelector('input[name="resizeTarget"]:checked').value;
+    if (target === 'canvas') {
+      document.getElementById('resizeWidth').value  = editState.baseWidth  || '';
+      document.getElementById('resizeHeight').value = editState.baseHeight || '';
+    } else {
+      const sel = editState.layers.find(l => l.id === editState.selectedLayerId && l.type === 'image');
+      document.getElementById('resizeWidth').value  = sel ? Math.round(sel.w) : '';
+      document.getElementById('resizeHeight').value = sel ? Math.round(sel.h) : '';
+    }
+  });
+});
+
+// 縦横比連動（TARGET に応じた比率を使用）
 document.getElementById('resizeWidth').addEventListener('input', e => {
-  if (!editState.baseImage || !document.getElementById('keepAspectPixel').checked) return;
+  if (!document.getElementById('keepAspectPixel').checked) return;
   const w = parseFloat(e.target.value);
-  if (w > 0) document.getElementById('resizeHeight').value = Math.round(w / editState.aspectRatio);
+  const ar = getResizeAspectRatio();
+  if (w > 0 && ar > 0) document.getElementById('resizeHeight').value = Math.round(w / ar);
 });
 document.getElementById('resizeHeight').addEventListener('input', e => {
-  if (!editState.baseImage || !document.getElementById('keepAspectPixel').checked) return;
+  if (!document.getElementById('keepAspectPixel').checked) return;
   const h = parseFloat(e.target.value);
-  if (h > 0) document.getElementById('resizeWidth').value = Math.round(h * editState.aspectRatio);
+  const ar = getResizeAspectRatio();
+  if (h > 0 && ar > 0) document.getElementById('resizeWidth').value = Math.round(h * ar);
 });
 
 document.getElementById('cropFixRatio').addEventListener('change', e => {
@@ -1506,12 +1545,47 @@ function resizeCanvas(newW, newH) {
   editState.baseImage = ctx.getImageData(0, 0, newW, newH);
   editState.baseWidth = newW; editState.baseHeight = newH; editState.aspectRatio = newW / newH;
   for (const l of editState.layers) {
-    if (l.type === 'text') { l.x *= scaleX; l.y *= scaleY; l.size *= (scaleX + scaleY) / 2; }
+    if (l.type === 'text')  { l.x *= scaleX; l.y *= scaleY; l.size *= (scaleX + scaleY) / 2; }
+    else if (l.type === 'image') { l.x *= scaleX; l.y *= scaleY; l.w *= scaleX; l.h *= scaleY; }
     else { l.x1 *= scaleX; l.x2 *= scaleX; l.y1 *= scaleY; l.y2 *= scaleY; }
   }
   document.getElementById('resizeWidth').value = newW;
   document.getElementById('resizeHeight').value = newH;
 }
+
+// RESIZE タブの「リサイズ実行」ボタン（TARGET に応じてキャンバス全体 or 選択レイヤー）
+document.getElementById('doResizeBtn').addEventListener('click', () => {
+  if (!editState.baseImage) { toast('先に画像を読み込んでください'); return; }
+  const target = document.querySelector('input[name="resizeTarget"]:checked').value;
+  const mode   = document.querySelector('input[name="resizeMode"]:checked').value;
+
+  if (target === 'canvas') {
+    // 画像全体リサイズ（既存の executeResize を流用）
+    if (executeResize()) {
+      applyZoom(); saveHistory(); render(); updateCanvasInfo();
+      toast(`リサイズ完了: ${editState.baseWidth}×${editState.baseHeight}px`);
+    }
+  } else {
+    // 選択中のレイヤーのみリサイズ
+    const sel = editState.layers.find(l => l.id === editState.selectedLayerId);
+    if (!sel) { toast('レイヤーを選択してください'); return; }
+    if (sel.type !== 'image') { toast('画像レイヤー（Clip）のみリサイズできます'); return; }
+    let newW, newH;
+    if (mode === 'pixel') {
+      newW = parseInt(document.getElementById('resizeWidth').value);
+      newH = parseInt(document.getElementById('resizeHeight').value);
+      if (!newW || !newH || newW < 1 || newH < 1) { toast('幅と高さを入力してください'); return; }
+    } else {
+      const pct = parseFloat(document.getElementById('resizePercent').value);
+      if (!pct || pct <= 0) { toast('倍率を入力してください'); return; }
+      newW = Math.round(sel.w * pct / 100);
+      newH = Math.round(sel.h * pct / 100);
+    }
+    sel.w = newW; sel.h = newH;
+    saveHistory(); render(); updateCanvasInfo();
+    toast(`${sel.name} をリサイズしました: ${newW}×${newH}px`);
+  }
+});
 
 document.getElementById('applyCropOnly').addEventListener('click', () => {
   if (!editState.baseImage) { toast('先に画像を読み込んでください'); return; }
