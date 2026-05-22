@@ -474,7 +474,6 @@ canvas {
         </div>
         <div class="help-box" style="margin-top:7px;">「トリミング」ツール(C)でキャンバス上をドラッグ</div>
         <div id="cropStatus" class="status-pill">範囲未選択</div>
-        <button id="saveTrimClipBtn" class="primary" style="width:100%; margin-top:8px; background:#FF7F00; border-color:#FF7F00; border-radius:14px; box-shadow:none;" disabled>クリップボードに保存</button>
       </div>
 
       <!-- 2. リサイズ -->
@@ -506,7 +505,6 @@ canvas {
           <input type="number" id="resizePercent" placeholder="50" value="50">
           <div class="help-box" style="margin-top:4px;">縦横比は自動で維持されます</div>
         </div>
-        <button id="saveResizeClipBtn" class="primary" style="width:100%; margin-top:10px; background:#FF7F00; border-color:#FF7F00; border-radius:14px; box-shadow:none;">クリップボードに保存</button>
       </div>
 
       <!-- 3. 実行 -->
@@ -530,6 +528,7 @@ canvas {
             <div class="clip-slot" data-idx="1"></div>
             <div class="clip-slot" data-idx="2"></div>
           </div>
+          <button id="saveClipboardBtn" class="primary" style="width:100%; margin-bottom:6px; background:#FF7F00; border-color:#FF7F00; border-radius:14px; box-shadow:none;">クリップボードに保存</button>
           <button id="clearClipboardBtn" style="width:100%; padding:5px; font-size:12px; border:1px solid #d0c8be; border-radius:8px; background:transparent; color:#8a7060; cursor:pointer; box-shadow:none;" disabled>全てクリア</button>
         </div>
       </div>
@@ -1257,19 +1256,59 @@ function drawShape(l) {
 }
 
 function drawImageLayer(l) {
-  if (!l._canvas) {
-    // ImageData → offscreen canvas にキャッシュ（毎フレーム再生成しない）
-    l._canvas = document.createElement('canvas');
-    l._canvas.width = l.w; l._canvas.height = l.h;
-    l._canvas.getContext('2d').putImageData(l.imageData, 0, 0);
+  // src (base64) ベースで描画。_img は描画キャッシュ用 HTMLImageElement。
+  // ImageData は使わない（JSON.stringify で破損するため）
+  if (!l._img) {
+    const img = new Image();
+    img.onload = () => { l._img = img; render(); };
+    img.src = l.src;
+    return; // 初回ロード待ち
   }
+  if (!l._img.complete || !l._img.naturalWidth) return;
+  const rot = l.rotation || 0;
+  const cx = l.x + l.w / 2;
+  const cy = l.y + l.h / 2;
   ctx.save();
-  ctx.drawImage(l._canvas, l.x, l.y, l.w, l.h);
+  ctx.translate(cx, cy);
+  if (rot) ctx.rotate(rot);
+  ctx.drawImage(l._img, -l.w / 2, -l.h / 2, l.w, l.h);
   if (editState.selectedLayerId === l.id) {
+    const hw = l.w / 2, hh = l.h / 2;
+    // 選択枠
     ctx.strokeStyle = '#ea580c'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
-    ctx.strokeRect(l.x - 4, l.y - 4, l.w + 8, l.h + 8); ctx.setLineDash([]);
+    ctx.strokeRect(-hw - 4, -hh - 4, l.w + 8, l.h + 8); ctx.setLineDash([]);
+    // 4コーナーリサイズハンドル
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = '#ea580c'; ctx.lineWidth = 1.5;
+    for (const [hx, hy] of [[-hw, -hh], [hw, -hh], [-hw, hh], [hw, hh]]) {
+      ctx.fillRect(hx - 5, hy - 5, 10, 10);
+      ctx.strokeRect(hx - 5, hy - 5, 10, 10);
+    }
+    // 回転ハンドル（上辺中央の 20px 上）
+    ctx.beginPath(); ctx.moveTo(0, -hh - 4); ctx.lineTo(0, -hh - 16);
+    ctx.strokeStyle = '#ea580c'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, -hh - 22, 6, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = '#ea580c'; ctx.lineWidth = 1.5; ctx.stroke();
   }
   ctx.restore();
+}
+
+// 選択中 image レイヤーのどのハンドルをクリックしたか判定（canvas 座標で渡す）
+function getImageHandleHit(l, x, y) {
+  const rot = l.rotation || 0;
+  const cx = l.x + l.w / 2, cy = l.y + l.h / 2;
+  const cos = Math.cos(-rot), sin = Math.sin(-rot);
+  const dx = x - cx, dy = y - cy;
+  const lx = dx * cos - dy * sin;
+  const ly = dx * sin + dy * cos;
+  const hw = l.w / 2, hh = l.h / 2;
+  // 回転ハンドル
+  if (Math.hypot(lx, ly + hh + 22) <= 9) return 'rotate';
+  // 4コーナー
+  if (Math.abs(lx + hw) <= 8 && Math.abs(ly + hh) <= 8) return 'tl';
+  if (Math.abs(lx - hw) <= 8 && Math.abs(ly + hh) <= 8) return 'tr';
+  if (Math.abs(lx + hw) <= 8 && Math.abs(ly - hh) <= 8) return 'bl';
+  if (Math.abs(lx - hw) <= 8 && Math.abs(ly - hh) <= 8) return 'br';
+  return null;
 }
 
 function drawArrow(x1, y1, x2, y2, sw) {
@@ -1344,7 +1383,6 @@ function updateCropStatus() {
   }
   document.getElementById('applyCropOnly').disabled = !hasCrop;
   document.getElementById('applyBoth').disabled = !hasCrop;
-  document.getElementById('saveTrimClipBtn').disabled = !hasCrop;
 }
 
 // --- D&D for edit mode ---
@@ -1525,19 +1563,15 @@ function pasteClipboardItem(base64) {
   if (!editState.baseImage) { toast('先に画像を読み込んでください'); return; }
   const img = new Image();
   img.onload = () => {
-    const tmp = document.createElement('canvas');
-    tmp.width = img.width; tmp.height = img.height;
-    tmp.getContext('2d').drawImage(img, 0, 0);
-    const imageData = tmp.getContext('2d').getImageData(0, 0, img.width, img.height);
     const existingNums = editState.layers
       .filter(l => l.type === 'image' && /^Clip_(\d+)$/.test(l.name))
       .map(l => parseInt(l.name.replace('Clip_', ''), 10));
     const nextNum = existingNums.length > 0 ? Math.max(...existingNums) + 1 : 1;
     const clipName = `Clip_${String(nextNum).padStart(3, '0')}`;
-    // キャンバス中央に配置
     const x = Math.round((editState.baseWidth - img.width) / 2);
     const y = Math.round((editState.baseHeight - img.height) / 2);
-    const layer = { id: uid(), type: 'image', name: clipName, x, y, w: img.width, h: img.height, imageData };
+    // src (base64) をそのまま保持 → JSON.stringify/parse でも壊れない
+    const layer = { id: uid(), type: 'image', name: clipName, x, y, w: img.width, h: img.height, src: base64 };
     editState.layers.push(layer);
     editState.selectedLayerId = layer.id;
     selectTool('select');
@@ -1547,23 +1581,20 @@ function pasteClipboardItem(base64) {
   img.src = base64;
 }
 
-// TRIMクリップボード保存
-document.getElementById('saveTrimClipBtn').addEventListener('click', () => {
-  if (!editState.baseImage) { toast('先に画像を読み込んでください'); return; }
-  if (!editState.cropRect || editState.cropRect.w <= 5 || editState.cropRect.h <= 5) {
-    toast('範囲を選択してください'); return;
-  }
+// クリップボード保存（集約ボタン）: TRIM範囲 > キャンバス全体 の優先順で保存
+document.getElementById('saveClipboardBtn').addEventListener('click', () => {
+  if (!editState.baseImage) { toast('保存できる内容がありません'); return; }
   const r = editState.cropRect;
+  const hasCrop = r && r.w > 5 && r.h > 5;
   const tmp = document.createElement('canvas');
-  tmp.width = Math.round(r.w); tmp.height = Math.round(r.h);
-  tmp.getContext('2d').drawImage(canvas, r.x, r.y, r.w, r.h, 0, 0, tmp.width, tmp.height);
+  if (hasCrop) {
+    tmp.width = Math.round(r.w); tmp.height = Math.round(r.h);
+    tmp.getContext('2d').drawImage(canvas, r.x, r.y, r.w, r.h, 0, 0, tmp.width, tmp.height);
+  } else {
+    tmp.width = canvas.width; tmp.height = canvas.height;
+    tmp.getContext('2d').drawImage(canvas, 0, 0);
+  }
   addToClipboard(tmp.toDataURL('image/png'));
-});
-
-// RESIZEクリップボード保存
-document.getElementById('saveResizeClipBtn').addEventListener('click', () => {
-  if (!editState.baseImage) { toast('先に画像を読み込んでください'); return; }
-  addToClipboard(canvas.toDataURL('image/png'));
 });
 
 // クリップボードスロットクリック → 貼り付け
@@ -1818,6 +1849,22 @@ canvas.addEventListener('mousedown', e => {
   if (tool === 'crop') { editState.dragging = { type: 'crop', startX: pos.x, startY: pos.y }; return; }
   if (['ellipse','rect','arrow','line'].includes(tool)) { editState.dragging = { type: 'shape', startX: pos.x, startY: pos.y, shape: tool }; return; }
   if (tool === 'select') {
+    // 選択中 image レイヤーのハンドルを最優先でチェック
+    if (editState.selectedLayerId) {
+      const selImg = editState.layers.find(l => l.id === editState.selectedLayerId && l.type === 'image');
+      if (selImg) {
+        const hit = getImageHandleHit(selImg, pos.x, pos.y);
+        if (hit === 'rotate') {
+          const cx = selImg.x + selImg.w / 2, cy = selImg.y + selImg.h / 2;
+          editState.dragging = { type: 'img-rotate', layerId: selImg.id, cx, cy, origRot: selImg.rotation || 0, origAngle: Math.atan2(pos.y - cy, pos.x - cx) };
+          return;
+        }
+        if (hit) {
+          editState.dragging = { type: 'img-resize', layerId: selImg.id, handle: hit, origX: selImg.x, origY: selImg.y, origW: selImg.w, origH: selImg.h, startX: pos.x, startY: pos.y };
+          return;
+        }
+      }
+    }
     const layer = findLayerAt(pos.x, pos.y);
     if (layer) {
       editState.selectedLayerId = layer.id;
@@ -1864,6 +1911,25 @@ canvas.addEventListener('mousemove', e => {
     if (layer.type === 'text' || layer.type === 'image') { layer.x = editState.dragging.orig.x + dx; layer.y = editState.dragging.orig.y + dy; }
     else { layer.x1 = editState.dragging.orig.x1 + dx; layer.y1 = editState.dragging.orig.y1 + dy; layer.x2 = editState.dragging.orig.x2 + dx; layer.y2 = editState.dragging.orig.y2 + dy; }
     render();
+  } else if (editState.dragging.type === 'img-resize') {
+    const d = editState.dragging;
+    const layer = editState.layers.find(l => l.id === d.layerId);
+    if (!layer) return;
+    const dx = pos.x - d.startX, dy = pos.y - d.startY;
+    let nx = d.origX, ny = d.origY, nw = d.origW, nh = d.origH;
+    if (d.handle === 'tl')      { nx = d.origX + dx; ny = d.origY + dy; nw = d.origW - dx; nh = d.origH - dy; }
+    else if (d.handle === 'tr') {                     ny = d.origY + dy; nw = d.origW + dx; nh = d.origH - dy; }
+    else if (d.handle === 'bl') { nx = d.origX + dx;                    nw = d.origW - dx; nh = d.origH + dy; }
+    else if (d.handle === 'br') {                                        nw = d.origW + dx; nh = d.origH + dy; }
+    if (nw > 10 && nh > 10) { layer.x = nx; layer.y = ny; layer.w = nw; layer.h = nh; }
+    render();
+  } else if (editState.dragging.type === 'img-rotate') {
+    const d = editState.dragging;
+    const layer = editState.layers.find(l => l.id === d.layerId);
+    if (!layer) return;
+    const angle = Math.atan2(pos.y - d.cy, pos.x - d.cx);
+    layer.rotation = d.origRot + (angle - d.origAngle);
+    render();
   }
 });
 
@@ -1884,6 +1950,7 @@ canvas.addEventListener('mouseup', e => {
     }
     render();
   } else if (editState.dragging.type === 'move') { saveHistory(); }
+  else if (editState.dragging.type === 'img-resize' || editState.dragging.type === 'img-rotate') { saveHistory(); render(); }
   editState.dragging = null;
 });
 
@@ -1920,7 +1987,13 @@ function findLayerAt(x, y) {
       const { w, h } = getTextBounds(l);
       if (x >= l.x - 6 && x <= l.x + w + 6 && y >= l.y - 4 && y <= l.y + h + 4) return l;
     } else if (l.type === 'image') {
-      if (x >= l.x - 4 && x <= l.x + l.w + 4 && y >= l.y - 4 && y <= l.y + l.h + 4) return l;
+      const rot = l.rotation || 0;
+      const cx = l.x + l.w / 2, cy = l.y + l.h / 2;
+      const cos = Math.cos(-rot), sin = Math.sin(-rot);
+      const dx = x - cx, dy = y - cy;
+      const lx = Math.abs(dx * cos - dy * sin);
+      const ly = Math.abs(dx * sin + dy * cos);
+      if (lx <= l.w / 2 + 4 && ly <= l.h / 2 + 4) return l;
     } else {
       const minX = Math.min(l.x1, l.x2) - 6; const maxX = Math.max(l.x1, l.x2) + 6;
       const minY = Math.min(l.y1, l.y2) - 6; const maxY = Math.max(l.y1, l.y2) + 6;
