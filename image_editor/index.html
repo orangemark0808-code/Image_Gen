@@ -1136,9 +1136,10 @@ function drawText(l, tCtx) {
     // 横書き: \n 改行対応
     const lines = l.text.split('\n');
     const lineH = l.size * (l.lineHeight ?? 1.4);
-    const totalH = lines.length * lineH;
+    // 実際のテキスト高さ = (行数-1) × 行間 + 文字サイズ（最終行の下端まで）
+    const textH = (lines.length - 1) * lineH + l.size;
     const maxW = lines.reduce((m, line) => Math.max(m, tCtx.measureText(line).width), 0);
-    if (l.bg) { tCtx.fillStyle = l.bgColor; tCtx.fillRect(l.x - 4, l.y - 2, maxW + 8, totalH + 4); }
+    if (l.bg) { tCtx.fillStyle = l.bgColor; tCtx.fillRect(l.x - 4, l.y - 2, maxW + 8, textH + 4); }
     if (l.border) {
       tCtx.strokeStyle = l.borderColor; tCtx.lineWidth = l.borderWidth;
       tCtx.lineJoin = 'round'; tCtx.miterLimit = 2;
@@ -1148,7 +1149,7 @@ function drawText(l, tCtx) {
     lines.forEach((line, i) => tCtx.fillText(line, l.x, l.y + i * lineH));
     if (tCtx === ctx && editState.selectedLayerId === l.id) {
       tCtx.strokeStyle = '#ea580c'; tCtx.lineWidth = 2; tCtx.setLineDash([4,4]);
-      tCtx.strokeRect(l.x - 6, l.y - 4, maxW + 12, totalH + 8); tCtx.setLineDash([]);
+      tCtx.strokeRect(l.x - 6, l.y - 4, maxW + 12, textH + 8); tCtx.setLineDash([]);
     }
   }
   tCtx.restore();
@@ -1194,8 +1195,9 @@ function getTextBounds(l) {
     h = maxChars * charStep;
   } else {
     const lines = l.text.split('\n');
+    const lineH = l.size * (l.lineHeight ?? 1.4);
     w = lines.reduce((m, line) => Math.max(m, ctx.measureText(line).width), 0);
-    h = lines.length * l.size * (l.lineHeight ?? 1.4);
+    h = (lines.length - 1) * lineH + l.size; // 実際のテキスト高さ
   }
   ctx.restore();
   return { w, h };
@@ -1512,25 +1514,38 @@ document.getElementById('textLineHeight').addEventListener('input', e => {
   updateTextPreview();
 });
 
+// テキスト設定の localStorage 永続化
+const TEXT_SETTINGS_KEY = 'ohana_text_last_settings';
+function loadLastTextSettings() {
+  try { return JSON.parse(localStorage.getItem(TEXT_SETTINGS_KEY)) || {}; } catch { return {}; }
+}
+function saveLastTextSettings(props) {
+  const { text, ...settings } = props; // テキスト内容は保存しない
+  try { localStorage.setItem(TEXT_SETTINGS_KEY, JSON.stringify(settings)); } catch {}
+}
+
 function openTextModal(mode, layer) {
   textModalState.mode = mode;
   textModalState.editLayerId = layer ? layer.id : null;
   document.getElementById('textModalTitle').textContent = mode === 'edit' ? 'TEXT — 編集' : 'TEXT — 新規追加';
   document.getElementById('textModalSubmitBtn').textContent = mode === 'edit' ? '更新' : '追加';
 
+  // 新規追加モードでは前回の設定を引き継ぐ
+  const saved = mode === 'add' ? loadLastTextSettings() : {};
+
   // フィールドに値をセット
   const ti = document.getElementById('textInput');
-  const dir = mode === 'edit' ? (layer.direction || 'horizontal') : editState.textDirection;
-  const size = mode === 'edit' ? (layer.size || 32) : 32;
-  const ls = mode === 'edit' ? (layer.letterSpacing ?? 0) : 0;
-  const lh = mode === 'edit' ? (layer.lineHeight ?? 1.4) : 1.4;
+  const dir  = mode === 'edit' ? (layer.direction || 'horizontal')   : (saved.direction || editState.textDirection);
+  const size = mode === 'edit' ? (layer.size || 32)                  : (saved.size || 32);
+  const ls   = mode === 'edit' ? (layer.letterSpacing ?? 0)          : (saved.letterSpacing ?? 0);
+  const lh   = mode === 'edit' ? (layer.lineHeight ?? 1.4)           : (saved.lineHeight ?? 1.4);
 
   ti.value = mode === 'edit' ? layer.text : '';
   document.querySelectorAll('.dir-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.dir === dir);
   });
   editState.textDirection = dir;
-  document.getElementById('textFont').value     = mode === 'edit' ? (layer.font || 'system') : 'system';
+  document.getElementById('textFont').value     = mode === 'edit' ? (layer.font || 'system') : (saved.font || 'system');
   document.getElementById('textSizeSlider').value = size;
   document.getElementById('textSize').value       = size;
   document.getElementById('textSizeLabel').textContent = size;
@@ -1538,12 +1553,12 @@ function openTextModal(mode, layer) {
   document.getElementById('textLetterSpacingLabel').textContent = ls;
   document.getElementById('textLineHeight').value      = lh;
   document.getElementById('textLineHeightLabel').textContent    = parseFloat(lh).toFixed(1);
-  document.getElementById('textColor').value      = mode === 'edit' ? layer.color : '#000000';
-  document.getElementById('textBg').checked       = mode === 'edit' ? !!layer.bg : false;
-  document.getElementById('textBgColor').value    = mode === 'edit' ? (layer.bgColor || '#ffffff') : '#ffffff';
-  document.getElementById('textBorder').checked   = mode === 'edit' ? !!layer.border : false;
-  document.getElementById('textBorderColor').value = mode === 'edit' ? (layer.borderColor || '#000000') : '#000000';
-  document.getElementById('textBorderWidth').value = mode === 'edit' ? (layer.borderWidth || 2) : 2;
+  document.getElementById('textColor').value      = mode === 'edit' ? layer.color   : (saved.color || '#000000');
+  document.getElementById('textBg').checked       = mode === 'edit' ? !!layer.bg    : (saved.bg ?? false);
+  document.getElementById('textBgColor').value    = mode === 'edit' ? (layer.bgColor || '#ffffff')    : (saved.bgColor || '#ffffff');
+  document.getElementById('textBorder').checked   = mode === 'edit' ? !!layer.border : (saved.border ?? false);
+  document.getElementById('textBorderColor').value = mode === 'edit' ? (layer.borderColor || '#000000') : (saved.borderColor || '#000000');
+  document.getElementById('textBorderWidth').value = mode === 'edit' ? (layer.borderWidth || 2) : (saved.borderWidth || 2);
 
   textModal.style.display = 'flex';
   ti.focus();
@@ -1587,6 +1602,7 @@ function submitTextModal() {
     editState.selectedLayerId = layer.id;
     selectTool('select');
   }
+  saveLastTextSettings(props); // 設定を localStorage に保存
   closeTextModal();
   saveHistory(); render(); updateLayerList(); updateCanvasInfo();
 }
@@ -1709,8 +1725,8 @@ canvas.addEventListener('mouseup', e => {
         color: document.getElementById('shapeColor').value,
         strokeWidth: parseInt(document.getElementById('strokeWidth').value),
         fill: document.getElementById('shapeFill').checked };
-      editState.layers.push(layer); editState.selectedLayerId = layer.id;
-      selectTool('select'); saveHistory(); updateLayerList(); updateCanvasInfo();
+      editState.layers.push(layer); editState.selectedLayerId = null;
+      saveHistory(); updateLayerList(); updateCanvasInfo();
     }
     render();
   } else if (editState.dragging.type === 'move') { saveHistory(); }
@@ -2651,7 +2667,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-22-11'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-22-12'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
