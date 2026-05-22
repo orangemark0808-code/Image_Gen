@@ -1036,7 +1036,7 @@ function drawText(l, tCtx) {
     const columns = l.text.split('\n');
     const charStep = l.size + (l.letterSpacing ?? 0); // 字間 = 文字サイズ + letterSpacing
     const colW = l.size * 1.2;
-    const colGap = l.size * (l.lineHeight ?? 1.4);    // 列間 = 文字サイズ基準 × lineHeight
+    const colGap = l.size * ((l.lineHeight ?? 1.4) - 1.0); // 列間: LH=1.0→0px, LH=1.4→size*0.4
     const colStep = colW + colGap;
     const nCols = columns.length;
     const totalW = nCols * colStep - colGap;
@@ -1117,7 +1117,7 @@ function getTextBounds(l) {
     const columns = l.text.split('\n');
     const charStep = l.size + (l.letterSpacing ?? 0); // 字間 = 文字サイズ + letterSpacing
     const colW = l.size * 1.2;
-    const colGap = l.size * (l.lineHeight ?? 1.4);    // 列間 = 文字サイズ基準 × lineHeight
+    const colGap = l.size * ((l.lineHeight ?? 1.4) - 1.0); // 列間: LH=1.0→0px, LH=1.4→size*0.4
     const colStep = colW + colGap;
     const maxChars = Math.max(...columns.map(col => [...col].length));
     w = columns.length * colStep - colGap;
@@ -2581,7 +2581,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-22-02'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-22-03'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
