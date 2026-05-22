@@ -392,6 +392,24 @@ canvas {
 
   .canvas-area, #transparentModeArea { padding: 10px; }
 }
+
+/* クリップボードスロット */
+.clip-slot {
+  width: 80px; height: 80px;
+  border-radius: 14px;
+  border: 1.5px dashed #c8bfb4;
+  background: #f7f3ee;
+  cursor: pointer;
+  flex-shrink: 0;
+  overflow: hidden;
+  position: relative;
+  transition: border-color .15s;
+  box-shadow: none;
+}
+.clip-slot.has-image { border-style: solid; border-color: #c8bfb4; }
+.clip-slot.has-image:hover { border-color: #FF7F00; }
+.clip-slot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.clip-slot.empty { cursor: default; }
 </style>
 </head>
 <body>
@@ -456,7 +474,7 @@ canvas {
         </div>
         <div class="help-box" style="margin-top:7px;">「トリミング」ツール(C)でキャンバス上をドラッグ</div>
         <div id="cropStatus" class="status-pill">範囲未選択</div>
-        <button id="addCropLayerBtn" class="primary" style="width:100%; margin-top:8px; background:#FF7F00; border-color:#FF7F00; border-radius:14px; box-shadow:none;" disabled>レイヤーに追加</button>
+        <button id="saveTrimClipBtn" class="primary" style="width:100%; margin-top:8px; background:#FF7F00; border-color:#FF7F00; border-radius:14px; box-shadow:none;" disabled>クリップボードに保存</button>
       </div>
 
       <!-- 2. リサイズ -->
@@ -488,6 +506,7 @@ canvas {
           <input type="number" id="resizePercent" placeholder="50" value="50">
           <div class="help-box" style="margin-top:4px;">縦横比は自動で維持されます</div>
         </div>
+        <button id="saveResizeClipBtn" class="primary" style="width:100%; margin-top:10px; background:#FF7F00; border-color:#FF7F00; border-radius:14px; box-shadow:none;">クリップボードに保存</button>
       </div>
 
       <!-- 3. 実行 -->
@@ -503,6 +522,16 @@ canvas {
           トリミング+リサイズを実行
         </button>
         <div class="help-box" style="margin-top:6px;">「両方実行」はトリミング範囲を選択中の時のみ有効です</div>
+        <!-- CLIPBOARD -->
+        <div style="margin-top:16px; padding-top:12px; border-top:1px solid #e8e2d8;">
+          <div class="section-title" style="font-family:'DM Mono',monospace; letter-spacing:.08em; font-size:11px; color:#8a7060; margin-bottom:10px;">CLIPBOARD</div>
+          <div id="clipboardThumbs" style="display:flex; gap:8px; margin-bottom:8px;">
+            <div class="clip-slot" data-idx="0"></div>
+            <div class="clip-slot" data-idx="1"></div>
+            <div class="clip-slot" data-idx="2"></div>
+          </div>
+          <button id="clearClipboardBtn" style="width:100%; padding:5px; font-size:12px; border:1px solid #d0c8be; border-radius:8px; background:transparent; color:#8a7060; cursor:pointer; box-shadow:none;" disabled>全てクリア</button>
+        </div>
       </div>
 
       <!-- 4. テキスト -->
@@ -1315,7 +1344,7 @@ function updateCropStatus() {
   }
   document.getElementById('applyCropOnly').disabled = !hasCrop;
   document.getElementById('applyBoth').disabled = !hasCrop;
-  document.getElementById('addCropLayerBtn').disabled = !hasCrop;
+  document.getElementById('saveTrimClipBtn').disabled = !hasCrop;
 }
 
 // --- D&D for edit mode ---
@@ -1451,32 +1480,111 @@ document.getElementById('applyCropOnly').addEventListener('click', () => {
   if (executeCrop()) { applyZoom(); saveHistory(); render(); updateCanvasInfo(); updateLayerList(); toast(`トリミング完了: ${editState.baseWidth}×${editState.baseHeight}px`); }
 });
 
-document.getElementById('addCropLayerBtn').addEventListener('click', () => {
+// ===== クリップボード (localStorage) =====
+const CLIP_KEY = 'ohana_image_editor_clipboard';
+const CLIP_MAX = 3;
+const CLIP_WARN_BYTES = 1.2 * 1024 * 1024; // 1.2MB（base64）
+
+function getClipboard() {
+  try { return JSON.parse(localStorage.getItem(CLIP_KEY) || '[]'); } catch { return []; }
+}
+function saveClipboardData(arr) {
+  try { localStorage.setItem(CLIP_KEY, JSON.stringify(arr)); } catch(e) {
+    toast('localStorage への保存に失敗しました（容量不足の可能性）');
+  }
+}
+function addToClipboard(base64) {
+  if (base64.length > CLIP_WARN_BYTES) {
+    toast('画像サイズが大きすぎます。範囲を絞ってください（目安: 1MB以下）');
+    return false;
+  }
+  const arr = getClipboard();
+  if (arr.length >= CLIP_MAX) arr.shift(); // 最古を削除
+  arr.push(base64);
+  saveClipboardData(arr);
+  renderClipboardThumbs();
+  toast(`クリップボードに保存しました（${arr.length}/${CLIP_MAX}）`);
+  return true;
+}
+function renderClipboardThumbs() {
+  const arr = getClipboard();
+  document.querySelectorAll('.clip-slot').forEach((slot, i) => {
+    slot.innerHTML = '';
+    if (arr[i]) {
+      slot.classList.add('has-image'); slot.classList.remove('empty');
+      const img = document.createElement('img');
+      img.src = arr[i]; img.draggable = false;
+      slot.appendChild(img);
+    } else {
+      slot.classList.remove('has-image'); slot.classList.add('empty');
+    }
+  });
+  document.getElementById('clearClipboardBtn').disabled = arr.length === 0;
+}
+function pasteClipboardItem(base64) {
+  if (!editState.baseImage) { toast('先に画像を読み込んでください'); return; }
+  const img = new Image();
+  img.onload = () => {
+    const tmp = document.createElement('canvas');
+    tmp.width = img.width; tmp.height = img.height;
+    tmp.getContext('2d').drawImage(img, 0, 0);
+    const imageData = tmp.getContext('2d').getImageData(0, 0, img.width, img.height);
+    const existingNums = editState.layers
+      .filter(l => l.type === 'image' && /^Clip_(\d+)$/.test(l.name))
+      .map(l => parseInt(l.name.replace('Clip_', ''), 10));
+    const nextNum = existingNums.length > 0 ? Math.max(...existingNums) + 1 : 1;
+    const clipName = `Clip_${String(nextNum).padStart(3, '0')}`;
+    // キャンバス中央に配置
+    const x = Math.round((editState.baseWidth - img.width) / 2);
+    const y = Math.round((editState.baseHeight - img.height) / 2);
+    const layer = { id: uid(), type: 'image', name: clipName, x, y, w: img.width, h: img.height, imageData };
+    editState.layers.push(layer);
+    editState.selectedLayerId = layer.id;
+    selectTool('select');
+    saveHistory(); render(); updateLayerList(); updateCanvasInfo();
+    toast(`${clipName} を貼り付けました`);
+  };
+  img.src = base64;
+}
+
+// TRIMクリップボード保存
+document.getElementById('saveTrimClipBtn').addEventListener('click', () => {
   if (!editState.baseImage) { toast('先に画像を読み込んでください'); return; }
   if (!editState.cropRect || editState.cropRect.w <= 5 || editState.cropRect.h <= 5) {
     toast('範囲を選択してください'); return;
   }
   const r = editState.cropRect;
-  const cw = Math.round(r.w); const ch = Math.round(r.h);
-  // 切り抜き範囲を背景透過PNGとして抽出（レイヤーを合成した状態から取る）
   const tmp = document.createElement('canvas');
-  tmp.width = cw; tmp.height = ch;
-  tmp.getContext('2d').drawImage(canvas, r.x, r.y, r.w, r.h, 0, 0, cw, ch);
-  const imageData = tmp.getContext('2d').getImageData(0, 0, cw, ch);
-  // Clip連番: 既存imageレイヤーの最大番号+1
-  const existingNums = editState.layers
-    .filter(l => l.type === 'image' && /^Clip_(\d+)$/.test(l.name))
-    .map(l => parseInt(l.name.replace('Clip_', ''), 10));
-  const nextNum = existingNums.length > 0 ? Math.max(...existingNums) + 1 : 1;
-  const clipName = `Clip_${String(nextNum).padStart(3, '0')}`;
-  const layer = { id: uid(), type: 'image', name: clipName, x: r.x, y: r.y, w: cw, h: ch, imageData };
-  editState.layers.push(layer);
-  editState.selectedLayerId = layer.id;
-  editState.cropRect = null;
-  selectTool('select');
-  saveHistory(); render(); updateLayerList(); updateCanvasInfo();
-  toast(`${clipName} をレイヤーに追加しました`);
+  tmp.width = Math.round(r.w); tmp.height = Math.round(r.h);
+  tmp.getContext('2d').drawImage(canvas, r.x, r.y, r.w, r.h, 0, 0, tmp.width, tmp.height);
+  addToClipboard(tmp.toDataURL('image/png'));
 });
+
+// RESIZEクリップボード保存
+document.getElementById('saveResizeClipBtn').addEventListener('click', () => {
+  if (!editState.baseImage) { toast('先に画像を読み込んでください'); return; }
+  addToClipboard(canvas.toDataURL('image/png'));
+});
+
+// クリップボードスロットクリック → 貼り付け
+document.getElementById('clipboardThumbs').addEventListener('click', e => {
+  const slot = e.target.closest('.clip-slot');
+  if (!slot || slot.classList.contains('empty')) return;
+  const idx = parseInt(slot.dataset.idx, 10);
+  const arr = getClipboard();
+  if (arr[idx]) pasteClipboardItem(arr[idx]);
+});
+
+// 全クリア
+document.getElementById('clearClipboardBtn').addEventListener('click', () => {
+  if (!confirm('クリップボードを全てクリアしますか？')) return;
+  saveClipboardData([]);
+  renderClipboardThumbs();
+  toast('クリップボードをクリアしました');
+});
+
+// ページロード時に復元
+renderClipboardThumbs();
 document.getElementById('applyResizeOnly').addEventListener('click', () => {
   if (!editState.baseImage) { toast('先に画像を読み込んでください'); return; }
   if (executeResize()) { applyZoom(); saveHistory(); render(); updateCanvasInfo(); toast(`リサイズ完了: ${editState.baseWidth}×${editState.baseHeight}px`); }
