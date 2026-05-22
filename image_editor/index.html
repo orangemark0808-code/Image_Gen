@@ -338,12 +338,13 @@ canvas {
 .acc-item {
   font-family: 'DM Mono', 'Courier New', monospace;
   font-size: 13px;
+  font-weight: 600;
   padding: 6px 12px 6px 20px;
   border: none;
   border-left: 2px solid #e5e7eb;
   margin-left: 12px;
   background: transparent;
-  color: #1e293b;
+  color: #0a0a0a;
   cursor: pointer;
   text-align: left;
   transition: color 0.15s, border-color 0.15s;
@@ -2637,7 +2638,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-22-07'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-22-08'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
