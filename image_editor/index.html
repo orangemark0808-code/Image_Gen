@@ -395,12 +395,13 @@ canvas {
 
 /* クリップボードスロット */
 .clip-slot {
-  width: 80px; height: 80px;
+  flex: 1;
+  min-width: 0;
+  aspect-ratio: 1;
   border-radius: 14px;
   border: 1.5px dashed #c8bfb4;
   background: #f7f3ee;
   cursor: pointer;
-  flex-shrink: 0;
   overflow: hidden;
   position: relative;
   transition: border-color .15s;
@@ -1934,7 +1935,7 @@ canvas.addEventListener('mousedown', e => {
           return;
         }
         if (hit) {
-          editState.dragging = { type: 'img-resize', layerId: selImg.id, handle: hit, origX: selImg.x, origY: selImg.y, origW: selImg.w, origH: selImg.h, startX: pos.x, startY: pos.y };
+          editState.dragging = { type: 'img-resize', layerId: selImg.id, handle: hit, origX: selImg.x, origY: selImg.y, origW: selImg.w, origH: selImg.h, origAr: selImg.w / selImg.h, startX: pos.x, startY: pos.y };
           return;
         }
       }
@@ -1991,10 +1992,19 @@ canvas.addEventListener('mousemove', e => {
     if (!layer) return;
     const dx = pos.x - d.startX, dy = pos.y - d.startY;
     let nx = d.origX, ny = d.origY, nw = d.origW, nh = d.origH;
+    // 自由変形（ハンドル別に対角を固定点として計算）
     if (d.handle === 'tl')      { nx = d.origX + dx; ny = d.origY + dy; nw = d.origW - dx; nh = d.origH - dy; }
     else if (d.handle === 'tr') {                     ny = d.origY + dy; nw = d.origW + dx; nh = d.origH - dy; }
     else if (d.handle === 'bl') { nx = d.origX + dx;                    nw = d.origW - dx; nh = d.origH + dy; }
     else if (d.handle === 'br') {                                        nw = d.origW + dx; nh = d.origH + dy; }
+    // Shift 押下中: 元の縦横比を維持（幅主導で高さを算出し、固定点を再計算）
+    if (e.shiftKey && d.origAr > 0) {
+      nh = nw / d.origAr;
+      if (d.handle === 'tl')      { nx = d.origX + d.origW - nw; ny = d.origY + d.origH - nh; }
+      else if (d.handle === 'tr') {                                ny = d.origY + d.origH - nh; }
+      else if (d.handle === 'bl') { nx = d.origX + d.origW - nw;                              }
+      // br: origX/origY はそのまま
+    }
     if (nw > 10 && nh > 10) { layer.x = nx; layer.y = ny; layer.w = nw; layer.h = nh; }
     render();
   } else if (editState.dragging.type === 'img-rotate') {
