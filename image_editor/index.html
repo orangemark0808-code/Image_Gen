@@ -456,13 +456,14 @@ canvas {
         </div>
         <div class="help-box" style="margin-top:7px;">「トリミング」ツール(C)でキャンバス上をドラッグ</div>
         <div id="cropStatus" class="status-pill">範囲未選択</div>
+        <button id="addCropLayerBtn" class="primary" style="width:100%; margin-top:8px; background:#FF7F00; border-color:#FF7F00; border-radius:14px; box-shadow:none;" disabled>レイヤーに追加</button>
       </div>
 
       <!-- 2. リサイズ -->
       <div class="section" id="sec-resize">
         <div class="section-title">RESIZE</div>
         <label class="inline" style="margin-top:0;">
-          <input type="radio" name="resizeMode" value="pixel" checked> ピクセル指定
+          <input type="radio" name="resizeMode" value="pixel"> ピクセル指定
         </label>
         <div id="pixelGroup" style="margin-top:6px;">
           <div class="row-2">
@@ -480,7 +481,7 @@ canvas {
           </label>
         </div>
         <label class="inline" style="margin-top:10px;">
-          <input type="radio" name="resizeMode" value="percent"> % 指定
+          <input type="radio" name="resizeMode" value="percent" checked> % 指定
         </label>
         <div id="percentGroup" style="margin-top:6px;">
           <label style="margin-top:0;">倍率 (%)</label>
@@ -1087,6 +1088,7 @@ function render() {
   for (const layer of editState.layers) {
     if (layer.type === 'text') drawText(layer);
     else if (layer.type === 'shape') drawShape(layer);
+    else if (layer.type === 'image') drawImageLayer(layer);
   }
   if (editState.currentTool === 'crop' && editState.cropRect) drawCropOverlay();
 }
@@ -1225,6 +1227,22 @@ function drawShape(l) {
   ctx.restore();
 }
 
+function drawImageLayer(l) {
+  if (!l._canvas) {
+    // ImageData → offscreen canvas にキャッシュ（毎フレーム再生成しない）
+    l._canvas = document.createElement('canvas');
+    l._canvas.width = l.w; l._canvas.height = l.h;
+    l._canvas.getContext('2d').putImageData(l.imageData, 0, 0);
+  }
+  ctx.save();
+  ctx.drawImage(l._canvas, l.x, l.y, l.w, l.h);
+  if (editState.selectedLayerId === l.id) {
+    ctx.strokeStyle = '#ea580c'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
+    ctx.strokeRect(l.x - 4, l.y - 4, l.w + 8, l.h + 8); ctx.setLineDash([]);
+  }
+  ctx.restore();
+}
+
 function drawArrow(x1, y1, x2, y2, sw) {
   const headLen = Math.max(10, sw * 3);
   const angle = Math.atan2(y2 - y1, x2 - x1);
@@ -1297,6 +1315,7 @@ function updateCropStatus() {
   }
   document.getElementById('applyCropOnly').disabled = !hasCrop;
   document.getElementById('applyBoth').disabled = !hasCrop;
+  document.getElementById('addCropLayerBtn').disabled = !hasCrop;
 }
 
 // --- D&D for edit mode ---
@@ -1356,7 +1375,7 @@ document.querySelectorAll('input[name="resizeMode"]').forEach(r => {
     document.getElementById('percentGroup').style.opacity = mode === 'percent' ? '1' : '0.4';
   });
 });
-document.getElementById('percentGroup').style.opacity = '0.4';
+document.getElementById('pixelGroup').style.opacity = '0.4';
 
 document.getElementById('resizeWidth').addEventListener('input', e => {
   if (!editState.baseImage || !document.getElementById('keepAspectPixel').checked) return;
@@ -1430,6 +1449,33 @@ function resizeCanvas(newW, newH) {
 document.getElementById('applyCropOnly').addEventListener('click', () => {
   if (!editState.baseImage) { toast('先に画像を読み込んでください'); return; }
   if (executeCrop()) { applyZoom(); saveHistory(); render(); updateCanvasInfo(); updateLayerList(); toast(`トリミング完了: ${editState.baseWidth}×${editState.baseHeight}px`); }
+});
+
+document.getElementById('addCropLayerBtn').addEventListener('click', () => {
+  if (!editState.baseImage) { toast('先に画像を読み込んでください'); return; }
+  if (!editState.cropRect || editState.cropRect.w <= 5 || editState.cropRect.h <= 5) {
+    toast('範囲を選択してください'); return;
+  }
+  const r = editState.cropRect;
+  const cw = Math.round(r.w); const ch = Math.round(r.h);
+  // 切り抜き範囲を背景透過PNGとして抽出（レイヤーを合成した状態から取る）
+  const tmp = document.createElement('canvas');
+  tmp.width = cw; tmp.height = ch;
+  tmp.getContext('2d').drawImage(canvas, r.x, r.y, r.w, r.h, 0, 0, cw, ch);
+  const imageData = tmp.getContext('2d').getImageData(0, 0, cw, ch);
+  // Clip連番: 既存imageレイヤーの最大番号+1
+  const existingNums = editState.layers
+    .filter(l => l.type === 'image' && /^Clip_(\d+)$/.test(l.name))
+    .map(l => parseInt(l.name.replace('Clip_', ''), 10));
+  const nextNum = existingNums.length > 0 ? Math.max(...existingNums) + 1 : 1;
+  const clipName = `Clip_${String(nextNum).padStart(3, '0')}`;
+  const layer = { id: uid(), type: 'image', name: clipName, x: r.x, y: r.y, w: cw, h: ch, imageData };
+  editState.layers.push(layer);
+  editState.selectedLayerId = layer.id;
+  editState.cropRect = null;
+  selectTool('select');
+  saveHistory(); render(); updateLayerList(); updateCanvasInfo();
+  toast(`${clipName} をレイヤーに追加しました`);
 });
 document.getElementById('applyResizeOnly').addEventListener('click', () => {
   if (!editState.baseImage) { toast('先に画像を読み込んでください'); return; }
@@ -1707,7 +1753,7 @@ canvas.addEventListener('mousemove', e => {
     const dx = pos.x - editState.dragging.startX; const dy = pos.y - editState.dragging.startY;
     const layer = editState.layers.find(l => l.id === editState.dragging.layerId);
     if (!layer) return;
-    if (layer.type === 'text') { layer.x = editState.dragging.orig.x + dx; layer.y = editState.dragging.orig.y + dy; }
+    if (layer.type === 'text' || layer.type === 'image') { layer.x = editState.dragging.orig.x + dx; layer.y = editState.dragging.orig.y + dy; }
     else { layer.x1 = editState.dragging.orig.x1 + dx; layer.y1 = editState.dragging.orig.y1 + dy; layer.x2 = editState.dragging.orig.x2 + dx; layer.y2 = editState.dragging.orig.y2 + dy; }
     render();
   }
@@ -1765,6 +1811,8 @@ function findLayerAt(x, y) {
     if (l.type === 'text') {
       const { w, h } = getTextBounds(l);
       if (x >= l.x - 6 && x <= l.x + w + 6 && y >= l.y - 4 && y <= l.y + h + 4) return l;
+    } else if (l.type === 'image') {
+      if (x >= l.x - 4 && x <= l.x + l.w + 4 && y >= l.y - 4 && y <= l.y + l.h + 4) return l;
     } else {
       const minX = Math.min(l.x1, l.x2) - 6; const maxX = Math.max(l.x1, l.x2) + 6;
       const minY = Math.min(l.y1, l.y2) - 6; const maxY = Math.max(l.y1, l.y2) + 6;
@@ -1775,7 +1823,8 @@ function findLayerAt(x, y) {
 }
 
 function getLayerOrigin(l) {
-  return l.type === 'text' ? { x: l.x, y: l.y } : { x1: l.x1, y1: l.y1, x2: l.x2, y2: l.y2 };
+  if (l.type === 'text' || l.type === 'image') return { x: l.x, y: l.y };
+  return { x1: l.x1, y1: l.y1, x2: l.x2, y2: l.y2 };
 }
 
 // --- Layer list ---
@@ -1793,6 +1842,8 @@ function updateLayerList() {
     div.className = 'layer-item' + (editState.selectedLayerId === l.id ? ' selected' : '');
     const lbl = l.type === 'text'
       ? `T ${l.direction === 'vertical' ? '縦' : '横'} ${l.text.slice(0,10)}${l.text.length > 10 ? '…' : ''}`
+      : l.type === 'image'
+      ? `[IMG] ${l.name}`
       : `${l.shape === 'ellipse' ? '〇' : l.shape === 'rect' ? '□' : l.shape === 'arrow' ? '→' : '／'} 図形`;
     const editBtn = l.type === 'text'
       ? `<button class="edit-layer-btn" style="border:none; background:none; color:#ea580c; padding:2px 6px; font-size:12px; cursor:pointer;">編集</button>`
