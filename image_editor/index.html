@@ -1032,11 +1032,9 @@ function drawText(l, tCtx) {
   if (l.direction === 'vertical') {
     // \n を列区切りとして扱い、右→左方向に列を並べる（日本語縦書き）
     const columns = l.text.split('\n');
-    const lh = l.size * (l.lineHeight ?? 1.1);
-    const ls = l.letterSpacing ?? 0;
-    const charStep = lh + ls;
+    const charStep = l.size + (l.letterSpacing ?? 0); // 字間 = 文字サイズ + letterSpacing
     const colW = l.size * 1.2;
-    const colGap = Math.max(4, l.size * 0.2);
+    const colGap = colW * (l.lineHeight ?? 1.4);      // 列間 = lineHeight 倍率で制御
     const colStep = colW + colGap;
     const nCols = columns.length;
     const totalW = nCols * colStep - colGap;
@@ -1115,9 +1113,9 @@ function getTextBounds(l) {
   let w, h;
   if (l.direction === 'vertical') {
     const columns = l.text.split('\n');
-    const charStep = l.size * (l.lineHeight ?? 1.1) + (l.letterSpacing ?? 0);
+    const charStep = l.size + (l.letterSpacing ?? 0); // 字間 = 文字サイズ + letterSpacing
     const colW = l.size * 1.2;
-    const colGap = Math.max(4, l.size * 0.2);
+    const colGap = colW * (l.lineHeight ?? 1.4);      // 列間 = lineHeight 倍率で制御
     const colStep = colW + colGap;
     const maxChars = Math.max(...columns.map(col => [...col].length));
     w = columns.length * colStep - colGap;
@@ -2581,7 +2579,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-21-04'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-22-01'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
