@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "prompt-builder";
-const CACHE_NAME = `${CACHE_PREFIX}-v1.0.5`;
+const CACHE_NAME = `${CACHE_PREFIX}-v1.0.6`;
 
 const APP_SHELL = [
   "./",
