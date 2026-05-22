@@ -325,6 +325,40 @@ canvas {
 }
 .toast.show { opacity: 1; }
 
+/* ===== Edit Section Nav ===== */
+.edit-nav {
+  position: sticky;
+  top: -14px; /* sidebar の padding-top: 14px を相殺してフラッシュ固定 */
+  margin: -14px -14px 12px;
+  padding: 8px 0 8px 0;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.edit-nav-btn {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px 0 14px;
+  background: none;
+  border: none;
+  border-left: 2px solid #e5e7eb;
+  text-align: left;
+  font-family: 'DM Mono', 'Courier New', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, border-width 0.1s;
+  white-space: nowrap;
+}
+.edit-nav-btn:hover:not(.active) { color: #475569; border-color: #cbd5e1; }
+.edit-nav-btn.active { color: #FF7F00; border-left: 3px solid #FF7F00; }
+
 /* ===== Hamburger (mobile) ===== */
 .hamburger-btn {
   display: none;
@@ -399,9 +433,20 @@ canvas {
     <!-- ==== EDIT MODE PANEL ==== -->
     <div id="editModePanel">
 
+      <!-- セクションナビ -->
+      <nav class="edit-nav" id="editNav">
+        <button class="edit-nav-btn active" data-sec="sec-trim">TRIM</button>
+        <button class="edit-nav-btn" data-sec="sec-resize">RESIZE</button>
+        <button class="edit-nav-btn" data-sec="sec-apply">APPLY</button>
+        <button class="edit-nav-btn" data-sec="sec-text">TEXT</button>
+        <button class="edit-nav-btn" data-sec="sec-shape">SHAPE</button>
+        <button class="edit-nav-btn" data-sec="sec-layer">LAYER</button>
+        <button class="edit-nav-btn" data-sec="sec-save">SAVE</button>
+      </nav>
+
       <!-- 1. トリミング -->
-      <div class="section">
-        <div class="section-title">1. トリミング設定</div>
+      <div class="section" id="sec-trim">
+        <div class="section-title">TRIM</div>
         <div class="row-2" style="margin-bottom:7px;">
           <button class="tool-btn" data-tool="crop">トリミング<span class="shortcut">C</span></button>
           <button id="deselectBtn">選択解除<span class="shortcut">Esc</span></button>
@@ -419,8 +464,8 @@ canvas {
       </div>
 
       <!-- 2. リサイズ -->
-      <div class="section">
-        <div class="section-title">2. リサイズ</div>
+      <div class="section" id="sec-resize">
+        <div class="section-title">RESIZE</div>
         <label class="inline" style="margin-top:0;">
           <input type="radio" name="resizeMode" value="pixel" checked> ピクセル指定
         </label>
@@ -450,8 +495,8 @@ canvas {
       </div>
 
       <!-- 3. 実行 -->
-      <div class="section">
-        <div class="section-title">3. 実行</div>
+      <div class="section" id="sec-apply">
+        <div class="section-title">APPLY</div>
         <button id="applyCropOnly" class="primary" style="width:100%; margin-bottom:6px; background:#059669; border-color:#059669;" disabled>
           トリミングのみ実行<span class="shortcut">Enter</span>
         </button>
@@ -465,15 +510,15 @@ canvas {
       </div>
 
       <!-- 4. テキスト -->
-      <div class="section">
-        <div class="section-title">4. テキスト</div>
+      <div class="section" id="sec-text">
+        <div class="section-title">TEXT</div>
         <button id="addText" class="primary" style="width:100%; margin-bottom:6px;">テキストを追加</button>
         <button id="editTextBtn" style="width:100%; display:none;">選択中のテキストを編集</button>
       </div>
 
       <!-- 5. 図形 -->
-      <div class="section">
-        <div class="section-title">5. 図形設定・ツール</div>
+      <div class="section" id="sec-shape">
+        <div class="section-title">SHAPE</div>
         <label style="margin-top:0;">線の色</label>
         <input type="color" id="shapeColor" value="#ff0000">
         <label>線の太さ: <span id="strokeWidthLabel">4</span>px</label>
@@ -494,16 +539,16 @@ canvas {
       </div>
 
       <!-- 6. レイヤー -->
-      <div class="section">
-        <div class="section-title">6. レイヤー一覧</div>
+      <div class="section" id="sec-layer">
+        <div class="section-title">LAYER</div>
         <div class="layer-list" id="layerList">
           <div style="padding:8px; color:#aaa; font-size:12px; text-align:center;">レイヤーなし</div>
         </div>
       </div>
 
       <!-- 7. 保存 -->
-      <div class="section">
-        <div class="section-title">7. 保存・状態管理</div>
+      <div class="section" id="sec-save">
+        <div class="section-title">SAVE</div>
         <label style="margin-top:0;">ファイル名</label>
         <input type="text" id="fileName" placeholder="note_image" value="note_image">
         <label>形式</label>
@@ -2581,7 +2626,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-22-04'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-22-05'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
@@ -2629,6 +2674,50 @@ updateCursor();
 // 初期モードは edit
 transparentModePanel.style.display = 'none';
 transparentModeArea.style.display = 'none';
+
+// ============================================================
+// === EDIT SECTION NAV ===
+// ============================================================
+(function() {
+  const sidebar = document.getElementById('sidebar');
+  const navBtns = document.querySelectorAll('.edit-nav-btn');
+
+  // クリック → スムーズスクロール
+  navBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = document.getElementById(btn.dataset.sec);
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+
+  // IntersectionObserver でスクロール連動ハイライト
+  const sections = [...navBtns]
+    .map(b => document.getElementById(b.dataset.sec))
+    .filter(Boolean);
+
+  const observer = new IntersectionObserver(entries => {
+    // 表示中のセクションのうち最も上にあるものをアクティブに
+    let topEntry = null;
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        if (!topEntry || entry.boundingClientRect.top < topEntry.boundingClientRect.top) {
+          topEntry = entry;
+        }
+      }
+    });
+    if (topEntry) {
+      navBtns.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.sec === topEntry.target.id);
+      });
+    }
+  }, {
+    root: sidebar,
+    rootMargin: '0px 0px -70% 0px', // 上部30%に入ったらアクティブ
+    threshold: 0,
+  });
+
+  sections.forEach(sec => observer.observe(sec));
+})();
 </script>
 </body>
 </html>
