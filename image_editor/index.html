@@ -122,7 +122,7 @@ body {
 .section-title {
   font-size: 11px;
   font-weight: 700;
-  color: #475569;
+  color: #1a1a1a;
   margin-bottom: 8px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -130,7 +130,7 @@ body {
 label {
   display: block;
   font-size: 12px;
-  color: #475569;
+  color: #1a1a1a;
   margin-bottom: 3px;
   margin-top: 7px;
 }
@@ -183,7 +183,7 @@ button.danger:hover { color: #b91c1c; border-color: #dc2626; background: #fef2f2
 button:disabled { opacity: 0.4; cursor: not-allowed; }
 .shortcut {
   display: inline-block;
-  background: #e5e7eb; color: #475569;
+  background: #e5e7eb; color: #1a1a1a;
   padding: 1px 5px; border-radius: 3px;
   font-size: 10px; margin-left: 4px; font-family: monospace;
 }
@@ -193,7 +193,7 @@ button.primary .shortcut { background: rgba(255,255,255,0.3); color: white; }
 .btn-row button { flex: 1; min-width: 0; font-size: 12px; padding: 6px 8px; }
 .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .help-box {
-  font-size: 11px; color: #64748b;
+  font-size: 11px; color: #1a1a1a;
   background: #f8fafc; padding: 6px 8px;
   border-radius: 4px; line-height: 1.5;
 }
@@ -230,7 +230,7 @@ button.primary .shortcut { background: rgba(255,255,255,0.3); color: white; }
   margin-bottom: 10px; flex-wrap: wrap; gap: 8px;
 }
 .canvas-info { font-size: 12px; color: #64748b; }
-.zoom-control { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #475569; }
+.zoom-control { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #1a1a1a; }
 .zoom-control input[type="range"] { width: 100px; }
 .zoom-control button { padding: 3px 7px; font-size: 11px; }
 .canvas-wrapper {
@@ -358,7 +358,7 @@ canvas {
 .hamburger-btn {
   display: none;
   background: none; border: none;
-  font-size: 22px; cursor: pointer; color: #475569; padding: 4px;
+  font-size: 22px; cursor: pointer; color: #1a1a1a; padding: 4px;
 }
 .sidebar-overlay {
   display: none;
@@ -537,7 +537,7 @@ canvas {
       <div class="section" id="sec-layer">
         <div class="section-title">LAYER</div>
         <div class="layer-list" id="layerList">
-          <div style="padding:8px; color:#aaa; font-size:12px; text-align:center;">レイヤーなし</div>
+          <div style="padding:8px; color:#1a1a1a; font-size:12px; text-align:center;">レイヤーなし</div>
         </div>
       </div>
 
@@ -597,7 +597,7 @@ canvas {
             小: クリックした色に近い色のみ<br>
             大: 似た色も広く含める
           </div>
-          <label style="margin-top:10px; font-family:'DM Mono','Courier New',monospace; font-size:10px; font-weight:700; letter-spacing:0.5px; color:#475569; text-transform:uppercase;">EDGE SHRINK: <span id="tpShrinkVal">1</span> px</label>
+          <label style="margin-top:10px; font-family:'DM Mono','Courier New',monospace; font-size:10px; font-weight:700; letter-spacing:0.5px; color:#1a1a1a; text-transform:uppercase;">EDGE SHRINK: <span id="tpShrinkVal">1</span> px</label>
           <input type="range" id="tpShrink" min="0" max="5" value="1">
           <div class="help-box" style="margin-top:4px;">
             0: 削らない（ふちが残る）<br>
@@ -727,9 +727,9 @@ canvas {
   <div style="width:92vw; max-width:1200px; height:88vh; display:flex; flex-direction:column; background:#111; border-radius:10px; overflow:hidden; box-shadow:0 8px 40px rgba(0,0,0,0.7);">
     <!-- ヘッダー：タイトル＋ズームコントロール＋アクション -->
     <div style="padding:8px 14px; display:flex; align-items:center; justify-content:space-between; background:#1c1c1c; flex-shrink:0; gap:10px; flex-wrap:wrap;">
-      <span style="color:#aaa; font-size:11px; font-family:monospace; white-space:nowrap;">PREVIEW — 黒背景</span>
+      <span style="color:#1a1a1a; font-size:11px; font-family:monospace; white-space:nowrap;">PREVIEW — 黒背景</span>
       <div class="zoom-control" style="flex:1; justify-content:center; gap:6px; min-width:200px;">
-        <span style="color:#aaa; font-size:11px;">表示</span>
+        <span style="color:#1a1a1a; font-size:11px;">表示</span>
         <button id="tpPvZoomOut" style="padding:2px 7px; font-size:11px; background:#333; border-color:#555; color:#ccc;">−</button>
         <input type="range" id="tpPvZoomSlider" min="25" max="400" value="100" style="width:90px; accent-color:#ea580c;">
         <button id="tpPvZoomIn" style="padding:2px 7px; font-size:11px; background:#333; border-color:#555; color:#ccc;">+</button>
@@ -754,7 +754,7 @@ canvas {
   <div style="width:800px; max-width:98vw; max-height:92vh; display:flex; flex-direction:column; background:#fff; border-radius:10px; overflow:hidden; box-shadow:0 8px 40px rgba(0,0,0,0.18);">
     <!-- ヘッダー -->
     <div style="padding:12px 16px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #e5e7eb; flex-shrink:0;">
-      <span id="textModalTitle" style="font-size:11px; font-weight:700; font-family:'DM Mono','Courier New',monospace; text-transform:uppercase; letter-spacing:0.5px; color:#475569;">TEXT — 新規追加</span>
+      <span id="textModalTitle" style="font-size:11px; font-weight:700; font-family:'DM Mono','Courier New',monospace; text-transform:uppercase; letter-spacing:0.5px; color:#1a1a1a;">TEXT — 新規追加</span>
       <button id="textModalCloseBtn" style="font-size:12px; padding:3px 9px;">✕</button>
     </div>
     <!-- 2カラムボディ -->
@@ -770,14 +770,14 @@ canvas {
         </div>
         <label style="margin-top:10px;">フォント</label>
         <select id="textFont" style="width:100%; padding:5px 6px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; background:white;"></select>
-        <label style="margin-top:10px; font-family:'DM Mono','Courier New',monospace; font-size:10px; font-weight:700; letter-spacing:0.5px; color:#475569; text-transform:uppercase;">SIZE: <span id="textSizeLabel">32</span> px</label>
+        <label style="margin-top:10px; font-family:'DM Mono','Courier New',monospace; font-size:10px; font-weight:700; letter-spacing:0.5px; color:#1a1a1a; text-transform:uppercase;">SIZE: <span id="textSizeLabel">32</span> px</label>
         <div style="display:flex; align-items:center; gap:6px;">
           <input type="range" id="textSizeSlider" min="8" max="200" value="32" style="flex:1; accent-color:#ea580c;">
           <input type="number" id="textSize" value="32" min="8" max="200" style="width:56px; padding:5px 6px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px;">
         </div>
-        <label style="margin-top:10px; font-family:'DM Mono','Courier New',monospace; font-size:10px; font-weight:700; letter-spacing:0.5px; color:#475569; text-transform:uppercase;">LETTER SPACING: <span id="textLetterSpacingLabel">0</span> px</label>
+        <label style="margin-top:10px; font-family:'DM Mono','Courier New',monospace; font-size:10px; font-weight:700; letter-spacing:0.5px; color:#1a1a1a; text-transform:uppercase;">LETTER SPACING: <span id="textLetterSpacingLabel">0</span> px</label>
         <input type="range" id="textLetterSpacing" min="0" max="20" value="0" step="1" style="width:100%; accent-color:#ea580c;">
-        <label style="margin-top:10px; font-family:'DM Mono','Courier New',monospace; font-size:10px; font-weight:700; letter-spacing:0.5px; color:#475569; text-transform:uppercase;">LINE HEIGHT: <span id="textLineHeightLabel">1.4</span></label>
+        <label style="margin-top:10px; font-family:'DM Mono','Courier New',monospace; font-size:10px; font-weight:700; letter-spacing:0.5px; color:#1a1a1a; text-transform:uppercase;">LINE HEIGHT: <span id="textLineHeightLabel">1.4</span></label>
         <input type="range" id="textLineHeight" min="0.5" max="3.0" value="1.4" step="0.1" style="width:100%; accent-color:#ea580c;">
         <label style="margin-top:10px;">文字色</label>
         <input type="color" id="textColor" value="#000000" style="width:100%; height:30px; border:1px solid #cbd5e1; border-radius:4px; cursor:pointer;">
@@ -795,7 +795,7 @@ canvas {
       </div>
       <!-- 右：プレビューエリア -->
       <div style="min-width:220px; flex:1; display:flex; flex-direction:column; background:#f8fafc; padding:12px; align-items:center; overflow:auto;">
-        <div style="font-size:10px; font-weight:700; font-family:'DM Mono','Courier New',monospace; text-transform:uppercase; letter-spacing:0.5px; color:#94a3b8; margin-bottom:10px; align-self:flex-start;">PREVIEW</div>
+        <div style="font-size:10px; font-weight:700; font-family:'DM Mono','Courier New',monospace; text-transform:uppercase; letter-spacing:0.5px; color:#1a1a1a; margin-bottom:10px; align-self:flex-start;">PREVIEW</div>
         <div style="flex:1; display:flex; align-items:center; justify-content:center; width:100%;">
           <canvas id="textPreviewCanvas" style="border:1px solid #e5e7eb; border-radius:4px; max-width:100%;"></canvas>
         </div>
@@ -1753,7 +1753,7 @@ function getLayerOrigin(l) {
 function updateLayerList() {
   const list = document.getElementById('layerList');
   if (editState.layers.length === 0) {
-    list.innerHTML = '<div style="padding:8px; color:#aaa; font-size:12px; text-align:center;">レイヤーなし</div>';
+    list.innerHTML = '<div style="padding:8px; color:#1a1a1a; font-size:12px; text-align:center;">レイヤーなし</div>';
     document.getElementById('editTextBtn').style.display = 'none';
     return;
   }
@@ -2638,7 +2638,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-22-08'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-22-09'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
