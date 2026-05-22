@@ -325,39 +325,33 @@ canvas {
 }
 .toast.show { opacity: 1; }
 
-/* ===== Edit Section Nav ===== */
-.edit-nav {
-  position: sticky;
-  top: -14px; /* sidebar の padding-top: 14px を相殺してフラッシュ固定 */
-  margin: -14px -14px 12px;
-  padding: 8px 0 8px 0;
-  background: #fff;
-  border-bottom: 1px solid #e5e7eb;
-  z-index: 5;
+/* ===== Accordion Section Nav ===== */
+.mode-accordion { display: flex; flex-direction: column; }
+.acc-menu {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  overflow: hidden;
+  transition: max-height 0.25s ease;
 }
-.edit-nav-btn {
-  display: flex;
-  align-items: center;
-  height: 28px;
-  padding: 0 12px 0 14px;
-  background: none;
-  border: none;
-  border-left: 2px solid #e5e7eb;
-  text-align: left;
+.acc-menu.closed { max-height: 0; }
+.acc-menu.open   { max-height: 300px; }
+.acc-item {
   font-family: 'DM Mono', 'Courier New', monospace;
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.8px;
-  color: #94a3b8;
+  padding: 6px 12px 6px 20px;
+  border: none;
+  border-left: 2px solid #e5e7eb;
+  margin-left: 12px;
+  background: transparent;
+  color: #6b7280;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s, border-width 0.1s;
+  text-align: left;
+  transition: color 0.15s, border-color 0.15s;
   white-space: nowrap;
 }
-.edit-nav-btn:hover:not(.active) { color: #475569; border-color: #cbd5e1; }
-.edit-nav-btn.active { color: #FF7F00; border-left: 3px solid #FF7F00; }
+.acc-item:hover { color: #ea580c; border-color: #fbd38d; }
+.acc-item.active { color: #FF7F00; border-left: 3px solid #FF7F00; font-weight: 600; }
+.acc-arrow { font-size: 9px; margin-left: 4px; }
 
 /* ===== Hamburger (mobile) ===== */
 .hamburger-btn {
@@ -422,7 +416,18 @@ canvas {
   <!-- ===== Mode Navigation ===== -->
   <nav class="mode-nav" id="modeNav">
     <div class="mode-nav-inner">
-      <button class="mode-btn active" data-mode="edit">編集</button>
+      <div class="mode-accordion">
+        <button class="mode-btn active" data-mode="edit">編集<span class="acc-arrow">▲</span></button>
+        <div class="acc-menu open" id="editAccMenu">
+          <button class="acc-item active" data-sec="sec-trim">TRIM</button>
+          <button class="acc-item" data-sec="sec-resize">RESIZE</button>
+          <button class="acc-item" data-sec="sec-apply">APPLY</button>
+          <button class="acc-item" data-sec="sec-text">TEXT</button>
+          <button class="acc-item" data-sec="sec-shape">SHAPE</button>
+          <button class="acc-item" data-sec="sec-layer">LAYER</button>
+          <button class="acc-item" data-sec="sec-save">SAVE</button>
+        </div>
+      </div>
       <button class="mode-btn" data-mode="transparent">透過</button>
     </div>
   </nav>
@@ -432,17 +437,6 @@ canvas {
 
     <!-- ==== EDIT MODE PANEL ==== -->
     <div id="editModePanel">
-
-      <!-- セクションナビ -->
-      <nav class="edit-nav" id="editNav">
-        <button class="edit-nav-btn active" data-sec="sec-trim">TRIM</button>
-        <button class="edit-nav-btn" data-sec="sec-resize">RESIZE</button>
-        <button class="edit-nav-btn" data-sec="sec-apply">APPLY</button>
-        <button class="edit-nav-btn" data-sec="sec-text">TEXT</button>
-        <button class="edit-nav-btn" data-sec="sec-shape">SHAPE</button>
-        <button class="edit-nav-btn" data-sec="sec-layer">LAYER</button>
-        <button class="edit-nav-btn" data-sec="sec-save">SAVE</button>
-      </nav>
 
       <!-- 1. トリミング -->
       <div class="section" id="sec-trim">
@@ -891,6 +885,21 @@ const transparentModePanel = document.getElementById('transparentModePanel');
 const editModeArea = document.getElementById('editModeArea');
 const transparentModeArea = document.getElementById('transparentModeArea');
 
+const editAccMenu = document.getElementById('editAccMenu');
+
+function setAccordion(open) {
+  const arrow = document.querySelector('[data-mode="edit"] .acc-arrow');
+  if (open) {
+    editAccMenu.classList.remove('closed');
+    editAccMenu.classList.add('open');
+    if (arrow) arrow.textContent = '▲';
+  } else {
+    editAccMenu.classList.remove('open');
+    editAccMenu.classList.add('closed');
+    if (arrow) arrow.textContent = '▼';
+  }
+}
+
 function switchMode(mode) {
   currentMode = mode;
   document.querySelectorAll('.mode-btn').forEach(btn => {
@@ -901,12 +910,14 @@ function switchMode(mode) {
     transparentModePanel.style.display = 'none';
     editModeArea.style.display = 'flex';
     transparentModeArea.style.display = 'none';
+    setAccordion(true);
   } else {
     editModePanel.style.display = 'none';
     // CSSで #transparentModePanel に display:none が指定されているため明示的に 'block' を指定
     transparentModePanel.style.display = 'block';
     editModeArea.style.display = 'none';
     transparentModeArea.style.display = 'flex';
+    setAccordion(false);
   }
   closeSidebar();
 }
@@ -2626,7 +2637,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-22-05'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-22-06'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
@@ -2676,27 +2687,28 @@ transparentModePanel.style.display = 'none';
 transparentModeArea.style.display = 'none';
 
 // ============================================================
-// === EDIT SECTION NAV ===
+// === ACCORDION SECTION NAV ===
 // ============================================================
 (function() {
   const sidebar = document.getElementById('sidebar');
-  const navBtns = document.querySelectorAll('.edit-nav-btn');
+  const accItems = document.querySelectorAll('.acc-item');
 
-  // クリック → スムーズスクロール
-  navBtns.forEach(btn => {
+  // クリック → スムーズスクロール＆アクティブ切替
+  accItems.forEach(btn => {
     btn.addEventListener('click', () => {
+      accItems.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
       const target = document.getElementById(btn.dataset.sec);
       if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   });
 
   // IntersectionObserver でスクロール連動ハイライト
-  const sections = [...navBtns]
+  const sections = [...accItems]
     .map(b => document.getElementById(b.dataset.sec))
     .filter(Boolean);
 
   const observer = new IntersectionObserver(entries => {
-    // 表示中のセクションのうち最も上にあるものをアクティブに
     let topEntry = null;
     entries.forEach(entry => {
       if (entry.isIntersecting) {
@@ -2706,13 +2718,13 @@ transparentModeArea.style.display = 'none';
       }
     });
     if (topEntry) {
-      navBtns.forEach(btn => {
+      accItems.forEach(btn => {
         btn.classList.toggle('active', btn.dataset.sec === topEntry.target.id);
       });
     }
   }, {
     root: sidebar,
-    rootMargin: '0px 0px -70% 0px', // 上部30%に入ったらアクティブ
+    rootMargin: '0px 0px -70% 0px',
     threshold: 0,
   });
 
