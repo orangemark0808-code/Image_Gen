@@ -258,13 +258,13 @@ canvas {
   width: 100%; min-height: 360px;
   display: flex; flex-direction: column;
   justify-content: center; align-items: center;
-  border: 2px dashed #cbd5e1; border-radius: 8px;
-  color: #64748b; cursor: pointer; transition: all 0.15s;
+  border: 1px solid #e5e7eb; border-radius: 8px;
+  background: #fafafa;
+  color: #000000; cursor: pointer; transition: all 0.15s;
 }
-.canvas-upload-prompt:hover { border-color: #ea580c; background: #fff7ed; color: #ea580c; }
-.canvas-upload-prompt .upload-icon { font-size: 42px; margin-bottom: 10px; }
-.canvas-upload-prompt .upload-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
-.canvas-upload-prompt .upload-subtitle { font-size: 13px; }
+.canvas-upload-prompt:hover { border-color: #FF7F00; background: #fff7ed; }
+.canvas-upload-prompt .upload-icon { margin-bottom: 12px; }
+.canvas-upload-prompt .upload-title { font-size: 15px; font-weight: 600; }
 
 /* ===== Transparent mode ===== */
 #transparentModePanel { display: none; }
@@ -678,9 +678,15 @@ canvas {
     </div>
     <div class="canvas-wrapper" id="canvasWrapper">
       <div id="canvasUploadPrompt" class="canvas-upload-prompt">
-        <div class="upload-icon">📁</div>
-        <div class="upload-title">画像をここにドラッグ&ドロップ</div>
-        <div class="upload-subtitle">またはクリックしてファイルを選択</div>
+        <div class="upload-icon">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none"
+               stroke="#FF7F00" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </div>
+        <div class="upload-title">画像をドロップ、またはクリックして選択</div>
         <input type="file" id="canvasFileInput" accept="image/*" style="display:none">
       </div>
       <canvas id="canvas" width="800" height="500" style="display:none;"></canvas>
@@ -691,8 +697,15 @@ canvas {
   <div id="transparentModeArea">
     <!-- アップロードプロンプト（画像未読込時） -->
     <div id="tpUploadPrompt" class="canvas-upload-prompt">
-      <div class="upload-title">画像をここにドラッグ&ドロップ</div>
-      <div class="upload-subtitle">またはクリックしてファイルを選択</div>
+      <div class="upload-icon">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none"
+             stroke="#FF7F00" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+      </div>
+      <div class="upload-title">画像をドロップ、またはクリックして選択</div>
       <input type="file" id="tpFileInput" accept="image/*" style="display:none">
     </div>
     <!-- ツールバー（画像読込後） -->
@@ -2638,7 +2651,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-22-10'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-22-11'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
