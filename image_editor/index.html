@@ -1030,11 +1030,13 @@ function drawText(l, tCtx) {
   if ('letterSpacing' in tCtx) tCtx.letterSpacing = `${l.letterSpacing ?? 0}px`;
 
   if (l.direction === 'vertical') {
+    // 縦書きでは CSS letter-spacing を無効化（charStep で手動制御するため）
+    if ('letterSpacing' in tCtx) tCtx.letterSpacing = '0px';
     // \n を列区切りとして扱い、右→左方向に列を並べる（日本語縦書き）
     const columns = l.text.split('\n');
     const charStep = l.size + (l.letterSpacing ?? 0); // 字間 = 文字サイズ + letterSpacing
     const colW = l.size * 1.2;
-    const colGap = colW * (l.lineHeight ?? 1.4);      // 列間 = lineHeight 倍率で制御
+    const colGap = l.size * (l.lineHeight ?? 1.4);    // 列間 = 文字サイズ基準 × lineHeight
     const colStep = colW + colGap;
     const nCols = columns.length;
     const totalW = nCols * colStep - colGap;
@@ -1115,7 +1117,7 @@ function getTextBounds(l) {
     const columns = l.text.split('\n');
     const charStep = l.size + (l.letterSpacing ?? 0); // 字間 = 文字サイズ + letterSpacing
     const colW = l.size * 1.2;
-    const colGap = colW * (l.lineHeight ?? 1.4);      // 列間 = lineHeight 倍率で制御
+    const colGap = l.size * (l.lineHeight ?? 1.4);    // 列間 = 文字サイズ基準 × lineHeight
     const colStep = colW + colGap;
     const maxChars = Math.max(...columns.map(col => [...col].length));
     w = columns.length * colStep - colGap;
@@ -2579,7 +2581,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-22-01'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-22-02'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
