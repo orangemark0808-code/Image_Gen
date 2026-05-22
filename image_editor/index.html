@@ -738,7 +738,7 @@ canvas {
         <label style="margin-top:10px; font-family:'DM Mono','Courier New',monospace; font-size:10px; font-weight:700; letter-spacing:0.5px; color:#475569; text-transform:uppercase;">LETTER SPACING: <span id="textLetterSpacingLabel">0</span> px</label>
         <input type="range" id="textLetterSpacing" min="0" max="20" value="0" step="1" style="width:100%; accent-color:#ea580c;">
         <label style="margin-top:10px; font-family:'DM Mono','Courier New',monospace; font-size:10px; font-weight:700; letter-spacing:0.5px; color:#475569; text-transform:uppercase;">LINE HEIGHT: <span id="textLineHeightLabel">1.4</span></label>
-        <input type="range" id="textLineHeight" min="1.0" max="3.0" value="1.4" step="0.1" style="width:100%; accent-color:#ea580c;">
+        <input type="range" id="textLineHeight" min="0.5" max="3.0" value="1.4" step="0.1" style="width:100%; accent-color:#ea580c;">
         <label style="margin-top:10px;">文字色</label>
         <input type="color" id="textColor" value="#000000" style="width:100%; height:30px; border:1px solid #cbd5e1; border-radius:4px; cursor:pointer;">
         <div class="deco-grid" style="margin-top:10px;">
@@ -1036,7 +1036,7 @@ function drawText(l, tCtx) {
     const columns = l.text.split('\n');
     const charStep = l.size + (l.letterSpacing ?? 0); // 字間 = 文字サイズ + letterSpacing
     const colW = l.size * 1.2;
-    const colGap = l.size * ((l.lineHeight ?? 1.4) - 1.0); // 列間: LH=1.0→0px, LH=1.4→size*0.4
+    const colGap = l.size * ((l.lineHeight ?? 1.4) - 1.2); // 列間: LH=1.2→0, LH=1.0→負(詰め)
     const colStep = colW + colGap;
     const nCols = columns.length;
     const totalW = nCols * colStep - colGap;
@@ -1117,7 +1117,7 @@ function getTextBounds(l) {
     const columns = l.text.split('\n');
     const charStep = l.size + (l.letterSpacing ?? 0); // 字間 = 文字サイズ + letterSpacing
     const colW = l.size * 1.2;
-    const colGap = l.size * ((l.lineHeight ?? 1.4) - 1.0); // 列間: LH=1.0→0px, LH=1.4→size*0.4
+    const colGap = l.size * ((l.lineHeight ?? 1.4) - 1.2); // 列間: LH=1.2→0, LH=1.0→負(詰め)
     const colStep = colW + colGap;
     const maxChars = Math.max(...columns.map(col => [...col].length));
     w = columns.length * colStep - colGap;
@@ -2581,7 +2581,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-22-03'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-22-04'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
