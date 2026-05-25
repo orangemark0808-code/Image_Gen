@@ -1054,6 +1054,8 @@ function updateUndoRedo() {
 }
 
 async function restoreFromHistory(idx) {
+  // Undo/Redo 開始時に pending なクリップボードペーストをキャンセル（レース条件防止）
+  if (clipboardPasteToken) { clipboardPasteToken.cancelled = true; clipboardPasteToken = null; }
   const h = editState.history[idx];
   editState.layers = JSON.parse(JSON.stringify(h.layers));
   editState.selectedLayerId = null; // 無効な選択IDが残らないようにリセット
@@ -1638,10 +1640,21 @@ function renderClipboardThumbs() {
   });
   document.getElementById('clearClipboardBtn').disabled = arr.length === 0;
 }
+// pending なクリップボードペーストのキャンセル用トークン
+// Undo/Redo が割り込んだ場合に img.onload の副作用を抑制する
+let clipboardPasteToken = null;
+
 function pasteClipboardItem(base64) {
   if (!editState.baseImage) { toast('先に画像を読み込んでください'); return; }
+  // 前回の pending paste があれば無効化
+  if (clipboardPasteToken) clipboardPasteToken.cancelled = true;
+  const token = { cancelled: false };
+  clipboardPasteToken = token;
   const img = new Image();
   img.onload = () => {
+    // Undo/Redo によってキャンセルされていれば何もしない
+    if (token.cancelled) return;
+    clipboardPasteToken = null;
     const existingNums = editState.layers
       .filter(l => l.type === 'image' && /^Clip_(\d+)$/.test(l.name))
       .map(l => parseInt(l.name.replace('Clip_', ''), 10));
@@ -2215,6 +2228,8 @@ document.getElementById('clearAll').addEventListener('click', () => {
 
 // --- Undo/Redo ---
 document.getElementById('undoBtn').addEventListener('click', async () => {
+  // Ctrl+Z 押下時は pending paste を常にキャンセル（undo 空振り時も含む）
+  if (clipboardPasteToken) { clipboardPasteToken.cancelled = true; clipboardPasteToken = null; }
   if (editState.historyIdx > 0) { editState.historyIdx--; await restoreFromHistory(editState.historyIdx); updateUndoRedo(); }
   else { toast('これ以上戻れません'); }
 });
@@ -3001,7 +3016,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-22-12'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-25-01'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
