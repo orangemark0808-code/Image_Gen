@@ -894,7 +894,7 @@ async function downloadFile(dataURL, filename) {
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
       await writable.write(new Blob([bytes], { type: mime }));
       await writable.close();
-      toast(`${filename} を保存しました`);
+      toast(`${fh.name} を保存しました`); // 実際に保存されたファイル名（OS ダイアログで変更された場合も正確に反映）
     } catch (e) {
       if (e.name !== 'AbortError') toast('保存に失敗しました');
     }
@@ -3018,7 +3018,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-25-02'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-25-03'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
