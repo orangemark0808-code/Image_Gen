@@ -1731,41 +1731,46 @@ const textModalState = { mode: 'add', editLayerId: null };
 
 // ===== テキストプレビュー =====
 function updateTextPreview() {
-  const pvCanvas = document.getElementById('textPreviewCanvas');
-  if (!pvCanvas) return;
-  const pvCtx = pvCanvas.getContext('2d');
+  try {
+    const pvCanvas = document.getElementById('textPreviewCanvas');
+    if (!pvCanvas) return;
+    const pvCtx = pvCanvas.getContext('2d');
 
-  const txt = document.getElementById('textInput').value || 'プレビューテキスト';
-  const tmpLayer = {
-    id: '__preview__', type: 'text',
-    text: txt,
-    direction: editState.textDirection,
-    size: parseInt(document.getElementById('textSize').value) || 32,
-    font: document.getElementById('textFont').value,
-    letterSpacing: parseInt(document.getElementById('textLetterSpacing').value) || 0,
-    lineHeight: parseFloat(document.getElementById('textLineHeight').value) || 1.4,
-    color: document.getElementById('textColor').value,
-    bg: document.getElementById('textBg').checked,
-    bgColor: document.getElementById('textBgColor').value,
-    border: document.getElementById('textBorder').checked,
-    borderColor: document.getElementById('textBorderColor').value,
-    borderWidth: parseInt(document.getElementById('textBorderWidth').value) || 2,
-    x: 0, y: 0,
-  };
+    const txt = document.getElementById('textInput').value || 'プレビューテキスト';
+    const tmpLayer = {
+      id: '__preview__', type: 'text',
+      text: txt,
+      direction: editState.textDirection,
+      size: parseInt(document.getElementById('textSize').value) || 32,
+      font: document.getElementById('textFont').value,
+      letterSpacing: parseInt(document.getElementById('textLetterSpacing').value) || 0,
+      lineHeight: parseFloat(document.getElementById('textLineHeight').value) || 1.4,
+      color: document.getElementById('textColor').value,
+      bg: document.getElementById('textBg').checked,
+      bgColor: document.getElementById('textBgColor').value,
+      border: document.getElementById('textBorder').checked,
+      borderColor: document.getElementById('textBorderColor').value,
+      borderWidth: parseInt(document.getElementById('textBorderWidth').value) || 2,
+      x: 0, y: 0,
+    };
 
-  const { w, h } = getTextBounds(tmpLayer);
-  const pad = 20;
-  const cw = Math.max(200, Math.ceil(w) + pad * 2);
-  const ch = Math.max(200, Math.ceil(h) + pad * 2);
-  pvCanvas.width = cw;
-  pvCanvas.height = ch;
+    const { w, h } = getTextBounds(tmpLayer);
+    const pad = 20;
+    const cw = Math.max(200, Math.min(4000, Math.ceil(w) + pad * 2)); // 最大幅を制限
+    const ch = Math.max(200, Math.min(4000, Math.ceil(h) + pad * 2)); // 最大高さを制限
+    pvCanvas.width = cw;
+    pvCanvas.height = ch;
 
-  pvCtx.fillStyle = '#ffffff';
-  pvCtx.fillRect(0, 0, cw, ch);
+    pvCtx.fillStyle = '#ffffff';
+    pvCtx.fillRect(0, 0, cw, ch);
 
-  tmpLayer.x = pad;
-  tmpLayer.y = pad;
-  drawText(tmpLayer, pvCtx);
+    tmpLayer.x = pad;
+    tmpLayer.y = pad;
+    drawText(tmpLayer, pvCtx);
+  } catch (err) {
+    // プレビュー描画失敗はモーダルを閉じず、コンソールに記録するだけ
+    console.error('[TextPreview] 描画失敗:', err);
+  }
 }
 
 // モーダル内 SIZE スライダー ↔ 数値入力 双方向バインド
@@ -1795,6 +1800,8 @@ document.getElementById('textLineHeight').addEventListener('input', e => {
 
 // テキスト設定の localStorage 永続化
 const TEXT_SETTINGS_KEY = 'ohana_text_last_settings';
+const TEXT_DRAFT_KEY = 'ohana_text_modal_draft'; // 入力中ドラフト（モーダル消失時のデータロス防止）
+let draftSaveTimer = null;
 function loadLastTextSettings() {
   try { return JSON.parse(localStorage.getItem(TEXT_SETTINGS_KEY)) || {}; } catch { return {}; }
 }
@@ -1820,6 +1827,13 @@ function openTextModal(mode, layer) {
   const lh   = mode === 'edit' ? (layer.lineHeight ?? 1.4)           : (saved.lineHeight ?? 1.4);
 
   ti.value = mode === 'edit' ? layer.text : '';
+  // 新規追加時: 前回未確定のドラフトがあれば自動復元
+  if (mode === 'add') {
+    try {
+      const draft = localStorage.getItem(TEXT_DRAFT_KEY);
+      if (draft) { ti.value = draft; toast('前回の入力内容を復元しました'); }
+    } catch {}
+  }
   document.querySelectorAll('.dir-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.dir === dir);
   });
@@ -1847,6 +1861,8 @@ function openTextModal(mode, layer) {
 
 function closeTextModal() {
   textModal.style.display = 'none';
+  clearTimeout(draftSaveTimer);
+  try { localStorage.removeItem(TEXT_DRAFT_KEY); } catch {}
 }
 
 function submitTextModal() {
@@ -1886,8 +1902,30 @@ function submitTextModal() {
   saveHistory(); render(); updateLayerList(); updateCanvasInfo();
 }
 
-// テキスト入力・各コントロール変更時にプレビュー更新
-document.getElementById('textInput').addEventListener('input', updateTextPreview);
+// テキスト入力・各コントロール変更時にプレビュー更新 + ドラフト保存
+document.getElementById('textInput').addEventListener('input', () => {
+  updateTextPreview();
+  // 500ms スロットルでドラフト保存（モーダル消失時のデータロス防止）
+  clearTimeout(draftSaveTimer);
+  draftSaveTimer = setTimeout(() => {
+    try { localStorage.setItem(TEXT_DRAFT_KEY, document.getElementById('textInput').value); } catch {}
+  }, 500);
+});
+
+// paste サニタイズ: HTML 書式・ゼロ幅スペース・制御文字を除去してプレーンテキストのみ挿入
+document.getElementById('textInput').addEventListener('paste', e => {
+  e.preventDefault();
+  const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+  const cleaned = text
+    .replace(/[​‌‍﻿­]/g, '') // ゼロ幅スペース・ソフトハイフン
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ''); // 制御文字（改行 \n \r 以外）
+  const el = e.target;
+  const start = el.selectionStart;
+  const end = el.selectionEnd;
+  el.value = el.value.slice(0, start) + cleaned + el.value.slice(end);
+  el.selectionStart = el.selectionEnd = start + cleaned.length;
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+});
 document.getElementById('textFont').addEventListener('change', updateTextPreview);
 document.getElementById('textColor').addEventListener('input', updateTextPreview);
 document.getElementById('textBg').addEventListener('change', updateTextPreview);
@@ -2244,8 +2282,9 @@ const shortcutMap = { v:'select', c:'crop', o:'ellipse', r:'rect', a:'arrow', l:
 
 document.addEventListener('keydown', e => {
   const inField = ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName);
-  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); document.getElementById('undoBtn').click(); return; }
-  if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); document.getElementById('redoBtn').click(); return; }
+  // textModal 開中: Ctrl+Z/Y はブラウザのテキスト取り消し/やり直しに委ねる（キャンバス操作を抑制）
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { if (textModal.style.display === 'flex') return; e.preventDefault(); document.getElementById('undoBtn').click(); return; }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { if (textModal.style.display === 'flex') return; e.preventDefault(); document.getElementById('redoBtn').click(); return; }
   if (inField) return;
   if (e.code === 'Space') {
     e.preventDefault(); // リピート中も常にスクロール抑制
@@ -3018,7 +3057,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-25-03'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-25-04'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
