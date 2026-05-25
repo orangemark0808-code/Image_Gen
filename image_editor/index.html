@@ -1056,8 +1056,11 @@ function updateUndoRedo() {
 async function restoreFromHistory(idx) {
   const h = editState.history[idx];
   editState.layers = JSON.parse(JSON.stringify(h.layers));
+  editState.selectedLayerId = null; // 無効な選択IDが残らないようにリセット
   editState.baseWidth = h.baseWidth;
   editState.baseHeight = h.baseHeight;
+  // 非同期処理前に即座にレイヤーリストを更新（ゴーストレイヤー防止）
+  updateLayerList();
   if (h.baseImageData) {
     const img = new Image();
     await new Promise(res => {
@@ -1069,6 +1072,7 @@ async function restoreFromHistory(idx) {
         editState.baseImage = tmp.getContext('2d').getImageData(0, 0, editState.baseWidth, editState.baseHeight);
         res();
       };
+      img.onerror = () => res(); // ロード失敗時もPromiseを解決して後続処理を保証
       img.src = h.baseImageData;
     });
   }
@@ -1949,6 +1953,8 @@ canvas.addEventListener('mousedown', e => {
   }
 });
 
+let resizeRaf = null; // img-resize/rotate 用 rAF スロットリング ID
+
 canvas.addEventListener('mousemove', e => {
   if (editState.panning) {
     canvasWrapper.scrollLeft = editState.panning.scrollLeft - (e.clientX - editState.panning.startX);
@@ -2006,20 +2012,23 @@ canvas.addEventListener('mousemove', e => {
       // br: origX/origY はそのまま
     }
     if (nw > 10 && nh > 10) { layer.x = nx; layer.y = ny; layer.w = nw; layer.h = nh; }
-    render();
+    // rAF スロットリング: 1フレームに1回だけ再描画（Shift+ドラッグ時のフリーズ防止）
+    if (!resizeRaf) resizeRaf = requestAnimationFrame(() => { render(); resizeRaf = null; });
   } else if (editState.dragging.type === 'img-rotate') {
     const d = editState.dragging;
     const layer = editState.layers.find(l => l.id === d.layerId);
     if (!layer) return;
     const angle = Math.atan2(pos.y - d.cy, pos.x - d.cx);
     layer.rotation = d.origRot + (angle - d.origAngle);
-    render();
+    if (!resizeRaf) resizeRaf = requestAnimationFrame(() => { render(); resizeRaf = null; });
   }
 });
 
 canvas.addEventListener('mouseup', e => {
   if (editState.panning) { editState.panning = null; canvasWrapper.classList.remove('panning'); return; }
   if (!editState.dragging) return;
+  // pending な rAF をキャンセルして、mouseup 時に最終描画を確実に行う
+  if (resizeRaf) { cancelAnimationFrame(resizeRaf); resizeRaf = null; }
   const pos = getCanvasPos(e);
   if (editState.dragging.type === 'shape') {
     const dx = Math.abs(pos.x - editState.dragging.startX); const dy = Math.abs(pos.y - editState.dragging.startY);
@@ -2058,6 +2067,15 @@ document.addEventListener('mousemove', e => {
 });
 document.addEventListener('mouseup', () => {
   if (editState.panning) { editState.panning = null; canvasWrapper.classList.remove('panning'); }
+  // キャンバス外でマウスを離したとき: canvas の mouseup が発火しないのでここで解除
+  // （canvas mouseup が先に発火した場合は dragging=null になっているので何もしない）
+  if (editState.dragging) {
+    if (resizeRaf) { cancelAnimationFrame(resizeRaf); resizeRaf = null; }
+    if (editState.dragging.type === 'move' || editState.dragging.type === 'img-resize' || editState.dragging.type === 'img-rotate') {
+      saveHistory(); render();
+    }
+    editState.dragging = null;
+  }
   if (tpState.tpPanning) {
     tpState.tpPanning = null; tpBeforeWrap.classList.remove('panning');
     if (tpPanRaf) { cancelAnimationFrame(tpPanRaf); tpPanRaf = null; }
