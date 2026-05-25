@@ -1030,7 +1030,7 @@ const canvasWrapper = document.getElementById('canvasWrapper');
 function saveHistory() {
   editState.history = editState.history.slice(0, editState.historyIdx + 1);
   editState.history.push({
-    layers: JSON.parse(JSON.stringify(editState.layers)),
+    layers: JSON.parse(JSON.stringify(editState.layers, (key, value) => key === '_img' ? undefined : value)),
     baseWidth: editState.baseWidth,
     baseHeight: editState.baseHeight,
     baseImageData: editState.baseImage ? canvasToDataURL_base() : null,
@@ -1058,6 +1058,8 @@ async function restoreFromHistory(idx) {
   if (clipboardPasteToken) { clipboardPasteToken.cancelled = true; clipboardPasteToken = null; }
   const h = editState.history[idx];
   editState.layers = JSON.parse(JSON.stringify(h.layers));
+  // _img は HTMLImageElement で JSON 非対応のため削除し、drawImageLayer に再ロードを促す
+  editState.layers.forEach(l => { if ('_img' in l) delete l._img; });
   editState.selectedLayerId = null; // 無効な選択IDが残らないようにリセット
   editState.baseWidth = h.baseWidth;
   editState.baseHeight = h.baseHeight;
@@ -3016,7 +3018,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-25-01'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-25-02'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
