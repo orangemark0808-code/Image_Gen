@@ -2207,7 +2207,10 @@ function updateLayerList() {
 // --- Save ---
 document.getElementById('saveBtn').addEventListener('click', () => {
   if (!editState.baseImage) { toast('保存する画像がありません'); return; }
-  const name = (document.getElementById('fileName').value || 'note_image').replace(/[^\w\-]/g, '_');
+  const raw = document.getElementById('fileName').value
+    .replace(/[\x00-\x1f\\/:*?"<>|]/g, '_')
+    .trim();
+  const name = raw || 'note_image';
   const format = document.getElementById('fileFormat').value;
   const prevSel = editState.selectedLayerId; const prevCrop = editState.cropRect;
   editState.selectedLayerId = null; editState.cropRect = null; render();
@@ -3057,7 +3060,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-25-04'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-26-01'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
