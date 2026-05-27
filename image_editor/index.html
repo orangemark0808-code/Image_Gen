@@ -636,7 +636,7 @@ canvas {
 
         <!-- 隠しカラーピッカー（色選択ボタンからトリガー） -->
         <input type="color" id="eraseColorPicker" value="#ffffff"
-          style="position:absolute; opacity:0; pointer-events:none; width:0; height:0;">
+          style="position:fixed; top:-200px; left:-200px; width:1px; height:1px; opacity:0;">
 
         <!-- 色プレビュー -->
         <div class="erase-color-preview">
@@ -2213,8 +2213,11 @@ document.querySelectorAll('.erase-tool-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const newTool = btn.dataset.eraseTool;
     if (newTool === 'color') {
-      // 色選択: hidden color picker を開く。確定後に tool='erase' へ戻す
-      document.getElementById('eraseColorPicker').click();
+      // 色選択: 現在色をピッカーに同期してから開く。確定後に tool='erase' へ戻る
+      const picker = document.getElementById('eraseColorPicker');
+      picker.value = eraseState.color;
+      console.log('[erase]', { event: 'tool-change', tool: 'color-pick', color: eraseState.color });
+      picker.click();
       return;
     }
     eraseState.tool = newTool;
@@ -3505,7 +3508,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-27-04'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-27-05'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
