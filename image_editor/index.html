@@ -1926,6 +1926,57 @@ document.getElementById('textInput').addEventListener('paste', e => {
   el.selectionStart = el.selectionEnd = start + cleaned.length;
   el.dispatchEvent(new Event('input', { bubbles: true }));
 });
+
+// ===== グローバル paste: Win+Shift+S スクショ等の画像貼り付け =====
+document.addEventListener('paste', e => {
+  // textModal が開いている場合は textInput 側に委ねる
+  if (textModal && textModal.style.display === 'flex') return;
+
+  const cd = e.clipboardData;
+  if (!cd) return;
+
+  // デバッグログ（原因切り分け用）
+  console.log('[paste]', {
+    itemsCount: cd.items.length,
+    itemTypes: Array.from(cd.items).map(i => i.type),
+    filesCount: cd.files.length,
+    fileTypes: Array.from(cd.files).map(f => f.type),
+  });
+
+  // 1) items から image/* を優先探索
+  let imageBlob = null;
+  for (const item of Array.from(cd.items)) {
+    if (item.type.startsWith('image/')) {
+      imageBlob = item.getAsFile();
+      break;
+    }
+  }
+
+  // 2) items で見つからなければ files にフォールバック
+  if (!imageBlob) {
+    for (const file of Array.from(cd.files)) {
+      if (file.type.startsWith('image/')) {
+        imageBlob = file;
+        break;
+      }
+    }
+  }
+
+  if (!imageBlob) return;
+
+  // 画像が見つかったのでデフォルト動作を抑制
+  e.preventDefault();
+
+  const reader = new FileReader();
+  reader.onload = ev => {
+    pasteClipboardItem(ev.target.result);
+    // pasteClipboardItem 内の toast は "Clip_NNN を貼り付けました" を出すが、
+    // スクショ専用メッセージで上書きしたい場合は下記を有効化:
+    // toast('スクショを貼り付けました');
+  };
+  reader.readAsDataURL(imageBlob);
+});
+
 document.getElementById('textFont').addEventListener('change', updateTextPreview);
 document.getElementById('textColor').addEventListener('input', updateTextPreview);
 document.getElementById('textBg').addEventListener('change', updateTextPreview);
@@ -3060,7 +3111,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-26-01'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-27-01'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
