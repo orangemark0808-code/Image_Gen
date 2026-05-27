@@ -416,7 +416,7 @@ canvas {
 .erase-mode-pills {
   display: flex; gap: 6px;
 }
-.erase-mode-btn {
+.erase-tool-btn {
   flex: 1; padding: 6px 0; font-size: 12px; font-weight: 600;
   font-family: 'DM Mono', 'Courier New', monospace;
   text-transform: uppercase; letter-spacing: 0.04em;
@@ -425,8 +425,8 @@ canvas {
   transition: border-color .15s, background .15s, color .15s;
   box-shadow: none;
 }
-.erase-mode-btn:hover { border-color: #FF7F00; color: #FF7F00; }
-.erase-mode-btn.active {
+.erase-tool-btn:hover { border-color: #FF7F00; color: #FF7F00; }
+.erase-tool-btn.active {
   background: #FF7F00; border-color: #FF7F00; color: #fff;
 }
 .erase-color-preview {
@@ -624,19 +624,19 @@ canvas {
       <div class="section" id="sec-erase">
         <div class="section-title">消しゴム</div>
 
-        <!-- COLOR MODE -->
+        <!-- TOOL: 3ボタン排他選択 -->
         <div style="margin-bottom:10px;">
-          <div style="font-family:'DM Mono','Courier New',monospace; font-size:11px; letter-spacing:.08em; color:#8a7060; margin-bottom:6px;">COLOR MODE</div>
+          <div style="font-family:'DM Mono','Courier New',monospace; font-size:11px; letter-spacing:.08em; color:#8a7060; margin-bottom:6px;">TOOL</div>
           <div class="erase-mode-pills">
-            <button class="erase-mode-btn active" data-erase-mode="eyedropper">スポイト</button>
-            <button class="erase-mode-btn" data-erase-mode="picker">カラーピッカー</button>
+            <button class="erase-tool-btn active" data-erase-tool="erase">消しゴム</button>
+            <button class="erase-tool-btn" data-erase-tool="pick">スポイト</button>
+            <button class="erase-tool-btn" data-erase-tool="color">色選択</button>
           </div>
         </div>
 
-        <!-- カラーピッカー入力 (picker モード時のみ表示) -->
-        <div id="erasePickerRow" style="display:none; margin-bottom:6px;">
-          <input type="color" id="eraseColorPicker" value="#ffffff" style="width:100%; height:32px; border-radius:8px; border:1.5px solid #d0c8be; cursor:pointer;">
-        </div>
+        <!-- 隠しカラーピッカー（色選択ボタンからトリガー） -->
+        <input type="color" id="eraseColorPicker" value="#ffffff"
+          style="position:absolute; opacity:0; pointer-events:none; width:0; height:0;">
 
         <!-- 色プレビュー -->
         <div class="erase-color-preview">
@@ -1213,22 +1213,7 @@ canvasWrapper.addEventListener('wheel', e => {
 
 // --- Cursor ---
 function updateCursor() {
-  if (editState.currentTool === 'paint') {
-    // スポイトモードで色未取得: スポイト風（小円＋十字）カーソル
-    if (eraseState.colorMode === 'eyedropper' && !eraseState.eyedropperPicked) {
-      const eyeSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23FF7F00' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M9 3H5a2 2 0 0 0-2 2v4'/><path d='M9 21H5a2 2 0 0 1-2-2v-4'/><path d='M15 3h4a2 2 0 0 1 2 2v4'/><path d='M15 21h4a2 2 0 0 0 2-2v-4'/><circle cx='12' cy='12' r='3'/></svg>`;
-      canvas.style.cursor = `url("data:image/svg+xml,${eyeSvg}") 12 12, crosshair`;
-      return;
-    }
-    // 描画モード（色取得済み or picker）: ブラシサイズの円カーソル
-    const size = parseInt(document.getElementById('eraseBrushSize')?.value || '20');
-    const r = Math.max(2, Math.round((size * editState.zoom) / 2));
-    const d = r * 2 + 4;
-    const cx = r + 2;
-    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${d}' height='${d}'><circle cx='${cx}' cy='${cx}' r='${r}' fill='none' stroke='%23FF7F00' stroke-width='1.5'/><line x1='${cx}' y1='${cx - Math.min(r, 5)}' x2='${cx}' y2='${cx + Math.min(r, 5)}' stroke='%23FF7F00' stroke-width='1'/><line x1='${cx - Math.min(r, 5)}' y1='${cx}' x2='${cx + Math.min(r, 5)}' y2='${cx}' stroke='%23FF7F00' stroke-width='1'/></svg>`;
-    canvas.style.cursor = `url("data:image/svg+xml,${svg}") ${cx} ${cx}, crosshair`;
-    return;
-  }
+  if (editState.currentTool === 'paint') { updateEraseCursor(); return; }
   canvas.style.cursor = editState.currentTool === 'select' ? 'default' : 'crosshair';
 }
 
@@ -2035,15 +2020,14 @@ document.getElementById('textInput').addEventListener('paste', e => {
 // === ERASE (Paint Layer) ===
 // ============================================================
 const eraseState = {
-  active: false,             // ERASE タブがアクティブか
-  colorMode: 'eyedropper',   // 'eyedropper' | 'picker'
-  color: '#ffffff',
-  eyedropperPicked: false,   // スポイト2段階: false=色未取得, true=色取得済み→描画可
+  active: false,         // ERASE タブがアクティブか
+  tool: 'erase',         // 'erase' | 'pick' | 'color'
+  color: '#ffffff',      // 現在の塗り色
   painting: false,
   lastX: null,
   lastY: null,
-  paintLayerId: null,        // 現在アクティブなペイントレイヤー ID
-  offscreenCanvas: null,     // 描画中の一時 Canvas
+  paintLayerId: null,    // 現在アクティブなペイントレイヤー ID
+  offscreenCanvas: null, // 描画中の一時 Canvas
   offscreenCtx: null,
 };
 
@@ -2078,8 +2062,33 @@ function pickColorAt(x, y) {
 function updateEraseColorUI() {
   document.getElementById('eraseColorSwatch').style.background = eraseState.color;
   document.getElementById('eraseColorHex').textContent = eraseState.color;
-  if (eraseState.colorMode === 'picker') {
-    document.getElementById('eraseColorPicker').value = eraseState.color;
+}
+
+// ツールボタンのアクティブ状態を eraseState.tool に同期
+function updateEraseToolUI() {
+  document.querySelectorAll('.erase-tool-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.eraseTool === eraseState.tool);
+  });
+}
+
+// カーソルを eraseState.tool に応じて更新（paint ツール専用）
+function updateEraseCursor() {
+  switch (eraseState.tool) {
+    case 'pick': {
+      // スポイトアイコン
+      const eyeSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23FF7F00' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M9 3H5a2 2 0 0 0-2 2v4'/><path d='M9 21H5a2 2 0 0 1-2-2v-4'/><path d='M15 3h4a2 2 0 0 1 2 2v4'/><path d='M15 21h4a2 2 0 0 0 2-2v-4'/><circle cx='12' cy='12' r='3'/></svg>`;
+      canvas.style.cursor = `url("data:image/svg+xml,${eyeSvg}") 12 12, crosshair`;
+      break;
+    }
+    default: {
+      // 消しゴム / 色選択 → ブラシサイズの円カーソル
+      const size = parseInt(document.getElementById('eraseBrushSize')?.value || '20');
+      const r = Math.max(2, Math.round((size * editState.zoom) / 2));
+      const d = r * 2 + 4;
+      const cx = r + 2;
+      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${d}' height='${d}'><circle cx='${cx}' cy='${cx}' r='${r}' fill='none' stroke='%23FF7F00' stroke-width='1.5'/><line x1='${cx}' y1='${cx - Math.min(r, 5)}' x2='${cx}' y2='${cx + Math.min(r, 5)}' stroke='%23FF7F00' stroke-width='1'/><line x1='${cx - Math.min(r, 5)}' y1='${cx}' x2='${cx + Math.min(r, 5)}' y2='${cx}' stroke='%23FF7F00' stroke-width='1'/></svg>`;
+      canvas.style.cursor = `url("data:image/svg+xml,${svg}") ${cx} ${cx}, crosshair`;
+    }
   }
 }
 
@@ -2193,46 +2202,44 @@ function endPaintStroke() {
     layer.src = eraseState.offscreenCanvas.toDataURL('image/png');
     layer._img = null; // キャッシュ無効化
   }
-  console.log('[erase]', { event: 'paint-end', color: eraseState.color, mode: eraseState.colorMode, picked: eraseState.eyedropperPicked });
+  console.log('[erase]', { event: 'paint-end', tool: eraseState.tool, color: eraseState.color });
   saveHistory();
   render();
   updateLayerList();
 }
 
 // --- ERASE UI イベントハンドラ ---
-document.querySelectorAll('.erase-mode-btn').forEach(btn => {
+document.querySelectorAll('.erase-tool-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    const newMode = btn.dataset.eraseMode;
-    const isSameEyedropper = newMode === 'eyedropper' && eraseState.colorMode === 'eyedropper';
-
-    document.querySelectorAll('.erase-mode-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    eraseState.colorMode = newMode;
-    document.getElementById('erasePickerRow').style.display =
-      newMode === 'picker' ? 'block' : 'none';
-
-    if (newMode === 'picker') {
-      // picker に切り替えたら即描画可能
-      eraseState.eyedropperPicked = true;
-    } else {
-      // スポイトボタン再クリック → 色取り直しモードに戻す
-      eraseState.eyedropperPicked = isSameEyedropper ? false : eraseState.eyedropperPicked;
+    const newTool = btn.dataset.eraseTool;
+    if (newTool === 'color') {
+      // 色選択: hidden color picker を開く。確定後に tool='erase' へ戻す
+      document.getElementById('eraseColorPicker').click();
+      return;
     }
-
-    console.log('[erase]', { event: 'mode-change', color: eraseState.color, mode: eraseState.colorMode, picked: eraseState.eyedropperPicked });
-    updateCursor();
+    eraseState.tool = newTool;
+    updateEraseToolUI();
+    updateEraseCursor();
+    console.log('[erase]', { event: 'tool-change', tool: eraseState.tool, color: eraseState.color });
   });
 });
 
 document.getElementById('eraseColorPicker').addEventListener('input', e => {
   eraseState.color = e.target.value;
-  eraseState.eyedropperPicked = true; // picker で色を選んだら即描画可
   updateEraseColorUI();
+});
+document.getElementById('eraseColorPicker').addEventListener('change', e => {
+  eraseState.color = e.target.value;
+  eraseState.tool = 'erase';
+  updateEraseColorUI();
+  updateEraseToolUI();
+  updateEraseCursor();
+  console.log('[erase]', { event: 'color-pick', tool: eraseState.tool, color: eraseState.color });
 });
 
 document.getElementById('eraseBrushSize').addEventListener('input', e => {
   document.getElementById('eraseSizeLabel').textContent = e.target.value;
-  if (editState.currentTool === 'paint') updateCursor();
+  if (editState.currentTool === 'paint') updateEraseCursor();
 });
 
 document.getElementById('eraseOpacity').addEventListener('input', e => {
@@ -2251,10 +2258,10 @@ document.getElementById('newPaintLayerBtn').addEventListener('click', () => {
 // ERASE acc-item クリック時にペイントツールをアクティブ化
 document.querySelector('[data-sec="sec-erase"]').addEventListener('click', () => {
   eraseState.active = true;
-  // スポイトモードを初期状態（色未取得）に戻す
-  if (eraseState.colorMode === 'eyedropper') eraseState.eyedropperPicked = false;
-  console.log('[erase]', { event: 'mode-change', color: eraseState.color, mode: eraseState.colorMode, picked: eraseState.eyedropperPicked });
-  if (editState.baseImage) selectTool('paint');
+  eraseState.tool = 'erase';
+  updateEraseToolUI();
+  console.log('[erase]', { event: 'tab-activate', tool: eraseState.tool, color: eraseState.color });
+  if (editState.baseImage) { selectTool('paint'); updateEraseCursor(); }
 });
 
 // 他タブに切り替わった時は active をリセット
@@ -2371,16 +2378,17 @@ canvas.addEventListener('mousedown', e => {
   if (tool === 'paint') {
     e.preventDefault();
 
-    // --- スポイトモード 第1段階: 色取得のみ ---
-    if (eraseState.colorMode === 'eyedropper' && !eraseState.eyedropperPicked) {
+    // スポイト: クリックで色取得 → 自動的に消しゴムモードへ
+    if (eraseState.tool === 'pick') {
       pickColorAt(pos.x, pos.y);
-      eraseState.eyedropperPicked = true;
-      console.log('[erase]', { event: 'eyedropper-pick', color: eraseState.color, mode: eraseState.colorMode, picked: eraseState.eyedropperPicked });
-      updateCursor(); // スポイト → ブラシカーソルに切替
-      return; // この mousedown では描画しない
+      eraseState.tool = 'erase';
+      updateEraseToolUI();
+      updateEraseCursor();
+      console.log('[erase]', { event: 'pick', tool: eraseState.tool, color: eraseState.color });
+      return;
     }
 
-    // --- 描画段階（スポイト第2段階 or picker モード）---
+    // 消しゴム: 描画開始
     const layer = getOrCreatePaintLayer();
     const needsInit = !eraseState.offscreenCanvas || eraseState.paintLayerId !== layer.id;
     eraseState.paintLayerId = layer.id;
@@ -2390,7 +2398,7 @@ canvas.addEventListener('mousedown', e => {
       eraseState.lastX = null;
       eraseState.lastY = null;
       paintStroke(pos.x, pos.y, true);
-      console.log('[erase]', { event: 'paint-start', color: eraseState.color, mode: eraseState.colorMode, picked: eraseState.eyedropperPicked });
+      console.log('[erase]', { event: 'paint-start', tool: eraseState.tool, color: eraseState.color });
       render();
     };
 
@@ -2441,7 +2449,7 @@ canvas.addEventListener('mousemove', e => {
   if (editState.currentTool === 'paint' && eraseState.painting) {
     const pos = getCanvasPos(e);
     paintStroke(pos.x, pos.y, false);
-    console.log('[erase]', { event: 'paint-move', color: eraseState.color, mode: eraseState.colorMode, picked: eraseState.eyedropperPicked });
+    console.log('[erase]', { event: 'paint-move', tool: eraseState.tool, color: eraseState.color });
     render();
     return;
   }
@@ -3497,7 +3505,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-27-03'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-27-04'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
