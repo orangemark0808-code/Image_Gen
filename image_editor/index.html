@@ -411,6 +411,42 @@ canvas {
 .clip-slot.has-image:hover { border-color: #FF7F00; }
 .clip-slot img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .clip-slot.empty { cursor: default; }
+
+/* ===== ERASE (Paint Layer) ===== */
+.erase-mode-pills {
+  display: flex; gap: 6px;
+}
+.erase-mode-btn {
+  flex: 1; padding: 6px 0; font-size: 12px; font-weight: 600;
+  font-family: 'DM Mono', 'Courier New', monospace;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  border: 1.5px solid #d0c8be; border-radius: 14px;
+  background: transparent; color: #6b5a4e; cursor: pointer;
+  transition: border-color .15s, background .15s, color .15s;
+  box-shadow: none;
+}
+.erase-mode-btn:hover { border-color: #FF7F00; color: #FF7F00; }
+.erase-mode-btn.active {
+  background: #FF7F00; border-color: #FF7F00; color: #fff;
+}
+.erase-color-preview {
+  display: flex; align-items: center; gap: 10px; margin: 10px 0 14px;
+}
+.erase-color-swatch {
+  width: 24px; height: 24px; border-radius: 6px;
+  border: 1.5px solid #d0c8be; flex-shrink: 0;
+  background: #ffffff;
+}
+.erase-color-hex {
+  font-family: 'DM Mono', 'Courier New', monospace;
+  font-size: 12px; color: #3a2a1a; letter-spacing: 0.04em;
+}
+.erase-layer-name {
+  font-size: 13px; color: #3a2a1a; padding: 6px 10px;
+  background: #f0ede6; border-radius: 8px; border: none;
+  font-family: 'DM Mono', 'Courier New', monospace;
+  letter-spacing: 0.02em; word-break: break-all;
+}
 </style>
 </head>
 <body>
@@ -446,6 +482,7 @@ canvas {
           <button class="acc-item" data-sec="sec-shape">SHAPE</button>
           <button class="acc-item" data-sec="sec-layer">LAYER</button>
           <button class="acc-item" data-sec="sec-save">SAVE</button>
+          <button class="acc-item" data-sec="sec-erase">ERASE</button>
         </div>
       </div>
       <button class="mode-btn" data-mode="transparent">透過</button>
@@ -599,6 +636,48 @@ canvas {
         </div>
         <button id="clearAll" class="danger" style="width:100%; margin-top:6px;">すべてクリア</button>
       </div>
+      <!-- 8. 消しゴム (ERASE) -->
+      <div class="section" id="sec-erase">
+        <div class="section-title">消しゴム</div>
+
+        <!-- COLOR MODE -->
+        <div style="margin-bottom:10px;">
+          <div style="font-family:'DM Mono','Courier New',monospace; font-size:11px; letter-spacing:.08em; color:#8a7060; margin-bottom:6px;">COLOR MODE</div>
+          <div class="erase-mode-pills">
+            <button class="erase-mode-btn active" data-erase-mode="eyedropper">スポイト</button>
+            <button class="erase-mode-btn" data-erase-mode="picker">カラーピッカー</button>
+          </div>
+        </div>
+
+        <!-- カラーピッカー入力 (picker モード時のみ表示) -->
+        <div id="erasePickerRow" style="display:none; margin-bottom:6px;">
+          <input type="color" id="eraseColorPicker" value="#ffffff" style="width:100%; height:32px; border-radius:8px; border:1.5px solid #d0c8be; cursor:pointer;">
+        </div>
+
+        <!-- 色プレビュー -->
+        <div class="erase-color-preview">
+          <div class="erase-color-swatch" id="eraseColorSwatch"></div>
+          <span class="erase-color-hex" id="eraseColorHex">#ffffff</span>
+        </div>
+
+        <!-- ブラシ設定 -->
+        <div style="margin-bottom:10px;">
+          <label style="margin-top:0;">SIZE: <span id="eraseSizeLabel">20</span>px</label>
+          <input type="range" id="eraseBrushSize" min="1" max="200" value="20">
+        </div>
+        <div style="margin-bottom:14px; padding-bottom:14px; border-bottom:1px dashed #e8e2d8;">
+          <label>OPACITY: <span id="eraseOpacityLabel">100</span>%</label>
+          <input type="range" id="eraseOpacity" min="0" max="100" value="100">
+        </div>
+
+        <!-- ペイントレイヤー操作 -->
+        <div>
+          <button id="newPaintLayerBtn" class="primary" style="width:100%; margin-bottom:10px; background:#FF7F00; border-color:#FF7F00; border-radius:14px; box-shadow:none;">新規ペイントレイヤー</button>
+          <div style="font-family:'DM Mono','Courier New',monospace; font-size:11px; letter-spacing:.08em; color:#8a7060; margin-bottom:6px;">CURRENT LAYER</div>
+          <div class="erase-layer-name" id="erasePaintLayerName">—</div>
+        </div>
+      </div>
+
     </div><!-- /editModePanel -->
 
     <!-- ==== TRANSPARENT MODE PANEL ==== -->
@@ -1023,7 +1102,7 @@ const editState = {
 };
 
 const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
 const canvasWrapper = document.getElementById('canvasWrapper');
 
 // --- History ---
@@ -1060,6 +1139,12 @@ async function restoreFromHistory(idx) {
   editState.layers = JSON.parse(JSON.stringify(h.layers));
   // _img は HTMLImageElement で JSON 非対応のため削除し、drawImageLayer に再ロードを促す
   editState.layers.forEach(l => { if ('_img' in l) delete l._img; });
+  // undo/redo 後は offscreen キャンバスを無効化して次回 mousedown 時に再初期化
+  if (typeof eraseState !== 'undefined') {
+    eraseState.painting = false;
+    eraseState.offscreenCanvas = null;
+    eraseState.offscreenCtx = null;
+  }
   editState.selectedLayerId = null; // 無効な選択IDが残らないようにリセット
   editState.baseWidth = h.baseWidth;
   editState.baseHeight = h.baseHeight;
@@ -1126,6 +1211,15 @@ canvasWrapper.addEventListener('wheel', e => {
 
 // --- Cursor ---
 function updateCursor() {
+  if (editState.currentTool === 'paint') {
+    const size = parseInt(document.getElementById('eraseBrushSize')?.value || '20');
+    const r = Math.max(2, Math.round((size * editState.zoom) / 2));
+    const d = r * 2 + 4;
+    const cx = r + 2;
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${d}' height='${d}'><circle cx='${cx}' cy='${cx}' r='${r}' fill='none' stroke='%23FF7F00' stroke-width='1.5'/><line x1='${cx}' y1='${cx - Math.min(r, 5)}' x2='${cx}' y2='${cx + Math.min(r, 5)}' stroke='%23FF7F00' stroke-width='1'/><line x1='${cx - Math.min(r, 5)}' y1='${cx}' x2='${cx + Math.min(r, 5)}' y2='${cx}' stroke='%23FF7F00' stroke-width='1'/></svg>`;
+    canvas.style.cursor = `url("data:image/svg+xml,${svg}") ${cx} ${cx}, crosshair`;
+    return;
+  }
   canvas.style.cursor = editState.currentTool === 'select' ? 'default' : 'crosshair';
 }
 
@@ -1137,6 +1231,7 @@ function render() {
     if (layer.type === 'text') drawText(layer);
     else if (layer.type === 'shape') drawShape(layer);
     else if (layer.type === 'image') drawImageLayer(layer);
+    else if (layer.type === 'paint') drawPaintLayer(layer);
   }
   if (editState.currentTool === 'crop' && editState.cropRect) drawCropOverlay();
 }
@@ -1389,7 +1484,7 @@ function updateCanvasInfo() {
 }
 
 function toolName(t) {
-  return { select:'選択', crop:'トリミング', ellipse:'楕円', rect:'四角', arrow:'矢印', line:'線' }[t] || t;
+  return { select:'選択', crop:'トリミング', ellipse:'楕円', rect:'四角', arrow:'矢印', line:'線', paint:'消しゴム' }[t] || t;
 }
 
 function updateCropStatus() {
@@ -1435,7 +1530,7 @@ document.querySelectorAll('.tool-btn').forEach(btn => {
 function selectTool(tool) {
   editState.currentTool = tool;
   document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
-  if (tool !== 'select') editState.selectedLayerId = null;
+  if (tool !== 'select' && tool !== 'paint') editState.selectedLayerId = null;
   updateCursor(); render(); updateCanvasInfo(); updateLayerList();
 }
 
@@ -1927,6 +2022,212 @@ document.getElementById('textInput').addEventListener('paste', e => {
   el.dispatchEvent(new Event('input', { bubbles: true }));
 });
 
+// ============================================================
+// === ERASE (Paint Layer) ===
+// ============================================================
+const eraseState = {
+  colorMode: 'eyedropper', // 'eyedropper' | 'picker'
+  color: '#ffffff',
+  painting: false,
+  lastX: null,
+  lastY: null,
+  paintLayerId: null,       // 現在アクティブなペイントレイヤー ID
+  offscreenCanvas: null,    // 描画中の一時 Canvas
+  offscreenCtx: null,
+};
+
+// --- ペイントレイヤー描画 ---
+function drawPaintLayer(l) {
+  // ストローク中: offscreen から直接描画
+  if (eraseState.painting && eraseState.paintLayerId === l.id && eraseState.offscreenCanvas) {
+    ctx.drawImage(eraseState.offscreenCanvas, 0, 0);
+    return;
+  }
+  if (!l.src) return; // 空レイヤー = まだ何も描いていない
+  if (!l._img) {
+    const img = new Image();
+    img.onload = () => { l._img = img; render(); };
+    img.src = l.src;
+    return;
+  }
+  if (!l._img.complete || !l._img.naturalWidth) return;
+  ctx.drawImage(l._img, 0, 0);
+}
+
+// --- スポイト: レンダリング済み canvas からピクセル取得 ---
+function pickColorAt(x, y) {
+  const xi = Math.max(0, Math.min(editState.baseWidth - 1, Math.round(x)));
+  const yi = Math.max(0, Math.min(editState.baseHeight - 1, Math.round(y)));
+  const px = ctx.getImageData(xi, yi, 1, 1).data;
+  eraseState.color = '#' + [px[0], px[1], px[2]].map(v => v.toString(16).padStart(2, '0')).join('');
+  updateEraseColorUI();
+}
+
+// --- UI 更新 ---
+function updateEraseColorUI() {
+  document.getElementById('eraseColorSwatch').style.background = eraseState.color;
+  document.getElementById('eraseColorHex').textContent = eraseState.color;
+  if (eraseState.colorMode === 'picker') {
+    document.getElementById('eraseColorPicker').value = eraseState.color;
+  }
+}
+
+function updateErasePaintLayerNameUI() {
+  const layer = editState.layers.find(l => l.id === eraseState.paintLayerId);
+  document.getElementById('erasePaintLayerName').textContent = layer ? layer.name : '—';
+}
+
+// --- ペイントレイヤー作成 ---
+function createNewPaintLayer() {
+  const existingNums = editState.layers
+    .filter(l => l.type === 'paint' && /^Paint_(\d+)$/.test(l.name))
+    .map(l => parseInt(l.name.replace('Paint_', ''), 10));
+  const nextNum = existingNums.length > 0 ? Math.max(...existingNums) + 1 : 1;
+  const name = `Paint_${String(nextNum).padStart(3, '0')}`;
+  const layer = { id: uid(), type: 'paint', name, src: '', _img: null };
+
+  // 選択中レイヤーのすぐ上 or スタック最上部に挿入
+  const selIdx = editState.layers.findIndex(l => l.id === editState.selectedLayerId);
+  if (selIdx !== -1) {
+    editState.layers.splice(selIdx + 1, 0, layer);
+  } else {
+    editState.layers.push(layer);
+  }
+
+  eraseState.paintLayerId = layer.id;
+  updateErasePaintLayerNameUI();
+  updateLayerList();
+  return layer;
+}
+
+function getOrCreatePaintLayer() {
+  if (eraseState.paintLayerId) {
+    const existing = editState.layers.find(l => l.id === eraseState.paintLayerId && l.type === 'paint');
+    if (existing) return existing;
+  }
+  return createNewPaintLayer();
+}
+
+// --- offscreen Canvas 初期化 (既存コンテンツを読み込む) ---
+function initOffscreenForLayer(layer, callback) {
+  const oc = document.createElement('canvas');
+  oc.width = editState.baseWidth;
+  oc.height = editState.baseHeight;
+  const octx = oc.getContext('2d');
+  eraseState.offscreenCanvas = oc;
+  eraseState.offscreenCtx = octx;
+
+  if (!layer.src) { callback(); return; }
+
+  // _img が既にロード済みならそのまま使う
+  if (layer._img && layer._img.complete && layer._img.naturalWidth) {
+    octx.drawImage(layer._img, 0, 0);
+    callback();
+    return;
+  }
+
+  // undo 直後等で _img が無い場合は再ロード
+  const img = new Image();
+  img.onload = () => { octx.drawImage(img, 0, 0); layer._img = img; callback(); };
+  img.onerror = callback;
+  img.src = layer.src;
+}
+
+// --- ブラシ 1点描画 ---
+function paintDot(x, y) {
+  const octx = eraseState.offscreenCtx;
+  if (!octx) return;
+  const size = parseInt(document.getElementById('eraseBrushSize').value) || 20;
+  const alpha = (parseInt(document.getElementById('eraseOpacity').value) || 100) / 100;
+  octx.globalCompositeOperation = 'source-over';
+  octx.globalAlpha = alpha;
+  octx.fillStyle = eraseState.color;
+  octx.beginPath();
+  octx.arc(x, y, size / 2, 0, Math.PI * 2);
+  octx.fill();
+}
+
+// --- ストローク描画 (補間付き) ---
+function paintStroke(x, y, isStart) {
+  if (!eraseState.offscreenCtx) return;
+  const size = parseInt(document.getElementById('eraseBrushSize').value) || 20;
+
+  if (isStart || eraseState.lastX === null) {
+    paintDot(x, y);
+  } else {
+    const dx = x - eraseState.lastX;
+    const dy = y - eraseState.lastY;
+    const dist = Math.hypot(dx, dy);
+    const step = Math.max(0.5, size / 6);
+    const steps = Math.max(1, Math.ceil(dist / step));
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      paintDot(eraseState.lastX + dx * t, eraseState.lastY + dy * t);
+    }
+  }
+
+  eraseState.lastX = x;
+  eraseState.lastY = y;
+}
+
+// --- ストローク終了処理 ---
+function endPaintStroke() {
+  if (!eraseState.painting) return;
+  eraseState.painting = false;
+  eraseState.lastX = null;
+  eraseState.lastY = null;
+
+  const layer = editState.layers.find(l => l.id === eraseState.paintLayerId);
+  if (layer && eraseState.offscreenCanvas) {
+    layer.src = eraseState.offscreenCanvas.toDataURL('image/png');
+    layer._img = null; // キャッシュ無効化
+  }
+  saveHistory();
+  render();
+  updateLayerList();
+}
+
+// --- ERASE UI イベントハンドラ ---
+document.querySelectorAll('.erase-mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.erase-mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    eraseState.colorMode = btn.dataset.eraseMode;
+    document.getElementById('erasePickerRow').style.display =
+      eraseState.colorMode === 'picker' ? 'block' : 'none';
+  });
+});
+
+document.getElementById('eraseColorPicker').addEventListener('input', e => {
+  eraseState.color = e.target.value;
+  updateEraseColorUI();
+});
+
+document.getElementById('eraseBrushSize').addEventListener('input', e => {
+  document.getElementById('eraseSizeLabel').textContent = e.target.value;
+  if (editState.currentTool === 'paint') updateCursor();
+});
+
+document.getElementById('eraseOpacity').addEventListener('input', e => {
+  document.getElementById('eraseOpacityLabel').textContent = e.target.value;
+});
+
+document.getElementById('newPaintLayerBtn').addEventListener('click', () => {
+  if (!editState.baseImage) { toast('先に画像を読み込んでください'); return; }
+  eraseState.paintLayerId = null; // 強制的に新規作成
+  eraseState.offscreenCanvas = null;
+  eraseState.offscreenCtx = null;
+  createNewPaintLayer();
+  toast('新規ペイントレイヤーを作成しました');
+});
+
+// ERASE acc-item クリック時にペイントツールをアクティブ化
+document.querySelector('[data-sec="sec-erase"]').addEventListener('click', () => {
+  if (editState.baseImage) selectTool('paint');
+});
+
+// ============================================================
+
 // ===== グローバル paste: Win+Shift+S スクショ等の画像貼り付け =====
 document.addEventListener('paste', e => {
   // textModal が開いている場合は textInput 側に委ねる
@@ -2029,6 +2330,30 @@ canvas.addEventListener('mousedown', e => {
   }
   const pos = getCanvasPos(e);
   const tool = editState.currentTool;
+  if (tool === 'paint') {
+    e.preventDefault();
+    const layer = getOrCreatePaintLayer();
+    // 別レイヤーに切り替わっていたら offscreen を再初期化
+    const needsInit = !eraseState.offscreenCanvas || eraseState.paintLayerId !== layer.id;
+    eraseState.paintLayerId = layer.id;
+    if (eraseState.colorMode === 'eyedropper') pickColorAt(pos.x, pos.y);
+    if (needsInit) {
+      initOffscreenForLayer(layer, () => {
+        eraseState.painting = true;
+        eraseState.lastX = null;
+        eraseState.lastY = null;
+        paintStroke(pos.x, pos.y, true);
+        render();
+      });
+    } else {
+      eraseState.painting = true;
+      eraseState.lastX = null;
+      eraseState.lastY = null;
+      paintStroke(pos.x, pos.y, true);
+      render();
+    }
+    return;
+  }
   if (tool === 'crop') { editState.dragging = { type: 'crop', startX: pos.x, startY: pos.y }; return; }
   if (['ellipse','rect','arrow','line'].includes(tool)) { editState.dragging = { type: 'shape', startX: pos.x, startY: pos.y, shape: tool }; return; }
   if (tool === 'select') {
@@ -2063,6 +2388,13 @@ canvas.addEventListener('mousemove', e => {
   if (editState.panning) {
     canvasWrapper.scrollLeft = editState.panning.scrollLeft - (e.clientX - editState.panning.startX);
     canvasWrapper.scrollTop = editState.panning.scrollTop - (e.clientY - editState.panning.startY);
+    return;
+  }
+  // ペイントツール: dragging フラグに依存せず painting フラグで制御
+  if (editState.currentTool === 'paint' && eraseState.painting) {
+    const pos = getCanvasPos(e);
+    paintStroke(pos.x, pos.y, false);
+    render();
     return;
   }
   if (!editState.dragging) return;
@@ -2130,6 +2462,8 @@ canvas.addEventListener('mousemove', e => {
 
 canvas.addEventListener('mouseup', e => {
   if (editState.panning) { editState.panning = null; canvasWrapper.classList.remove('panning'); return; }
+  // ペイントツール
+  if (editState.currentTool === 'paint' && eraseState.painting) { endPaintStroke(); return; }
   if (!editState.dragging) return;
   // pending な rAF をキャンセルして、mouseup 時に最終描画を確実に行う
   if (resizeRaf) { cancelAnimationFrame(resizeRaf); resizeRaf = null; }
@@ -2171,6 +2505,8 @@ document.addEventListener('mousemove', e => {
 });
 document.addEventListener('mouseup', () => {
   if (editState.panning) { editState.panning = null; canvasWrapper.classList.remove('panning'); }
+  // ペイントツール: canvas 外でリリースした場合もストローク終了
+  if (editState.currentTool === 'paint' && eraseState.painting) { endPaintStroke(); }
   // キャンバス外でマウスを離したとき: canvas の mouseup が発火しないのでここで解除
   // （canvas mouseup が先に発火した場合は dragging=null になっているので何もしない）
   if (editState.dragging) {
@@ -2231,6 +2567,8 @@ function updateLayerList() {
       ? `T ${l.direction === 'vertical' ? '縦' : '横'} ${l.text.slice(0,10)}${l.text.length > 10 ? '…' : ''}`
       : l.type === 'image'
       ? `[IMG] ${l.name}`
+      : l.type === 'paint'
+      ? `[PAINT] ${l.name}`
       : `${l.shape === 'ellipse' ? '〇' : l.shape === 'rect' ? '□' : l.shape === 'arrow' ? '→' : '／'} 図形`;
     const editBtn = l.type === 'text'
       ? `<button class="edit-layer-btn" style="border:none; background:none; color:#ea580c; padding:2px 6px; font-size:12px; cursor:pointer;">編集</button>`
@@ -3111,7 +3449,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-27-01'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-27-02'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
