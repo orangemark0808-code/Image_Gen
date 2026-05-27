@@ -481,8 +481,9 @@ canvas {
           <button class="acc-item" data-sec="sec-text">TEXT</button>
           <button class="acc-item" data-sec="sec-shape">SHAPE</button>
           <button class="acc-item" data-sec="sec-layer">LAYER</button>
-          <button class="acc-item" data-sec="sec-save">SAVE</button>
           <button class="acc-item" data-sec="sec-erase">ERASE</button>
+          <!-- SAVE は常に最下部固定 -->
+          <button class="acc-item" data-sec="sec-save">SAVE</button>
         </div>
       </div>
       <button class="mode-btn" data-mode="transparent">透過</button>
@@ -619,24 +620,7 @@ canvas {
         </div>
       </div>
 
-      <!-- 7. 保存 -->
-      <div class="section" id="sec-save">
-        <div class="section-title">SAVE</div>
-        <label style="margin-top:0;">ファイル名</label>
-        <input type="text" id="fileName" placeholder="note_image" value="note_image">
-        <label>形式</label>
-        <select id="fileFormat">
-          <option value="png">PNG (透過可)</option>
-          <option value="jpeg">JPEG</option>
-        </select>
-        <button id="saveBtn" class="primary" style="width:100%; margin-top:8px;">💾 ダウンロード</button>
-        <div class="row-2" style="margin-top:8px;">
-          <button id="saveState">状態保存</button>
-          <button id="loadState">復元</button>
-        </div>
-        <button id="clearAll" class="danger" style="width:100%; margin-top:6px;">すべてクリア</button>
-      </div>
-      <!-- 8. 消しゴム (ERASE) -->
+      <!-- 7. 消しゴム (ERASE) -->
       <div class="section" id="sec-erase">
         <div class="section-title">消しゴム</div>
 
@@ -676,6 +660,24 @@ canvas {
           <div style="font-family:'DM Mono','Courier New',monospace; font-size:11px; letter-spacing:.08em; color:#8a7060; margin-bottom:6px;">CURRENT LAYER</div>
           <div class="erase-layer-name" id="erasePaintLayerName">—</div>
         </div>
+      </div>
+
+      <!-- 8. 保存（SAVE は常に最下部固定） -->
+      <div class="section" id="sec-save">
+        <div class="section-title">SAVE</div>
+        <label style="margin-top:0;">ファイル名</label>
+        <input type="text" id="fileName" placeholder="note_image" value="note_image">
+        <label>形式</label>
+        <select id="fileFormat">
+          <option value="png">PNG (透過可)</option>
+          <option value="jpeg">JPEG</option>
+        </select>
+        <button id="saveBtn" class="primary" style="width:100%; margin-top:8px;">💾 ダウンロード</button>
+        <div class="row-2" style="margin-top:8px;">
+          <button id="saveState">状態保存</button>
+          <button id="loadState">復元</button>
+        </div>
+        <button id="clearAll" class="danger" style="width:100%; margin-top:6px;">すべてクリア</button>
       </div>
 
     </div><!-- /editModePanel -->
@@ -1212,6 +1214,13 @@ canvasWrapper.addEventListener('wheel', e => {
 // --- Cursor ---
 function updateCursor() {
   if (editState.currentTool === 'paint') {
+    // スポイトモードで色未取得: スポイト風（小円＋十字）カーソル
+    if (eraseState.colorMode === 'eyedropper' && !eraseState.eyedropperPicked) {
+      const eyeSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23FF7F00' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M9 3H5a2 2 0 0 0-2 2v4'/><path d='M9 21H5a2 2 0 0 1-2-2v-4'/><path d='M15 3h4a2 2 0 0 1 2 2v4'/><path d='M15 21h4a2 2 0 0 0 2-2v-4'/><circle cx='12' cy='12' r='3'/></svg>`;
+      canvas.style.cursor = `url("data:image/svg+xml,${eyeSvg}") 12 12, crosshair`;
+      return;
+    }
+    // 描画モード（色取得済み or picker）: ブラシサイズの円カーソル
     const size = parseInt(document.getElementById('eraseBrushSize')?.value || '20');
     const r = Math.max(2, Math.round((size * editState.zoom) / 2));
     const d = r * 2 + 4;
@@ -2026,13 +2035,15 @@ document.getElementById('textInput').addEventListener('paste', e => {
 // === ERASE (Paint Layer) ===
 // ============================================================
 const eraseState = {
-  colorMode: 'eyedropper', // 'eyedropper' | 'picker'
+  active: false,             // ERASE タブがアクティブか
+  colorMode: 'eyedropper',   // 'eyedropper' | 'picker'
   color: '#ffffff',
+  eyedropperPicked: false,   // スポイト2段階: false=色未取得, true=色取得済み→描画可
   painting: false,
   lastX: null,
   lastY: null,
-  paintLayerId: null,       // 現在アクティブなペイントレイヤー ID
-  offscreenCanvas: null,    // 描画中の一時 Canvas
+  paintLayerId: null,        // 現在アクティブなペイントレイヤー ID
+  offscreenCanvas: null,     // 描画中の一時 Canvas
   offscreenCtx: null,
 };
 
@@ -2182,6 +2193,7 @@ function endPaintStroke() {
     layer.src = eraseState.offscreenCanvas.toDataURL('image/png');
     layer._img = null; // キャッシュ無効化
   }
+  console.log('[erase]', { event: 'paint-end', color: eraseState.color, mode: eraseState.colorMode, picked: eraseState.eyedropperPicked });
   saveHistory();
   render();
   updateLayerList();
@@ -2190,16 +2202,31 @@ function endPaintStroke() {
 // --- ERASE UI イベントハンドラ ---
 document.querySelectorAll('.erase-mode-btn').forEach(btn => {
   btn.addEventListener('click', () => {
+    const newMode = btn.dataset.eraseMode;
+    const isSameEyedropper = newMode === 'eyedropper' && eraseState.colorMode === 'eyedropper';
+
     document.querySelectorAll('.erase-mode-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    eraseState.colorMode = btn.dataset.eraseMode;
+    eraseState.colorMode = newMode;
     document.getElementById('erasePickerRow').style.display =
-      eraseState.colorMode === 'picker' ? 'block' : 'none';
+      newMode === 'picker' ? 'block' : 'none';
+
+    if (newMode === 'picker') {
+      // picker に切り替えたら即描画可能
+      eraseState.eyedropperPicked = true;
+    } else {
+      // スポイトボタン再クリック → 色取り直しモードに戻す
+      eraseState.eyedropperPicked = isSameEyedropper ? false : eraseState.eyedropperPicked;
+    }
+
+    console.log('[erase]', { event: 'mode-change', color: eraseState.color, mode: eraseState.colorMode, picked: eraseState.eyedropperPicked });
+    updateCursor();
   });
 });
 
 document.getElementById('eraseColorPicker').addEventListener('input', e => {
   eraseState.color = e.target.value;
+  eraseState.eyedropperPicked = true; // picker で色を選んだら即描画可
   updateEraseColorUI();
 });
 
@@ -2223,7 +2250,18 @@ document.getElementById('newPaintLayerBtn').addEventListener('click', () => {
 
 // ERASE acc-item クリック時にペイントツールをアクティブ化
 document.querySelector('[data-sec="sec-erase"]').addEventListener('click', () => {
+  eraseState.active = true;
+  // スポイトモードを初期状態（色未取得）に戻す
+  if (eraseState.colorMode === 'eyedropper') eraseState.eyedropperPicked = false;
+  console.log('[erase]', { event: 'mode-change', color: eraseState.color, mode: eraseState.colorMode, picked: eraseState.eyedropperPicked });
   if (editState.baseImage) selectTool('paint');
+});
+
+// 他タブに切り替わった時は active をリセット
+document.querySelectorAll('.acc-item').forEach(btn => {
+  if (btn.dataset.sec !== 'sec-erase') {
+    btn.addEventListener('click', () => { eraseState.active = false; });
+  }
 });
 
 // ============================================================
@@ -2332,25 +2370,34 @@ canvas.addEventListener('mousedown', e => {
   const tool = editState.currentTool;
   if (tool === 'paint') {
     e.preventDefault();
+
+    // --- スポイトモード 第1段階: 色取得のみ ---
+    if (eraseState.colorMode === 'eyedropper' && !eraseState.eyedropperPicked) {
+      pickColorAt(pos.x, pos.y);
+      eraseState.eyedropperPicked = true;
+      console.log('[erase]', { event: 'eyedropper-pick', color: eraseState.color, mode: eraseState.colorMode, picked: eraseState.eyedropperPicked });
+      updateCursor(); // スポイト → ブラシカーソルに切替
+      return; // この mousedown では描画しない
+    }
+
+    // --- 描画段階（スポイト第2段階 or picker モード）---
     const layer = getOrCreatePaintLayer();
-    // 別レイヤーに切り替わっていたら offscreen を再初期化
     const needsInit = !eraseState.offscreenCanvas || eraseState.paintLayerId !== layer.id;
     eraseState.paintLayerId = layer.id;
-    if (eraseState.colorMode === 'eyedropper') pickColorAt(pos.x, pos.y);
-    if (needsInit) {
-      initOffscreenForLayer(layer, () => {
-        eraseState.painting = true;
-        eraseState.lastX = null;
-        eraseState.lastY = null;
-        paintStroke(pos.x, pos.y, true);
-        render();
-      });
-    } else {
+
+    const startPainting = () => {
       eraseState.painting = true;
       eraseState.lastX = null;
       eraseState.lastY = null;
       paintStroke(pos.x, pos.y, true);
+      console.log('[erase]', { event: 'paint-start', color: eraseState.color, mode: eraseState.colorMode, picked: eraseState.eyedropperPicked });
       render();
+    };
+
+    if (needsInit) {
+      initOffscreenForLayer(layer, startPainting);
+    } else {
+      startPainting();
     }
     return;
   }
@@ -2394,6 +2441,7 @@ canvas.addEventListener('mousemove', e => {
   if (editState.currentTool === 'paint' && eraseState.painting) {
     const pos = getCanvasPos(e);
     paintStroke(pos.x, pos.y, false);
+    console.log('[erase]', { event: 'paint-move', color: eraseState.color, mode: eraseState.colorMode, picked: eraseState.eyedropperPicked });
     render();
     return;
   }
@@ -3449,7 +3497,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-27-02'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-05-27-03'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
