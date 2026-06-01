@@ -562,6 +562,8 @@ canvas {
         <label>線の太さ: <span id="strokeWidthLabel">4</span>px</label>
         <input type="range" id="strokeWidth" min="1" max="20" value="4">
         <label class="inline" style="margin-top:8px;"><input type="checkbox" id="shapeFill"> 塗りつぶし</label>
+        <label style="margin-top:8px;" id="shapeFillColorLabel">塗りつぶしの色</label>
+        <input type="color" id="shapeFillColor" value="#ff0000" disabled style="opacity:0.4; cursor:not-allowed;">
         <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #e5e5e5;">
           <label style="margin-top:0; font-weight:600;">ツール</label>
           <div class="row-2" style="margin-top:4px;">
@@ -1258,7 +1260,7 @@ function getTextBounds(l) {
 
 function drawShape(l) {
   ctx.save();
-  ctx.strokeStyle = l.color; ctx.fillStyle = l.color; ctx.lineWidth = l.strokeWidth;
+  ctx.strokeStyle = l.color; ctx.fillStyle = l.fill ? (l.fillColor || l.color) : l.color; ctx.lineWidth = l.strokeWidth;
   const x = Math.min(l.x1, l.x2); const y = Math.min(l.y1, l.y2);
   const w = Math.abs(l.x2 - l.x1); const h = Math.abs(l.y2 - l.y1);
   if (l.shape === 'ellipse') {
@@ -1726,6 +1728,13 @@ document.getElementById('strokeWidth').addEventListener('input', e => {
   document.getElementById('strokeWidthLabel').textContent = e.target.value;
 });
 
+document.getElementById('shapeFill').addEventListener('change', e => {
+  const picker = document.getElementById('shapeFillColor');
+  picker.disabled = !e.target.checked;
+  picker.style.opacity = e.target.checked ? '1' : '0.4';
+  picker.style.cursor = e.target.checked ? 'pointer' : 'not-allowed';
+});
+
 // ============================================================
 // === TEXT MODAL ===
 // ============================================================
@@ -2091,7 +2100,8 @@ canvas.addEventListener('mousemove', e => {
       x1: editState.dragging.startX, y1: editState.dragging.startY, x2: pos.x, y2: pos.y,
       color: document.getElementById('shapeColor').value,
       strokeWidth: parseInt(document.getElementById('strokeWidth').value),
-      fill: document.getElementById('shapeFill').checked });
+      fill: document.getElementById('shapeFill').checked,
+      fillColor: document.getElementById('shapeFillColor').value });
   } else if (editState.dragging.type === 'move') {
     const dx = pos.x - editState.dragging.startX; const dy = pos.y - editState.dragging.startY;
     const layer = editState.layers.find(l => l.id === editState.dragging.layerId);
@@ -2144,7 +2154,8 @@ canvas.addEventListener('mouseup', e => {
         x1: editState.dragging.startX, y1: editState.dragging.startY, x2: pos.x, y2: pos.y,
         color: document.getElementById('shapeColor').value,
         strokeWidth: parseInt(document.getElementById('strokeWidth').value),
-        fill: document.getElementById('shapeFill').checked };
+        fill: document.getElementById('shapeFill').checked,
+        fillColor: document.getElementById('shapeFillColor').value };
       editState.layers.push(layer); editState.selectedLayerId = null;
       saveHistory(); updateLayerList(); updateCanvasInfo();
     }
@@ -3114,7 +3125,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-05-27-06'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-06-01-01'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
