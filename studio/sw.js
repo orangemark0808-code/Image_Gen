@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ohana-studio-v1';
+const CACHE_NAME = 'ohana-studio-2026-06-03-01';
 
 // キャッシュする統合UI本体のアセット
 const ASSETS = [

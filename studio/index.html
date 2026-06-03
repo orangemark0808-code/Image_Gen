@@ -183,6 +183,7 @@
 
   <div class="tab-bar" role="tablist">
     <button class="tab-btn" role="tab" data-tab="image_editor" aria-selected="false">画像editer</button>
+    <button class="tab-btn" role="tab" data-tab="pdf2img"      aria-selected="false">PDF→画像</button>
     <button class="tab-btn" role="tab" data-tab="p_builder"    aria-selected="false">プロンプト</button>
     <button class="tab-btn" role="tab" data-tab="renamer"      aria-selected="false">リネーマー</button>
   </div>
@@ -193,6 +194,12 @@
     id="iframe-image_editor"
     src="https://orangemark0808-code.github.io/Image_Gen/image_editor/"
     title="画像editer"
+    allow="clipboard-read; clipboard-write"
+  ></iframe>
+  <iframe
+    id="iframe-pdf2img"
+    src="https://orangemark0808-code.github.io/Image_Gen/pdf2img/"
+    title="PDF→画像"
     allow="clipboard-read; clipboard-write"
   ></iframe>
   <iframe
@@ -210,6 +217,7 @@
 </div>
 
 <script>
+  const APP_VERSION = '2026-06-03-01';
   const STORAGE_KEY = 'ohana-studio-active-tab';
   const DEFAULT_TAB = 'image_editor';
 

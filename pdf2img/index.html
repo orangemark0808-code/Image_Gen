@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDF to Image — OrangeMania Tools</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@600;700&family=Nunito:wght@400;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+  <style>
+    /* ── Citrus Fresh カラーシステム ── */
+    :root {
+      --bg:         #FFFBF6;
+      --surface:    #FFFFFF;
+      --text:       #21201F;
+      --text-sub:   #6A655F;
+      --border:     #ECE4DA;
+      --brand:      #FF6F1F;
+      --cta:        #E55A0E;
+      --cta-hover:  #C94C08;
+      --teal:       #0FA39A;
+      --teal-dark:  #0C8579;
+      --teal-light: rgba(15, 163, 154, 0.10);
+      --radius:     14px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Nunito', -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 40px 20px 100px;
+      line-height: 1.7;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    /* ── ヘッダー ── */
+    .header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 40px;
+      gap: 16px;
+    }
+
+    .header-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-sub);
+      margin-bottom: 6px;
+    }
+
+    .header-title {
+      font-family: 'Lora', serif;
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.2;
+    }
+
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      background: var(--brand);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    /* ── エラー表示 ── */
+    .error-box {
+      background: #FFF0EE;
+      border: 1px solid #FFCCC7;
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      color: #C0392B;
+      font-size: 14px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .error-box svg { flex-shrink: 0; }
+
+    /* ── ドロップゾーン ── */
+    .dropzone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      padding: 64px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      outline: none;
+      user-select: none;
+    }
+
+    .dropzone:hover,
+    .dropzone:focus,
+    .dropzone.drag-over {
+      border-color: var(--teal);
+      background: var(--teal-light);
+    }
+
+    .dropzone-icon {
+      color: var(--text-sub);
+      margin-bottom: 16px;
+    }
+
+    .dropzone-text {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .dropzone-sub {
+      font-size: 13px;
+      color: var(--text-sub);
+    }
+
+    /* ── ファイル情報バー ── */
+    .file-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 20px;
+      margin-bottom: 20px;
+    }
+
+    .file-info-icon { color: var(--text-sub); flex-shrink: 0; }
+
+    .file-info-name {
+      font-weight: 700;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 14px;
+    }
+
+    .file-info-pages {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--text-sub);
+      white-space: nowrap;
+      letter-spacing: 0.06em;
+    }
+
+    .change-btn {
+      color: var(--teal-dark);
+      font-size: 13px;
+      font-weight: 700;
+      font-family: 'Nunito', sans-serif;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0;
+      white-space: nowrap;
+      text-decoration: none;
+    }
+    .change-btn:hover { text-decoration: underline; }
+
+    /* ── 設定セクション ── */
+    .settings-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    .setting-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .setting-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-sub);
+      min-width: 96px;
+      flex-shrink: 0;
+    }
+
+    /* セグメントコントロール */
+    .segment {
+      display: inline-flex;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 3px;
+      gap: 2px;
+    }
+
+    .seg-btn {
+      padding: 6px 18px;
+      border: none;
+      border-radius: 6px;
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      background: transparent;
+      color: var(--text-sub);
+      transition: background 0.15s, color 0.15s;
+      line-height: 1;
+    }
+
+    .seg-btn.on {
+      background: var(--teal);
+      color: #fff;
+    }
+
+    .seg-btn:not(.on):hover {
+      background: var(--teal-light);
+      color: var(--teal-dark);
+    }
+
+    .resolution-hint {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--text-sub);
+      letter-spacing: 0.04em;
+      margin-top: 8px;
+      margin-left: 110px;
+    }
+
+    /* ── PAGES セクション ── */
+    .pages-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .pages-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .pages-section-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-sub);
+    }
+
+    .pages-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .pages-count {
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      color: var(--teal);
+      font-weight: 500;
+      letter-spacing: 0.04em;
+    }
+
+    .action-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-family: 'Nunito', sans-serif;
+      font-weight: 700;
+      color: var(--text-sub);
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .action-btn:hover {
+      border-color: var(--teal);
+      color: var(--teal-dark);
+    }
+
+    /* サムネイルグリッド */
+    .thumb-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: 10px;
+    }
+
+    .thumb-item {
+      position: relative;
+      cursor: pointer;
+      border-radius: 8px;
+      border: 2px solid var(--border);
+      overflow: hidden;
+      background: var(--bg);
+      transition: border-color 0.15s, opacity 0.15s;
+      user-select: none;
+    }
+
+    .thumb-item canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .thumb-item.on {
+      border-color: var(--teal);
+      opacity: 1;
+    }
+
+    .thumb-item:not(.on) {
+      opacity: 0.42;
+    }
+
+    .thumb-item:hover {
+      opacity: 1;
+      border-color: var(--teal);
+    }
+
+    /* チェックバッジ */
+    .thumb-badge {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      width: 20px;
+      height: 20px;
+      background: var(--teal);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.15s;
+      pointer-events: none;
+    }
+
+    .thumb-item.on .thumb-badge { opacity: 1; }
+
+    .thumb-page-num {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--text-sub);
+      background: rgba(255,251,246,0.85);
+      padding: 2px 0 3px;
+      pointer-events: none;
+    }
+
+    /* ── CTAボタン ── */
+    .cta-btn {
+      width: 100%;
+      padding: 17px 24px;
+      background: var(--cta);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      font-family: 'Nunito', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.18s, opacity 0.18s;
+      line-height: 1.4;
+      letter-spacing: 0.01em;
+    }
+
+    .cta-btn:hover:not(:disabled) { background: var(--cta-hover); }
+
+    .cta-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    /* プログレス表示 */
+    .progress-bar-wrap {
+      margin-top: 14px;
+      background: var(--border);
+      border-radius: 100px;
+      height: 4px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: var(--teal);
+      border-radius: 100px;
+      transition: width 0.2s;
+      width: 0%;
+    }
+
+    .progress-text {
+      text-align: center;
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      color: var(--text-sub);
+      margin-top: 10px;
+      letter-spacing: 0.04em;
+    }
+
+    /* 完了メッセージ */
+    .done-text {
+      text-align: center;
+      font-size: 14px;
+      color: var(--teal-dark);
+      font-weight: 700;
+      margin-top: 10px;
+    }
+
+    /* ユーティリティ */
+    .hidden { display: none !important; }
+
+    #file-input { display: none; }
+
+    /* レスポンシブ */
+    @media (max-width: 540px) {
+      body { padding: 24px 14px 80px; }
+      .header-title { font-size: 22px; }
+      .resolution-hint { margin-left: 0; margin-top: 10px; }
+      .thumb-grid { grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <div>
+      <div class="header-label">OrangeMania Tools</div>
+      <h1 class="header-title">PDF to Image</h1>
+    </div>
+    <div class="brand-mark" aria-hidden="true">
+      <!-- PDF→画像 をイメージした Lucide-style アイコン -->
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+           stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <circle cx="8.5" cy="8.5" r="1.5"/>
+        <polyline points="21 15 16 10 5 21"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- エラーボックス -->
+  <div id="error-box" class="error-box hidden">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <line x1="12" y1="8" x2="12" y2="12"/>
+      <line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+    <span id="error-msg"></span>
+  </div>
+
+  <!-- ドロップゾーン -->
+  <div id="dropzone" class="dropzone" tabindex="0" role="button"
+       aria-label="PDFファイルをドロップまたはクリックして選択">
+    <div class="dropzone-icon">
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="12" y1="18" x2="12" y2="12"/>
+        <polyline points="9 15 12 12 15 15"/>
+      </svg>
+    </div>
+    <div class="dropzone-text">PDFをここにドロップ</div>
+    <div class="dropzone-sub">またはクリックしてファイルを選択</div>
+  </div>
+
+  <input type="file" id="file-input" accept=".pdf,application/pdf" />
+
+  <!-- ファイル情報バー -->
+  <div id="file-info" class="file-info hidden">
+    <svg class="file-info-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+      <polyline points="14 2 14 8 20 8"/>
+    </svg>
+    <span id="file-name" class="file-info-name"></span>
+    <span id="file-pages" class="file-info-pages"></span>
+    <button id="change-btn" class="change-btn">変更</button>
+  </div>
+
+  <!-- 設定カード -->
+  <div id="settings-card" class="settings-card hidden">
+    <!-- FORMAT -->
+    <div class="setting-row">
+      <div class="setting-label">FORMAT</div>
+      <div class="segment" id="format-seg">
+        <button class="seg-btn on" data-val="png">PNG</button>
+        <button class="seg-btn"    data-val="jpeg">JPEG</button>
+      </div>
+    </div>
+
+    <!-- RESOLUTION -->
+    <div>
+      <div class="setting-row">
+        <div class="setting-label">RESOLUTION</div>
+        <div class="segment" id="dpi-seg">
+          <button class="seg-btn"    data-val="72">72</button>
+          <button class="seg-btn on" data-val="150">150</button>
+          <button class="seg-btn"    data-val="300">300</button>
+        </div>
+        <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-sub);letter-spacing:0.1em">DPI</span>
+      </div>
+      <div class="resolution-hint" id="resolution-hint"></div>
+    </div>
+  </div>
+
+  <!-- PAGESセクション -->
+  <div id="pages-section" class="pages-card hidden">
+    <div class="pages-header">
+      <div class="pages-section-label">PAGES</div>
+      <div class="pages-controls">
+        <span id="pages-count" class="pages-count"></span>
+        <button id="select-all-btn"   class="action-btn">全選択</button>
+        <button id="deselect-all-btn" class="action-btn">全解除</button>
+      </div>
+    </div>
+    <div id="thumb-grid" class="thumb-grid"></div>
+  </div>
+
+  <!-- CTAボタン & プログレス -->
+  <button id="convert-btn" class="cta-btn hidden" disabled></button>
+  <div id="progress-wrap" class="hidden">
+    <div class="progress-bar-wrap">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+    <div class="progress-text" id="progress-text"></div>
+  </div>
+  <div id="done-text" class="done-text hidden"></div>
+
+</div><!-- /container -->
+
+<script>
+/* ── APP_VERSION ── */
+const APP_VERSION = '2026-06-03-01';
+
+/* ── PDF.js worker 設定 ── */
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+/* ── 状態 ── */
+let pdfDoc      = null;
+let totalPages  = 0;
+let selectedPages = new Set();
+let currentFile   = null;
+let currentFormat = 'png';
+let currentDpi    = 150;
+
+const THUMB_SCALE = 0.28;
+
+/* ── DPI → scale 換算 ── */
+function dpiToScale(dpi) { return dpi / 72; }
+
+/* ── 解像度ヒント更新 ── */
+function updateResolutionHint() {
+  const s = dpiToScale(currentDpi);
+  const w = Math.round(595 * s);
+  const h = Math.round(842 * s);
+  document.getElementById('resolution-hint').textContent =
+    `推定 ${w.toLocaleString()} × ${h.toLocaleString()} px（A4縦ベース）`;
+}
+
+/* ── CTAボタンテキスト更新 ── */
+function updateCTABtn() {
+  const btn = document.getElementById('convert-btn');
+  const n   = selectedPages.size;
+  if (n === 0) {
+    btn.textContent = 'ページを選択してください';
+    btn.disabled = true;
+  } else if (n === 1) {
+    btn.textContent = `選択した 1 ページを変換 → 画像をダウンロード（${currentFormat.toUpperCase()}）`;
+    btn.disabled = false;
+  } else {
+    btn.textContent = `選択した ${n} ページを変換 → ZIP ダウンロード`;
+    btn.disabled = false;
+  }
+}
+
+/* ── ページ数カウンター更新 ── */
+function updatePagesCount() {
+  document.getElementById('pages-count').textContent =
+    `${selectedPages.size} / ${totalPages} 選択中`;
+  updateCTABtn();
+}
+
+/* ── エラー表示 ── */
+function showError(msg) {
+  const box = document.getElementById('error-box');
+  if (msg) {
+    document.getElementById('error-msg').textContent = msg;
+    box.classList.remove('hidden');
+  } else {
+    box.classList.add('hidden');
+  }
+}
+
+/* ── ドロップゾーン ── */
+const dropzone  = document.getElementById('dropzone');
+const fileInput = document.getElementById('file-input');
+
+dropzone.addEventListener('click',   () => fileInput.click());
+dropzone.addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+});
+dropzone.addEventListener('dragover',  e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+dropzone.addEventListener('dragleave', ()  => dropzone.classList.remove('drag-over'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) loadFile(f);
+});
+
+fileInput.addEventListener('change', e => {
+  if (e.target.files[0]) loadFile(e.target.files[0]);
+});
+
+document.getElementById('change-btn').addEventListener('click', () => {
+  fileInput.value = '';
+  fileInput.click();
+});
+
+/* ── フォーマット切替 ── */
+document.getElementById('format-seg').addEventListener('click', e => {
+  const btn = e.target.closest('.seg-btn');
+  if (!btn) return;
+  document.querySelectorAll('#format-seg .seg-btn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  currentFormat = btn.dataset.val;
+  updateCTABtn();
+});
+
+/* ── DPI切替 ── */
+document.getElementById('dpi-seg').addEventListener('click', e => {
+  const btn = e.target.closest('.seg-btn');
+  if (!btn) return;
+  document.querySelectorAll('#dpi-seg .seg-btn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  currentDpi = parseInt(btn.dataset.val, 10);
+  updateResolutionHint();
+});
+
+/* ── 全選択 / 全解除 ── */
+document.getElementById('select-all-btn').addEventListener('click', () => {
+  for (let i = 1; i <= totalPages; i++) selectedPages.add(i);
+  document.querySelectorAll('.thumb-item').forEach(el => el.classList.add('on'));
+  updatePagesCount();
+});
+
+document.getElementById('deselect-all-btn').addEventListener('click', () => {
+  selectedPages.clear();
+  document.querySelectorAll('.thumb-item').forEach(el => el.classList.remove('on'));
+  updatePagesCount();
+});
+
+/* ── PDF 読み込み ── */
+async function loadFile(file) {
+  showError('');
+  hideDone();
+
+  if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+    showError('PDFファイル（.pdf）のみ対応しています。');
+    return;
+  }
+
+  currentFile = file;
+
+  let arrayBuffer;
+  try {
+    arrayBuffer = await file.arrayBuffer();
+  } catch {
+    showError('ファイルの読み込みに失敗しました。');
+    return;
+  }
+
+  try {
+    pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+  } catch (err) {
+    if (err && err.name === 'PasswordException') {
+      showError('パスワード付きPDFは対応していません。パスワードを解除してから変換してください。');
+    } else {
+      showError(`PDFの読み込みに失敗しました。ファイルが破損している可能性があります（${err.message ?? err}）`);
+    }
+    pdfDoc = null;
+    return;
+  }
+
+  totalPages = pdfDoc.numPages;
+
+  /* ファイル情報を更新 */
+  document.getElementById('file-name').textContent  = file.name;
+  document.getElementById('file-pages').textContent = `${totalPages} PAGES`;
+
+  /* UIを表示 */
+  dropzone.classList.add('hidden');
+  document.getElementById('file-info').classList.remove('hidden');
+  document.getElementById('settings-card').classList.remove('hidden');
+  document.getElementById('pages-section').classList.remove('hidden');
+  document.getElementById('convert-btn').classList.remove('hidden');
+
+  /* 全ページ選択済みで初期化 */
+  selectedPages = new Set();
+  for (let i = 1; i <= totalPages; i++) selectedPages.add(i);
+
+  updateResolutionHint();
+  updatePagesCount();
+
+  await renderThumbnails();
+}
+
+/* ── サムネイル描画 ── */
+async function renderThumbnails() {
+  const grid = document.getElementById('thumb-grid');
+  grid.innerHTML = '';
+
+  for (let p = 1; p <= totalPages; p++) {
+    const page     = await pdfDoc.getPage(p);
+    const viewport = page.getViewport({ scale: THUMB_SCALE });
+
+    const canvas   = document.createElement('canvas');
+    canvas.width   = viewport.width;
+    canvas.height  = viewport.height;
+
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    const item = document.createElement('div');
+    item.className  = 'thumb-item on';
+    item.dataset.page = p;
+
+    item.appendChild(canvas);
+
+    /* チェックバッジ */
+    const badge = document.createElement('div');
+    badge.className = 'thumb-badge';
+    badge.innerHTML =
+      `<svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+            stroke="white" stroke-width="3.2"
+            stroke-linecap="round" stroke-linejoin="round">
+         <polyline points="20 6 9 17 4 12"/>
+       </svg>`;
+    item.appendChild(badge);
+
+    /* ページ番号 */
+    const num = document.createElement('div');
+    num.className   = 'thumb-page-num';
+    num.textContent = p;
+    item.appendChild(num);
+
+    /* クリックで選択トグル */
+    item.addEventListener('click', () => {
+      const pg = parseInt(item.dataset.page, 10);
+      if (selectedPages.has(pg)) {
+        selectedPages.delete(pg);
+        item.classList.remove('on');
+      } else {
+        selectedPages.add(pg);
+        item.classList.add('on');
+      }
+      updatePagesCount();
+    });
+
+    grid.appendChild(item);
+  }
+}
+
+/* ── 変換処理 ── */
+document.getElementById('convert-btn').addEventListener('click', async () => {
+  const n = selectedPages.size;
+
+  /* 重い処理への警告 */
+  if (currentDpi >= 300 && n > 20) {
+    if (!confirm(`高解像度（300dpi）× ${n}ページの変換は時間がかかり、端末によっては動作が重くなることがあります。続けますか？`)) return;
+  } else if (currentDpi >= 150 && n > 50) {
+    if (!confirm(`${n}ページの変換には時間がかかることがあります。続けますか？`)) return;
+  } else if (currentDpi >= 300 && n > 10) {
+    if (!confirm(`高解像度（300dpi）× ${n}ページの変換は時間がかかることがあります。続けますか？`)) return;
+  }
+
+  await convertPages();
+});
+
+async function convertPages() {
+  const btn          = document.getElementById('convert-btn');
+  const progressWrap = document.getElementById('progress-wrap');
+  const progressBar  = document.getElementById('progress-bar');
+  const progressText = document.getElementById('progress-text');
+
+  btn.disabled = true;
+  progressWrap.classList.remove('hidden');
+  hideDone();
+
+  const sorted      = [...selectedPages].sort((a, b) => a - b);
+  const total       = sorted.length;
+  const scale       = dpiToScale(currentDpi);
+  const mimeType    = currentFormat === 'jpeg' ? 'image/jpeg' : 'image/png';
+  const ext         = currentFormat === 'jpeg' ? 'jpg' : 'png';
+  const baseName    = currentFile.name.replace(/\.pdf$/i, '');
+  const padLen      = Math.max(2, String(totalPages).length);
+
+  const images = [];
+
+  for (let i = 0; i < sorted.length; i++) {
+    const pageNum = sorted[i];
+    progressText.textContent = `変換中... ${i + 1} / ${total}`;
+    progressBar.style.width  = `${Math.round(((i + 1) / (total + 1)) * 100)}%`;
+
+    const page     = await pdfDoc.getPage(pageNum);
+    const viewport = page.getViewport({ scale });
+
+    const canvas = document.createElement('canvas');
+    canvas.width  = viewport.width;
+    canvas.height = viewport.height;
+
+    const ctx = canvas.getContext('2d');
+    if (currentFormat === 'jpeg') {
+      /* JPEG: 透明部分を白で塗りつぶし */
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    const quality = currentFormat === 'jpeg' ? 0.92 : undefined;
+    const dataUrl = canvas.toDataURL(mimeType, quality);
+    const base64  = dataUrl.split(',')[1];
+
+    const paddedNum = String(pageNum).padStart(padLen, '0');
+    const fileName  = `${baseName}_p${paddedNum}.${ext}`;
+
+    images.push({ fileName, base64, dataUrl });
+  }
+
+  progressText.textContent = '出力を準備中...';
+  progressBar.style.width  = '95%';
+
+  if (images.length === 1) {
+    /* 単体ダウンロード */
+    const a = document.createElement('a');
+    a.href     = images[0].dataUrl;
+    a.download = images[0].fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } else {
+    /* ZIP ダウンロード */
+    const zip = new JSZip();
+    images.forEach(img => zip.file(img.fileName, img.base64, { base64: true }));
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `${baseName}_images.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  progressBar.style.width = '100%';
+
+  setTimeout(() => {
+    progressWrap.classList.add('hidden');
+    progressBar.style.width = '0%';
+    showDone(`完了！ ${total}ページを変換しました。`);
+    btn.disabled = false;
+    updateCTABtn();
+  }, 600);
+}
+
+function showDone(msg) {
+  const el = document.getElementById('done-text');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+
+function hideDone() {
+  document.getElementById('done-text').classList.add('hidden');
+}
+
+/* ── Service Worker 登録 ── */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+  });
+}
+
+/* 初期ヒント表示 */
+updateResolutionHint();
+</script>
+</body>
+</html>
