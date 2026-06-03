@@ -1019,6 +1019,7 @@ const editState = {
   textDirection: 'horizontal',
   cropRect: null,
   dragging: null,
+  moveSnap: null,
   history: [],
   historyIdx: -1,
   aspectRatio: 1,
@@ -1144,6 +1145,10 @@ function render() {
     else if (layer.type === 'image') drawImageLayer(layer);
   }
   if (editState.currentTool === 'crop' && editState.cropRect) drawCropOverlay();
+  if (editState.dragging && editState.dragging.type === 'move') {
+    const ml = editState.layers.find(l => l.id === editState.dragging.layerId);
+    if (ml && ml.type === 'image') drawMoveGuides();
+  }
 }
 
 // tCtx を省略するとメインcanvasのctxを使用（プレビュー描画でも流用可能）
@@ -1344,6 +1349,28 @@ function drawArrow(x1, y1, x2, y2, sw) {
   ctx.lineTo(x2 - headLen * Math.cos(angle - Math.PI/6), y2 - headLen * Math.sin(angle - Math.PI/6));
   ctx.lineTo(x2 - headLen * Math.cos(angle + Math.PI/6), y2 - headLen * Math.sin(angle + Math.PI/6));
   ctx.closePath(); ctx.fill();
+}
+
+function drawMoveGuides() {
+  const ccx = canvas.width / 2, ccy = canvas.height / 2;
+  const z = editState.zoom || 1;
+  const s = editState.moveSnap || { v: false, h: false };
+  ctx.save();
+  // 縦中央線
+  ctx.beginPath();
+  ctx.moveTo(ccx, 0); ctx.lineTo(ccx, canvas.height);
+  ctx.strokeStyle = s.v ? '#FF7F00' : 'rgba(255,127,0,0.35)';
+  ctx.lineWidth = (s.v ? 1.5 : 1) / z;
+  ctx.setLineDash(s.v ? [] : [6 / z, 4 / z]);
+  ctx.stroke();
+  // 横中央線
+  ctx.beginPath();
+  ctx.moveTo(0, ccy); ctx.lineTo(canvas.width, ccy);
+  ctx.strokeStyle = s.h ? '#FF7F00' : 'rgba(255,127,0,0.35)';
+  ctx.lineWidth = (s.h ? 1.5 : 1) / z;
+  ctx.setLineDash(s.h ? [] : [6 / z, 4 / z]);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawCropOverlay() {
@@ -2116,6 +2143,19 @@ canvas.addEventListener('mousemove', e => {
     if (!layer) return;
     if (layer.type === 'text' || layer.type === 'image') { layer.x = editState.dragging.orig.x + dx; layer.y = editState.dragging.orig.y + dy; }
     else { layer.x1 = editState.dragging.orig.x1 + dx; layer.y1 = editState.dragging.orig.y1 + dy; layer.x2 = editState.dragging.orig.x2 + dx; layer.y2 = editState.dragging.orig.y2 + dy; }
+    // ▼ 画像レイヤーのみ：中心をキャンバス中央にスナップ吸着
+    if (layer.type === 'image') {
+      const SNAP = 8 / (editState.zoom || 1); // 画面上 約8px 相当（canvas座標に換算）
+      const ccx = canvas.width / 2, ccy = canvas.height / 2;
+      const cx = layer.x + layer.w / 2, cy = layer.y + layer.h / 2;
+      const snapV = Math.abs(cx - ccx) <= SNAP;
+      const snapH = Math.abs(cy - ccy) <= SNAP;
+      if (snapV) layer.x = ccx - layer.w / 2;
+      if (snapH) layer.y = ccy - layer.h / 2;
+      editState.moveSnap = { v: snapV, h: snapH };
+    } else {
+      editState.moveSnap = null;
+    }
     render();
   } else if (editState.dragging.type === 'img-resize') {
     const d = editState.dragging;
@@ -2171,6 +2211,8 @@ canvas.addEventListener('mouseup', e => {
   } else if (editState.dragging.type === 'move') { saveHistory(); }
   else if (editState.dragging.type === 'img-resize' || editState.dragging.type === 'img-rotate') { saveHistory(); render(); }
   editState.dragging = null;
+  editState.moveSnap = null;
+  render();
 });
 
 let tpPanRaf = null; // rAF ID for tp pan batching
@@ -2201,6 +2243,8 @@ document.addEventListener('mouseup', () => {
       saveHistory(); render();
     }
     editState.dragging = null;
+    editState.moveSnap = null;
+    render();
   }
   if (tpState.tpPanning) {
     tpState.tpPanning = null; tpBeforeWrap.classList.remove('panning');
@@ -3133,7 +3177,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-06-03-01'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-06-03-02'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
