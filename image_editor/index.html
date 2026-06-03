@@ -1563,6 +1563,14 @@ function resizeCanvas(newW, newH) {
     else if (l.type === 'image') { l.x *= scaleX; l.y *= scaleY; l.w *= scaleX; l.h *= scaleY; }
     else { l.x1 *= scaleX; l.x2 *= scaleX; l.y1 *= scaleY; l.y2 *= scaleY; }
   }
+  // TRIM選択範囲もレイヤーと同様に拡縮し、リサイズ後の枠ズレを防ぐ
+  if (editState.cropRect) {
+    editState.cropRect.x *= scaleX;
+    editState.cropRect.y *= scaleY;
+    editState.cropRect.w *= scaleX;
+    editState.cropRect.h *= scaleY;
+    updateCropStatus();
+  }
   document.getElementById('resizeWidth').value = newW;
   document.getElementById('resizeHeight').value = newH;
 }
@@ -3125,7 +3133,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-06-01-03'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-06-03-01'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
