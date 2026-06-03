@@ -1359,14 +1359,14 @@ function drawMoveGuides() {
   // 縦中央線
   ctx.beginPath();
   ctx.moveTo(ccx, 0); ctx.lineTo(ccx, canvas.height);
-  ctx.strokeStyle = s.v ? '#FF7F00' : 'rgba(255,127,0,0.35)';
+  ctx.strokeStyle = s.v ? '#FF00FF' : 'rgba(255,0,255,0.35)';
   ctx.lineWidth = (s.v ? 1.5 : 1) / z;
   ctx.setLineDash(s.v ? [] : [6 / z, 4 / z]);
   ctx.stroke();
   // 横中央線
   ctx.beginPath();
   ctx.moveTo(0, ccy); ctx.lineTo(canvas.width, ccy);
-  ctx.strokeStyle = s.h ? '#FF7F00' : 'rgba(255,127,0,0.35)';
+  ctx.strokeStyle = s.h ? '#FF00FF' : 'rgba(255,0,255,0.35)';
   ctx.lineWidth = (s.h ? 1.5 : 1) / z;
   ctx.setLineDash(s.h ? [] : [6 / z, 4 / z]);
   ctx.stroke();
@@ -3177,7 +3177,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-06-03-02'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-06-03-03'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
