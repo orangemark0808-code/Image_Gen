@@ -1548,6 +1548,7 @@ function executeCrop() {
   const cw = Math.round(r.w); const ch = Math.round(r.h);
   const tmp = document.createElement('canvas');
   tmp.width = cw; tmp.height = ch;
+  editState.cropRect = null; render();
   tmp.getContext('2d').drawImage(canvas, r.x, r.y, r.w, r.h, 0, 0, cw, ch);
   canvas.width = cw; canvas.height = ch; ctx.drawImage(tmp, 0, 0);
   editState.baseImage = ctx.getImageData(0, 0, cw, ch);
@@ -1720,6 +1721,7 @@ document.getElementById('saveClipboardBtn').addEventListener('click', () => {
   if (!editState.baseImage) { toast('保存できる内容がありません'); return; }
   const r = editState.cropRect;
   const hasCrop = r && r.w > 5 && r.h > 5;
+  editState.cropRect = null; render();
   const tmp = document.createElement('canvas');
   if (hasCrop) {
     tmp.width = Math.round(r.w); tmp.height = Math.round(r.h);
@@ -1728,6 +1730,7 @@ document.getElementById('saveClipboardBtn').addEventListener('click', () => {
     tmp.width = canvas.width; tmp.height = canvas.height;
     tmp.getContext('2d').drawImage(canvas, 0, 0);
   }
+  editState.cropRect = r; render();
   addToClipboard(tmp.toDataURL('image/png'));
 });
 
@@ -3177,7 +3180,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-06-03-03'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-06-04-01'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
