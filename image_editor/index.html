@@ -477,6 +477,9 @@ canvas {
         </div>
         <div class="help-box" style="margin-top:7px;">「トリミング」ツール(C)でキャンバス上をドラッグ</div>
         <div id="cropStatus" class="status-pill">範囲未選択</div>
+        <button id="applyCropOnly" class="primary" style="width:100%; margin-top:14px; height:48px; background:#FF7F00; border-color:#FF7F00; border-radius:14px; box-shadow:none; font-size:15px; font-weight:600;" disabled>
+          トリミング実行<span class="shortcut">Enter</span>
+        </button>
       </div>
 
       <!-- 2. リサイズ -->
@@ -524,12 +527,6 @@ canvas {
       <!-- 3. 実行 -->
       <div class="section" id="sec-apply">
         <div class="section-title">APPLY</div>
-        <button id="applyCropOnly" class="primary" style="width:100%; margin-bottom:6px; background:#059669; border-color:#059669;" disabled>
-          トリミングのみ実行<span class="shortcut">Enter</span>
-        </button>
-        <button id="applyResizeOnly" class="primary" style="width:100%; margin-bottom:6px;">
-          リサイズのみ実行
-        </button>
         <button id="applyBoth" class="primary" style="width:100%; background:#c2410c; border-color:#c2410c;" disabled>
           トリミング+リサイズを実行
         </button>
@@ -1753,10 +1750,6 @@ document.getElementById('clearClipboardBtn').addEventListener('click', () => {
 
 // ページロード時に復元
 renderClipboardThumbs();
-document.getElementById('applyResizeOnly').addEventListener('click', () => {
-  if (!editState.baseImage) { toast('先に画像を読み込んでください'); return; }
-  if (executeResize()) { applyZoom(); saveHistory(); render(); updateCanvasInfo(); toast(`リサイズ完了: ${editState.baseWidth}×${editState.baseHeight}px`); }
-});
 document.getElementById('applyBoth').addEventListener('click', () => {
   if (!editState.baseImage) { toast('先に画像を読み込んでください'); return; }
   if (executeCrop() && executeResize()) { applyZoom(); saveHistory(); render(); updateCanvasInfo(); updateLayerList(); toast(`完了: ${editState.baseWidth}×${editState.baseHeight}px`); }
@@ -3180,7 +3173,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-06-04-01'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-06-04-02'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
