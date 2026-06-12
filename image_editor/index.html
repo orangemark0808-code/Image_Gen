@@ -14,7 +14,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Yomogi&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Yomogi&family=M+PLUS+Rounded+1c:wght@500;700;900&family=Dela+Gothic+One&family=Mochiy+Pop+One&display=swap" rel="stylesheet">
 <style>
 /* ===== Reset & Base ===== */
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -210,8 +210,48 @@ button.primary .shortcut { background: rgba(255,255,255,0.3); color: white; }
 .deco-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
 .deco-box { border: 1px solid #e5e7eb; border-radius: 4px; padding: 6px; background: #fafbfc; }
 .deco-box label.inline { font-size: 11px; font-weight: 600; }
-.deco-box input[type="color"] { height: 24px; margin-top: 4px; }
 .deco-box input[type="number"] { margin-top: 4px; font-size: 11px; padding: 3px 5px; }
+
+/* ===== Color Picker (palette + hex) ===== */
+.color-picker { margin-top: 4px; }
+.color-swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.color-swatch {
+  width: 32px; height: 32px; padding: 0; flex-shrink: 0;
+  border: 1px solid #DFE4EA; border-radius: 8px;
+  cursor: pointer; box-shadow: none; transition: border-color 0.15s;
+}
+.color-swatch:hover { border-color: #FF7F00; background: inherit; }
+.color-swatch.active { border: 2px solid #FF7F00; }
+.color-hex-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.color-preview {
+  width: 28px; height: 28px; flex-shrink: 0;
+  border: 1px solid #DFE4EA; border-radius: 8px; box-shadow: none;
+}
+.color-hex-input {
+  flex: 1; min-width: 0; padding: 5px 6px;
+  border: 1px solid #cbd5e1; border-radius: 8px;
+  font-size: 12px; font-family: 'DM Mono', 'Courier New', monospace;
+  text-transform: uppercase; background: white; color: #3a2a1a;
+}
+.color-hex-input:focus { outline: none; border-color: #FF7F00; box-shadow: 0 0 0 2px rgba(255,127,0,0.15); }
+
+/* ===== TEXT 新規追加/編集モーダル: 縦スクロール対応 ===== */
+.text-modal-dialog {
+  max-height: 92vh;
+  max-height: 92dvh; /* モバイルのアドレスバー等を考慮した動的ビューポート高さ */
+}
+/* プレビューが大きくなって行(row)全体が body の高さを超えた場合に備え、
+   bodyレベルでも縦スクロールできるようにする（通常時は見た目に変化なし） */
+.text-modal-body { overflow-y: auto; overflow-x: hidden; }
+@media (max-width: 700px) {
+  /* 画面が狭い場合は左右2カラムを縦積みにし、モーダル全体を1つのスクロール領域にする */
+  .text-modal-body { flex-direction: column; overflow-y: auto; }
+  .text-modal-body > div {
+    flex: 0 0 auto !important;
+    min-width: 0 !important;
+    overflow: visible !important;
+  }
+}
 .layer-list {
   max-height: 180px; overflow-y: auto;
   border: 1px solid #e5e7eb; border-radius: 4px; padding: 4px;
@@ -810,14 +850,14 @@ canvas {
 
 <!-- ===== Text Edit Modal ===== -->
 <div id="textModal" style="display:none; position:fixed; inset:0; z-index:150; background:rgba(0,0,0,0.45); align-items:center; justify-content:center; padding:10px;">
-  <div style="width:800px; max-width:98vw; max-height:92vh; display:flex; flex-direction:column; background:#fff; border-radius:10px; overflow:hidden; box-shadow:0 8px 40px rgba(0,0,0,0.18);">
+  <div class="text-modal-dialog" style="width:800px; max-width:98vw; display:flex; flex-direction:column; background:#fff; border-radius:10px; overflow:hidden; box-shadow:0 8px 40px rgba(0,0,0,0.18);">
     <!-- ヘッダー -->
     <div style="padding:12px 16px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #e5e7eb; flex-shrink:0;">
       <span id="textModalTitle" style="font-size:11px; font-weight:700; font-family:'DM Mono','Courier New',monospace; text-transform:uppercase; letter-spacing:0.5px; color:#000000;">TEXT — 新規追加</span>
       <button id="textModalCloseBtn" style="font-size:12px; padding:3px 9px;">✕</button>
     </div>
     <!-- 2カラムボディ -->
-    <div style="display:flex; flex-wrap:wrap; flex:1; overflow:hidden; min-height:0;">
+    <div class="text-modal-body" style="display:flex; flex-wrap:wrap; flex:1; min-height:0;">
       <!-- 左：設定パネル -->
       <div style="min-width:280px; flex:1; overflow-y:auto; padding:14px; border-right:1px solid #e5e7eb;">
         <label style="margin-top:0;">テキスト</label>
@@ -839,15 +879,18 @@ canvas {
         <label style="margin-top:10px; font-family:'DM Mono','Courier New',monospace; font-size:10px; font-weight:700; letter-spacing:0.5px; color:#000000; text-transform:uppercase;">LINE HEIGHT: <span id="textLineHeightLabel">1.4</span></label>
         <input type="range" id="textLineHeight" min="0.5" max="3.0" value="1.4" step="0.1" style="width:100%; accent-color:#ea580c;">
         <label style="margin-top:10px;">文字色</label>
-        <input type="color" id="textColor" value="#000000" style="width:100%; height:30px; border:1px solid #cbd5e1; border-radius:4px; cursor:pointer;">
+        <input type="color" id="textColor" value="#000000" style="display:none;">
+        <div id="textColorPicker" class="color-picker"></div>
         <div class="deco-grid" style="margin-top:10px;">
           <div class="deco-box">
             <label class="inline" style="margin-top:0;"><input type="checkbox" id="textBg"> 背景色</label>
-            <input type="color" id="textBgColor" value="#ffffff">
+            <input type="color" id="textBgColor" value="#ffffff" style="display:none;">
+            <div id="textBgColorPicker" class="color-picker"></div>
           </div>
           <div class="deco-box">
             <label class="inline" style="margin-top:0;"><input type="checkbox" id="textBorder"> 枠線</label>
-            <input type="color" id="textBorderColor" value="#000000">
+            <input type="color" id="textBorderColor" value="#000000" style="display:none;">
+            <div id="textBorderColorPicker" class="color-picker"></div>
             <input type="number" id="textBorderWidth" value="2" min="1" max="20" placeholder="太さpx">
           </div>
         </div>
@@ -914,9 +957,17 @@ async function downloadFile(dataURL, filename) {
 // === FONT DEFINITIONS ===
 // ============================================================
 const FONT_LIST = [
-  { value: 'system', label: 'システムデフォルト', css: '-apple-system, "Hiragino Sans", "Yu Gothic", sans-serif' },
-  { value: 'yomogi', label: 'Yomogi（手書き風）',  css: "'Yomogi', cursive" },
+  { value: 'mplus-rounded-semibold', label: '丸ゴシック中字', css: "'M PLUS Rounded 1c', sans-serif", weight: '700', googleFont: true, family: 'M PLUS Rounded 1c' },
+  { value: 'mplus-rounded-medium', label: '丸ゴシック中', css: "'M PLUS Rounded 1c', sans-serif", weight: '500', googleFont: true, family: 'M PLUS Rounded 1c' },
+  { value: 'mplus-rounded-bold', label: '丸ゴシック太字', css: "'M PLUS Rounded 1c', sans-serif", weight: '900', googleFont: true, family: 'M PLUS Rounded 1c' },
+  { value: 'system', label: 'システムデフォルト', css: '-apple-system, "Hiragino Sans", "Yu Gothic", sans-serif', weight: 'normal' },
+  { value: 'yomogi', label: 'Yomogi（手書き風）',  css: "'Yomogi', cursive", weight: 'normal' },
+  { value: 'dela-gothic', label: '極太ゴシック', css: "'Dela Gothic One', sans-serif", weight: 'normal', googleFont: true, family: 'Dela Gothic One' },
+  { value: 'mochiy-pop', label: '太丸ポップ', css: "'Mochiy Pop One', sans-serif", weight: 'normal', googleFont: true, family: 'Mochiy Pop One' },
 ];
+
+// 新規テキスト作成時の初期フォント（フォント選択は記憶しない）
+const DEFAULT_TEXT_FONT = 'mplus-rounded-semibold';
 
 // フォント選択プルダウンを動的生成
 (function buildFontSelect() {
@@ -932,8 +983,46 @@ const FONT_LIST = [
 
 function getFontCSS(value) {
   const f = FONT_LIST.find(f => f.value === value);
-  return f ? f.css : FONT_LIST[0].css;
+  return f ? f.css : FONT_LIST.find(f => f.value === 'system').css;
 }
+
+function getFontWeight(value) {
+  const f = FONT_LIST.find(f => f.value === value);
+  return f && f.weight ? f.weight : 'normal';
+}
+
+// ctx.font 用のフォント指定文字列（ウェイト込み）を組み立てる
+function getFontString(l) {
+  const value = l.font || 'system';
+  return `${getFontWeight(value)} ${l.size}px ${getFontCSS(value)}`;
+}
+
+// ============================================================
+// === Webフォントの明示ロード ===
+// Canvasは未ロードのフォントで描画するとフォールバック表示になるため、
+// 起動時・選択変更時にロードし、完了後に再描画する
+// ============================================================
+const loadedFontValues = new Set();
+function ensureFontLoaded(value, onReady) {
+  const f = FONT_LIST.find(f => f.value === value);
+  if (!f || !f.googleFont || loadedFontValues.has(value) || !document.fonts || !document.fonts.load) {
+    if (onReady) onReady();
+    return;
+  }
+  const fontStr = `${f.weight || 'normal'} 32px "${f.family}"`;
+  document.fonts.load(fontStr, 'あA1').then(() => {
+    loadedFontValues.add(value);
+    if (onReady) onReady();
+  }).catch(() => {
+    // オフライン等でロード失敗してもフォールバック描画のまま続行
+    if (onReady) onReady();
+  });
+}
+
+// 起動時に全Webフォントをプリロード → 完了後にキャンバスを再描画
+FONT_LIST.forEach(f => {
+  if (f.googleFont) ensureFontLoaded(f.value, () => render());
+});
 
 // ============================================================
 // === MODE SWITCHING ===
@@ -1155,7 +1244,7 @@ function render() {
 function drawText(l, tCtx) {
   if (!tCtx) tCtx = ctx;
   tCtx.save();
-  tCtx.font = `${l.size}px ${getFontCSS(l.font || 'system')}`;
+  tCtx.font = getFontString(l);
   tCtx.textBaseline = 'top';
   if ('letterSpacing' in tCtx) tCtx.letterSpacing = `${l.letterSpacing ?? 0}px`;
 
@@ -1241,7 +1330,7 @@ function fillVertChar(ctx, c, lx, ly, i, lineHeight, w, size) {
 
 function getTextBounds(l) {
   ctx.save();
-  ctx.font = `${l.size}px ${getFontCSS(l.font || 'system')}`;
+  ctx.font = getFontString(l);
   if ('letterSpacing' in ctx) ctx.letterSpacing = `${l.letterSpacing ?? 0}px`;
   let w, h;
   if (l.direction === 'vertical') {
@@ -1770,6 +1859,82 @@ document.getElementById('shapeFill').addEventListener('change', e => {
 });
 
 // ============================================================
+// === COLOR PICKER（基本色パレット + HEX入力） ===
+// 既存の <input type="color" id="..."> は隠し要素として値の保持に使い、
+// 見た目は隣接する .color-picker 内にパレット+HEX入力を生成して差し替える
+// ============================================================
+const COLOR_PALETTE = ['#FFFFFF', '#000000', '#FF0000', '#0066FF', '#00A000', '#FFD400', '#FF7F00', '#808080'];
+
+function setupColorPicker(inputId) {
+  const input = document.getElementById(inputId);
+  const wrapper = document.getElementById(inputId + 'Picker');
+  if (!input || !wrapper) return;
+
+  const swatchRow = document.createElement('div');
+  swatchRow.className = 'color-swatches';
+  const swatches = COLOR_PALETTE.map(color => {
+    const sw = document.createElement('button');
+    sw.type = 'button';
+    sw.className = 'color-swatch';
+    sw.style.background = color;
+    sw.title = color;
+    sw.addEventListener('click', () => {
+      input.value = color;
+      sync();
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    swatchRow.appendChild(sw);
+    return sw;
+  });
+
+  const hexRow = document.createElement('div');
+  hexRow.className = 'color-hex-row';
+  const preview = document.createElement('span');
+  preview.className = 'color-preview';
+  const hexInput = document.createElement('input');
+  hexInput.type = 'text';
+  hexInput.className = 'color-hex-input';
+  hexInput.maxLength = 7;
+  hexInput.spellcheck = false;
+  hexInput.addEventListener('input', () => {
+    let v = hexInput.value.trim();
+    if (v && !v.startsWith('#')) v = '#' + v;
+    if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+      input.value = v;
+      sync();
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  });
+  hexRow.appendChild(preview);
+  hexRow.appendChild(hexInput);
+
+  wrapper.appendChild(swatchRow);
+  wrapper.appendChild(hexRow);
+
+  // 隠しinputの現在値をパレット/HEX表示に反映
+  function sync() {
+    const cur = (input.value || '#000000').toLowerCase();
+    preview.style.background = cur;
+    hexInput.value = cur;
+    swatches.forEach((sw, i) => sw.classList.toggle('active', COLOR_PALETTE[i].toLowerCase() === cur));
+  }
+
+  // openTextModal 等で input.value を直接書き換えた後に呼ぶための同期関数
+  input._syncColorPicker = sync;
+  sync();
+}
+
+['textColor', 'textBgColor', 'textBorderColor'].forEach(setupColorPicker);
+
+// openTextModal 等で .value を直接セットした後に表示を同期する
+function refreshColorPickers() {
+  ['textColor', 'textBgColor', 'textBorderColor'].forEach(id => {
+    const input = document.getElementById(id);
+    if (input && input._syncColorPicker) input._syncColorPicker();
+  });
+}
+
+// ============================================================
 // === TEXT MODAL ===
 // ============================================================
 const textModal = document.getElementById('textModal');
@@ -1852,7 +2017,7 @@ function loadLastTextSettings() {
   try { return JSON.parse(localStorage.getItem(TEXT_SETTINGS_KEY)) || {}; } catch { return {}; }
 }
 function saveLastTextSettings(props) {
-  const { text, ...settings } = props; // テキスト内容は保存しない
+  const { text, font, ...settings } = props; // テキスト内容・フォントは保存しない（フォントは毎回デフォルトに戻す）
   try { localStorage.setItem(TEXT_SETTINGS_KEY, JSON.stringify(settings)); } catch {}
 }
 
@@ -1884,7 +2049,8 @@ function openTextModal(mode, layer) {
     b.classList.toggle('active', b.dataset.dir === dir);
   });
   editState.textDirection = dir;
-  document.getElementById('textFont').value     = mode === 'edit' ? (layer.font || 'system') : (saved.font || 'system');
+  // フォント選択は記憶しない: 新規追加時は常にデフォルト、編集時はそのレイヤーのフォント
+  document.getElementById('textFont').value     = mode === 'edit' ? (layer.font || 'system') : DEFAULT_TEXT_FONT;
   document.getElementById('textSizeSlider').value = size;
   document.getElementById('textSize').value       = size;
   document.getElementById('textSizeLabel').textContent = size;
@@ -1898,6 +2064,7 @@ function openTextModal(mode, layer) {
   document.getElementById('textBorder').checked   = mode === 'edit' ? !!layer.border : (saved.border ?? false);
   document.getElementById('textBorderColor').value = mode === 'edit' ? (layer.borderColor || '#000000') : (saved.borderColor || '#000000');
   document.getElementById('textBorderWidth').value = mode === 'edit' ? (layer.borderWidth || 2) : (saved.borderWidth || 2);
+  refreshColorPickers(); // パレット/HEX表示を隠しinputの値に同期
 
   textModal.style.display = 'flex';
   ti.focus();
@@ -1946,6 +2113,7 @@ function submitTextModal() {
   saveLastTextSettings(props); // 設定を localStorage に保存
   closeTextModal();
   saveHistory(); render(); updateLayerList(); updateCanvasInfo();
+  ensureFontLoaded(props.font, render); // 未ロードフォントなら読み込み後に再描画
 }
 
 // テキスト入力・各コントロール変更時にプレビュー更新 + ドラフト保存
@@ -2023,7 +2191,10 @@ document.addEventListener('paste', e => {
   reader.readAsDataURL(imageBlob);
 });
 
-document.getElementById('textFont').addEventListener('change', updateTextPreview);
+document.getElementById('textFont').addEventListener('change', e => {
+  updateTextPreview();
+  ensureFontLoaded(e.target.value, updateTextPreview);
+});
 document.getElementById('textColor').addEventListener('input', updateTextPreview);
 document.getElementById('textBg').addEventListener('change', updateTextPreview);
 document.getElementById('textBgColor').addEventListener('input', updateTextPreview);
@@ -3176,7 +3347,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-06-04-03'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-06-12-05'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
