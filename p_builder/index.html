@@ -639,6 +639,33 @@ async function saveTurnaroundPromptFile(fullCode,charName,jpText,enText){
  showToast(`${promptFileName}を自動作成しました。`);
  return {folderName,promptFileName};
 }
+async function saveTestPromptFile(testBaseName,jpText,enText){
+ if(!window.showDirectoryPicker){
+  showStatus('⚠️ 自動保存にはChrome / Edgeが必要です。生成結果は画面からコピーできます。');
+  return;
+ }
+ if(!promptSaveRootHandle){
+  showToast('保存先が未選択です。先に「保存先選択」を押してください。');
+  return;
+ }
+ const permitted=await ensurePromptSavePermission();
+ if(!permitted){
+  showToast('保存権限がありません。もう一度「保存先選択」を押してください。');
+  return;
+ }
+ let fileName=`${sanitizeFileName(testBaseName)}.txt`;
+ try{
+  await promptSaveRootHandle.getFileHandle(fileName);
+  fileName=`${sanitizeFileName(testBaseName)}_${timestampForFileName()}.txt`;
+ }catch(e){}
+ const fileHandle=await promptSaveRootHandle.getFileHandle(fileName,{create:true});
+ const writable=await fileHandle.createWritable();
+ await writable.write(`${jpText}\n\n---\n\n${enText}`);
+ await writable.close();
+ showStatus(`✅ ${fileName} をテスト保存しました。`);
+ showToast(`${fileName}をテスト保存しました。`);
+ return {fileName};
+}
 async function appendFolderNameToExcel(folderName,promptFileName='prompt.txt'){
  if(!window.showDirectoryPicker){
   showStatus('⚠️ Excel追記にはChrome / Edgeが必要です。');
@@ -862,6 +889,13 @@ artifact-free,
   }).catch(e=>{
    console.error(e);
    showStatus('⚠️ prompt.txtの自動作成に失敗しました。保存先の権限を確認してください。');
+  });
+ }else if(isTest){
+  // テスト生成：採番・Excel追記は行わず、保存先ルート直下にテスト用ファイルのみ保存する
+  const testBaseName=`テスト_${getSerialNumber()}_${productCode()}`;
+  saveTestPromptFile(testBaseName,jpText,enText).catch(e=>{
+   console.error(e);
+   showStatus('⚠️ テスト保存に失敗しました。保存先の権限を確認してください。');
   });
  }
  setTimeout(()=>document.getElementById('output').scrollIntoView({behavior:'smooth',block:'start'}),100);
@@ -1356,7 +1390,7 @@ if ("serviceWorker" in navigator) {
 // ============================================================
 // APP_VERSIONとservice-worker.jsのCACHE_VERSIONは常に一致させる。
 // 形式はYYYY-MM-DD-NN（同日複数回更新時は末尾連番を+1）。
-const APP_VERSION = '2026-06-13-02';
+const APP_VERSION = '2026-06-13-03';
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 </script>
 </body>
