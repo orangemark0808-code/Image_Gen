@@ -598,12 +598,14 @@ canvas {
       <div class="section" id="sec-shape">
         <div class="section-title">SHAPE</div>
         <label style="margin-top:0;">線の色</label>
-        <input type="color" id="shapeColor" value="#000000">
+        <input type="color" id="shapeColor" value="#000000" style="display:none;">
+        <div id="shapeColorPicker" class="color-picker"></div>
         <label>線の太さ: <span id="strokeWidthLabel">6</span>px</label>
         <input type="range" id="strokeWidth" min="1" max="20" value="6">
         <label class="inline" style="margin-top:8px;"><input type="checkbox" id="shapeFill"> 塗りつぶし</label>
         <label style="margin-top:8px;" id="shapeFillColorLabel">塗りつぶしの色</label>
-        <input type="color" id="shapeFillColor" value="#ffffff" disabled style="opacity:0.4; cursor:not-allowed;">
+        <input type="color" id="shapeFillColor" value="#ffffff" disabled style="display:none;">
+        <div id="shapeFillColorPicker" class="color-picker" style="opacity:0.4; pointer-events:none;"></div>
         <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #e5e5e5;">
           <label style="margin-top:0; font-weight:600;">ツール</label>
           <div class="row-2" style="margin-top:4px;">
@@ -1474,7 +1476,7 @@ function drawCropOverlay() {
 }
 
 // --- Image loading (edit mode) ---
-function loadEditImage(file) {
+function loadEditImage(file, message = '画像を読み込みました') {
   const reader = new FileReader();
   reader.onload = e => {
     const img = new Image();
@@ -1491,7 +1493,7 @@ function loadEditImage(file) {
       document.getElementById('canvasUploadPrompt').style.display = 'none';
       canvas.style.display = 'block';
       zoomFit(); saveHistory(); render(); updateCanvasInfo(); updateLayerList();
-      toast('画像を読み込みました');
+      toast(message);
     };
     img.src = e.target.result;
   };
@@ -1854,8 +1856,9 @@ document.getElementById('strokeWidth').addEventListener('input', e => {
 document.getElementById('shapeFill').addEventListener('change', e => {
   const picker = document.getElementById('shapeFillColor');
   picker.disabled = !e.target.checked;
-  picker.style.opacity = e.target.checked ? '1' : '0.4';
-  picker.style.cursor = e.target.checked ? 'pointer' : 'not-allowed';
+  const wrapper = document.getElementById('shapeFillColorPicker');
+  wrapper.style.opacity = e.target.checked ? '' : '0.4';
+  wrapper.style.pointerEvents = e.target.checked ? '' : 'none';
 });
 
 // ============================================================
@@ -1924,7 +1927,7 @@ function setupColorPicker(inputId) {
   sync();
 }
 
-['textColor', 'textBgColor', 'textBorderColor'].forEach(setupColorPicker);
+['textColor', 'textBgColor', 'textBorderColor', 'shapeColor', 'shapeFillColor'].forEach(setupColorPicker);
 
 // openTextModal 等で .value を直接セットした後に表示を同期する
 function refreshColorPickers() {
@@ -2180,6 +2183,12 @@ document.addEventListener('paste', e => {
 
   // 画像が見つかったのでデフォルト動作を抑制
   e.preventDefault();
+
+  // ベース画像が未読込の場合は、貼り付け画像をベース画像として読み込む
+  if (!editState.baseImage) {
+    loadEditImage(imageBlob, 'スクショをベース画像として読み込みました');
+    return;
+  }
 
   const reader = new FileReader();
   reader.onload = ev => {
@@ -3347,7 +3356,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-06-12-05'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-06-19-01'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
