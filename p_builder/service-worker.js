@@ -1,7 +1,7 @@
 const CACHE_PREFIX = "prompt-builder";
 // CACHE_VERSIONとindex.html側のAPP_VERSIONは常に一致させる。
 // 形式はYYYY-MM-DD-NN（同日複数回更新時は末尾連番を+1）。
-const CACHE_VERSION = "2026-06-13-08";
+const CACHE_VERSION = "2026-06-24-01";
 const CACHE_NAME = `${CACHE_PREFIX}-${CACHE_VERSION}`;
 
 const APP_SHELL = [
