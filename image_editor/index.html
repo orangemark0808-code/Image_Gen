@@ -99,10 +99,42 @@ body {
   width: 272px;
   background: white;
   border-right: 1px solid #e5e7eb;
-  overflow-y: auto;
   flex-shrink: 0;
   padding: 14px;
+  display: flex;
+  flex-direction: column;
 }
+#editModePanel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+#transparentModePanel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+.layer-dock {
+  flex: 0 0 auto;
+  border-top: 1px solid #e5e7eb;
+  margin-top: 8px;
+  padding-top: 8px;
+  background: white;
+  box-shadow: none;
+}
+.layer-dock-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 6px 2px;
+}
+.layer-dock-chevron { transition: transform 0.2s; color: #000000; }
+.layer-dock.collapsed .layer-dock-chevron { transform: rotate(-90deg); }
+.layer-dock.collapsed .layer-list { display: none; }
 
 /* ===== Main Area ===== */
 .main-area {
@@ -503,7 +535,7 @@ canvas {
           <button class="acc-item" data-sec="sec-apply">APPLY</button>
           <button class="acc-item" data-sec="sec-text">TEXT</button>
           <button class="acc-item" data-sec="sec-shape">SHAPE</button>
-          <button class="acc-item" data-sec="sec-layer">LAYER</button>
+          <!-- LAYER はサイドバー下部に常時固定（layerDock）のためジャンプボタンなし -->
           <!-- SAVE は常に最下部固定 -->
           <button class="acc-item" data-sec="sec-save">SAVE</button>
         </div>
@@ -636,15 +668,7 @@ canvas {
         </div>
       </div>
 
-      <!-- 6. レイヤー -->
-      <div class="section" id="sec-layer">
-        <div class="section-title">LAYER</div>
-        <div class="layer-list" id="layerList">
-          <div style="padding:8px; color:#000000; font-size:12px; text-align:center;">レイヤーなし</div>
-        </div>
-      </div>
-
-      <!-- 7. 保存（SAVE は常に最下部固定） -->
+      <!-- 6. 保存（SAVE は常に最下部固定） -->
       <div class="section" id="sec-save">
         <div class="section-title">SAVE</div>
         <label style="margin-top:0;">ファイル名</label>
@@ -663,6 +687,17 @@ canvas {
       </div>
 
     </div><!-- /editModePanel -->
+
+    <!-- ==== LAYER DOCK（サイドバー下部に常時固定） ==== -->
+    <div id="layerDock" class="layer-dock">
+      <button id="layerDockToggle" class="layer-dock-head" type="button">
+        <span class="section-title" style="margin:0;">LAYER</span>
+        <svg class="layer-dock-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button>
+      <div class="layer-list" id="layerList">
+        <div style="padding:8px; color:#000000; font-size:12px; text-align:center;">レイヤーなし</div>
+      </div>
+    </div>
 
     <!-- ==== TRANSPARENT MODE PANEL ==== -->
     <div id="transparentModePanel">
@@ -1074,6 +1109,7 @@ FONT_LIST.forEach(f => {
 let currentMode = 'edit';
 
 const editModePanel = document.getElementById('editModePanel');
+const layerDock = document.getElementById('layerDock');
 const transparentModePanel = document.getElementById('transparentModePanel');
 const editModeArea = document.getElementById('editModeArea');
 const transparentModeArea = document.getElementById('transparentModeArea');
@@ -1100,12 +1136,14 @@ function switchMode(mode) {
   });
   if (mode === 'edit') {
     editModePanel.style.display = '';
+    layerDock.style.display = '';
     transparentModePanel.style.display = 'none';
     editModeArea.style.display = 'flex';
     transparentModeArea.style.display = 'none';
     setAccordion(true);
   } else {
     editModePanel.style.display = 'none';
+    layerDock.style.display = 'none';
     // CSSで #transparentModePanel に display:none が指定されているため明示的に 'block' を指定
     transparentModePanel.style.display = 'block';
     editModeArea.style.display = 'none';
@@ -3567,7 +3605,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-06-25-04'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-06-25-05'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
@@ -3617,10 +3655,22 @@ transparentModePanel.style.display = 'none';
 transparentModeArea.style.display = 'none';
 
 // ============================================================
+// === LAYER DOCK 折りたたみ（localStorage で状態保持） ===
+// ============================================================
+const layerDockToggle = document.getElementById('layerDockToggle');
+function setLayerDockCollapsed(c) {
+  layerDock.classList.toggle('collapsed', c);
+  localStorage.setItem('ie_layerDockCollapsed', c ? '1' : '0');
+}
+layerDockToggle.addEventListener('click', () => setLayerDockCollapsed(!layerDock.classList.contains('collapsed')));
+setLayerDockCollapsed(localStorage.getItem('ie_layerDockCollapsed') === '1'); // 既定=開く
+
+// ============================================================
 // === ACCORDION SECTION NAV ===
 // ============================================================
 (function() {
-  const sidebar = document.getElementById('sidebar');
+  // サイドバー自体はスクロールしなくなったため、中段スクロール領域を root にする
+  const scrollRoot = document.getElementById('editModePanel');
   const accItems = document.querySelectorAll('.acc-item');
 
   // クリック → スムーズスクロール＆アクティブ切替
@@ -3653,7 +3703,7 @@ transparentModeArea.style.display = 'none';
       });
     }
   }, {
-    root: sidebar,
+    root: scrollRoot,
     rootMargin: '0px 0px -70% 0px',
     threshold: 0,
   });
