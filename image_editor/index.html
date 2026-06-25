@@ -526,6 +526,7 @@ canvas {
           <input type="number" id="cropRatioH" value="9" min="1" disabled>
         </div>
         <div class="help-box" style="margin-top:7px;">「トリミング」ツール(C)でキャンバス上をドラッグ</div>
+        <div class="help-box" style="margin-top:7px;">画像レイヤーを選択中は、その画像だけを切り抜きます（キャンバス・他のレイヤーはそのまま）</div>
         <div id="cropStatus" class="status-pill">範囲未選択</div>
         <button id="applyCropOnly" class="primary btn-action" style="margin-top:14px;" disabled>
           トリミング実行<span class="shortcut">Enter</span>
@@ -1426,7 +1427,7 @@ function drawImageLayer(l) {
   ctx.translate(cx, cy);
   if (rot) ctx.rotate(rot);
   ctx.drawImage(l._img, -l.w / 2, -l.h / 2, l.w, l.h);
-  if (editState.selectedLayerId === l.id) {
+  if (editState.selectedLayerId === l.id && editState.currentTool !== 'crop') {
     const hw = l.w / 2, hh = l.h / 2;
     // 選択枠
     ctx.strokeStyle = '#ea580c'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
@@ -1627,7 +1628,14 @@ document.querySelectorAll('.tool-btn').forEach(btn => {
 function selectTool(tool) {
   editState.currentTool = tool;
   document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
-  if (tool !== 'select') editState.selectedLayerId = null;
+  if (tool !== 'select') {
+    if (tool === 'crop') {
+      const sel = editState.layers.find(l => l.id === editState.selectedLayerId);
+      if (!sel || sel.type !== 'image') editState.selectedLayerId = null; // 画像レイヤーのみ維持
+    } else {
+      editState.selectedLayerId = null;
+    }
+  }
   updateCursor(); render(); updateCanvasInfo(); updateLayerList();
 }
 
@@ -1700,6 +1708,51 @@ document.getElementById('cropFixRatio').addEventListener('change', e => {
   document.getElementById('cropRatioW').disabled = !on;
   document.getElementById('cropRatioH').disabled = !on;
 });
+
+// --- 画像レイヤー専用トリミング ---
+function cropSelectedImageLayer() {
+  // 画像レイヤー選択中ならその画像をトリミング対象に。なければ false（=従来のキャンバス全体トリミング）
+  const layer = editState.layers.find(l => l.id === editState.selectedLayerId && l.type === 'image');
+  if (!layer) return false;
+
+  const r = editState.cropRect;
+  if (!r) { toast('トリミングツールで範囲を選択してください'); return true; }
+  if (layer.rotation) { toast('回転中の画像はトリミングできません（回転を0に戻してください）'); return true; }
+  const img = layer._img;
+  if (!img || !img.complete || !img.naturalWidth) { toast('画像を読み込み中です。少し待って再実行してください'); return true; }
+
+  // 範囲（キャンバス座標）を正規化し、画像レイヤーとの交差を取る
+  const rx = Math.min(r.x, r.x + r.w), ry = Math.min(r.y, r.y + r.h);
+  const rw = Math.abs(r.w), rh = Math.abs(r.h);
+  const ix = Math.max(rx, layer.x);
+  const iy = Math.max(ry, layer.y);
+  const ix2 = Math.min(rx + rw, layer.x + layer.w);
+  const iy2 = Math.min(ry + rh, layer.y + layer.h);
+  const iw = ix2 - ix, ih = iy2 - iy;
+  if (iw < 5 || ih < 5) { toast('画像の上で範囲を選択してください'); return true; }
+
+  // 表示座標 → 元画像（フル解像度）のソース座標へマップして高画質で切り出す
+  const sx = (ix - layer.x) / layer.w * img.naturalWidth;
+  const sy = (iy - layer.y) / layer.h * img.naturalHeight;
+  const sw = iw / layer.w * img.naturalWidth;
+  const sh = ih / layer.h * img.naturalHeight;
+  const tmp = document.createElement('canvas');
+  tmp.width  = Math.max(1, Math.round(sw));
+  tmp.height = Math.max(1, Math.round(sh));
+  tmp.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, tmp.width, tmp.height);
+
+  // レイヤー更新：表示位置/サイズは交差範囲、src は切り出した画像
+  layer.src = tmp.toDataURL('image/png');
+  layer.x = ix; layer.y = iy; layer.w = iw; layer.h = ih;
+  delete layer._img; // 次の render で新 src を再ロード
+
+  editState.cropRect = null;
+  selectTool('select');                 // 切り抜き後すぐ移動・リサイズできるよう選択ツールへ
+  editState.selectedLayerId = layer.id;  // 選択を維持
+  saveHistory(); render(); updateCanvasInfo(); updateLayerList(); updateCropStatus();
+  toast('画像をトリミングしました');
+  return true;
+}
 
 // --- Crop / Resize execution ---
 function executeCrop() {
@@ -1799,6 +1852,7 @@ document.getElementById('doResizeBtn').addEventListener('click', () => {
 
 document.getElementById('applyCropOnly').addEventListener('click', () => {
   if (!editState.baseImage) { toast('先に画像を読み込んでください'); return; }
+  if (cropSelectedImageLayer()) return; // 画像レイヤー選択中はその画像だけ切り抜く
   if (executeCrop()) { applyZoom(); saveHistory(); render(); updateCanvasInfo(); updateLayerList(); toast(`トリミング完了: ${editState.baseWidth}×${editState.baseHeight}px`); }
 });
 
@@ -1922,6 +1976,8 @@ document.getElementById('clearClipboardBtn').addEventListener('click', () => {
 renderClipboardThumbs();
 document.getElementById('applyBoth').addEventListener('click', () => {
   if (!editState.baseImage) { toast('先に画像を読み込んでください'); return; }
+  const selImg = editState.layers.find(l => l.id === editState.selectedLayerId && l.type === 'image');
+  if (selImg) { toast('画像レイヤー選択中は「トリミング実行」で画像だけを切り抜けます'); return; }
   if (executeCrop() && executeResize()) { applyZoom(); saveHistory(); render(); updateCanvasInfo(); updateLayerList(); toast(`完了: ${editState.baseWidth}×${editState.baseHeight}px`); }
 });
 
@@ -3432,7 +3488,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-06-25-02'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-06-25-03'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
