@@ -1452,6 +1452,15 @@ function drawShape(l) {
   if (editState.selectedLayerId === l.id) {
     ctx.strokeStyle = '#ea580c'; ctx.lineWidth = 1; ctx.setLineDash([4,4]);
     ctx.strokeRect(x - 4, y - 4, w + 8, h + 8); ctx.setLineDash([]);
+    // リサイズハンドル（rect/ellipse=四隅、line/arrow=両端点）
+    ctx.setLineDash([]); ctx.fillStyle = '#fff'; ctx.strokeStyle = '#ea580c'; ctx.lineWidth = 1.5;
+    const handlePoints = (l.shape === 'line' || l.shape === 'arrow')
+      ? [[l.x1, l.y1], [l.x2, l.y2]]
+      : [[x, y], [x + w, y], [x, y + h], [x + w, y + h]];
+    for (const [hx, hy] of handlePoints) {
+      ctx.fillRect(hx - 5, hy - 5, 10, 10);
+      ctx.strokeRect(hx - 5, hy - 5, 10, 10);
+    }
   }
   ctx.restore();
 }
@@ -1509,6 +1518,22 @@ function getImageHandleHit(l, x, y) {
   if (Math.abs(lx - hw) <= 8 && Math.abs(ly + hh) <= 8) return 'tr';
   if (Math.abs(lx + hw) <= 8 && Math.abs(ly - hh) <= 8) return 'bl';
   if (Math.abs(lx - hw) <= 8 && Math.abs(ly - hh) <= 8) return 'br';
+  return null;
+}
+
+// 選択中 shape レイヤーのどのハンドルをクリックしたか判定（canvas 座標で渡す）
+function getShapeHandleHit(l, x, y) {
+  if (l.shape === 'line' || l.shape === 'arrow') {
+    if (Math.hypot(x - l.x1, y - l.y1) <= 9) return 'p1';
+    if (Math.hypot(x - l.x2, y - l.y2) <= 9) return 'p2';
+    return null;
+  }
+  const bx = Math.min(l.x1, l.x2), by = Math.min(l.y1, l.y2);
+  const bw = Math.abs(l.x2 - l.x1), bh = Math.abs(l.y2 - l.y1);
+  if (Math.hypot(x - bx, y - by) <= 8) return 'tl';
+  if (Math.hypot(x - (bx + bw), y - by) <= 8) return 'tr';
+  if (Math.hypot(x - bx, y - (by + bh)) <= 8) return 'bl';
+  if (Math.hypot(x - (bx + bw), y - (by + bh)) <= 8) return 'br';
   return null;
 }
 
@@ -2027,8 +2052,25 @@ document.getElementById('applyBoth').addEventListener('click', () => {
   if (executeCrop() && executeResize()) { applyZoom(); saveHistory(); render(); updateCanvasInfo(); updateLayerList(); toast(`完了: ${editState.baseWidth}×${editState.baseHeight}px`); }
 });
 
+// 選択中の図形レイヤー（type:'shape'）を返す。未選択時は undefined
+function getSelectedShapeLayer() {
+  return editState.layers.find(l => l.id === editState.selectedLayerId && l.type === 'shape');
+}
+
+// SHAPE パネル → 選択中の図形へ即反映する。選択中の図形が無い場合は
+// 新規図形描画用のデフォルト値として働く既存挙動のみになる
+document.getElementById('shapeColor').addEventListener('input', e => {
+  const sel = getSelectedShapeLayer();
+  if (sel) { sel.color = e.target.value; render(); saveHistory(); }
+});
+
 document.getElementById('strokeWidth').addEventListener('input', e => {
   document.getElementById('strokeWidthLabel').textContent = e.target.value;
+  const sel = getSelectedShapeLayer();
+  if (sel) { sel.strokeWidth = parseInt(e.target.value); render(); }
+});
+document.getElementById('strokeWidth').addEventListener('change', () => {
+  if (getSelectedShapeLayer()) saveHistory();
 });
 
 document.getElementById('shapeFill').addEventListener('change', e => {
@@ -2037,7 +2079,33 @@ document.getElementById('shapeFill').addEventListener('change', e => {
   const wrapper = document.getElementById('shapeFillColorPicker');
   wrapper.style.opacity = e.target.checked ? '' : '0.4';
   wrapper.style.pointerEvents = e.target.checked ? '' : 'none';
+  const sel = getSelectedShapeLayer();
+  if (sel) { sel.fill = e.target.checked; render(); saveHistory(); }
 });
+
+document.getElementById('shapeFillColor').addEventListener('input', e => {
+  const sel = getSelectedShapeLayer();
+  if (sel) { sel.fillColor = e.target.value; render(); saveHistory(); }
+});
+
+// 選択中の図形の現在値を SHAPE パネルへ反映する（パネル → 図形 とは逆方向の同期）
+function syncShapePanelFromLayer(l) {
+  if (!l || l.type !== 'shape') return;
+  const colorInput = document.getElementById('shapeColor');
+  colorInput.value = l.color;
+  if (colorInput._syncColorPicker) colorInput._syncColorPicker();
+  document.getElementById('strokeWidth').value = l.strokeWidth;
+  document.getElementById('strokeWidthLabel').textContent = l.strokeWidth;
+  const fillCheckbox = document.getElementById('shapeFill');
+  fillCheckbox.checked = !!l.fill;
+  const fillColorInput = document.getElementById('shapeFillColor');
+  fillColorInput.value = l.fillColor || l.color;
+  fillColorInput.disabled = !l.fill;
+  if (fillColorInput._syncColorPicker) fillColorInput._syncColorPicker();
+  const wrapper = document.getElementById('shapeFillColorPicker');
+  wrapper.style.opacity = l.fill ? '' : '0.4';
+  wrapper.style.pointerEvents = l.fill ? '' : 'none';
+}
 
 // ============================================================
 // === COLOR PICKER（基本色パレット + HEX入力） ===
@@ -2451,11 +2519,21 @@ canvas.addEventListener('mousedown', e => {
           return;
         }
       }
+      const selShape = editState.layers.find(l => l.id === editState.selectedLayerId && l.type === 'shape');
+      if (selShape) {
+        const hit = getShapeHandleHit(selShape, pos.x, pos.y);
+        if (hit) {
+          editState.dragging = { type: 'shape-resize', layerId: selShape.id, handle: hit,
+            origX1: selShape.x1, origY1: selShape.y1, origX2: selShape.x2, origY2: selShape.y2 };
+          return;
+        }
+      }
     }
     const layer = findLayerAt(pos.x, pos.y);
     if (layer) {
       editState.selectedLayerId = layer.id;
       editState.dragging = { type: 'move', startX: pos.x, startY: pos.y, layerId: layer.id, orig: getLayerOrigin(layer) };
+      syncShapePanelFromLayer(layer);
     } else { editState.selectedLayerId = null; }
     render(); updateLayerList();
   }
@@ -2536,6 +2614,33 @@ canvas.addEventListener('mousemove', e => {
     if (nw > 10 && nh > 10) { layer.x = nx; layer.y = ny; layer.w = nw; layer.h = nh; }
     // rAF スロットリング: 1フレームに1回だけ再描画（Shift+ドラッグ時のフリーズ防止）
     if (!resizeRaf) resizeRaf = requestAnimationFrame(() => { render(); resizeRaf = null; });
+  } else if (editState.dragging.type === 'shape-resize') {
+    const d = editState.dragging;
+    const layer = editState.layers.find(l => l.id === d.layerId);
+    if (!layer) return;
+    if (layer.shape === 'line' || layer.shape === 'arrow') {
+      if (d.handle === 'p1') { layer.x1 = pos.x; layer.y1 = pos.y; }
+      else { layer.x2 = pos.x; layer.y2 = pos.y; }
+    } else {
+      // バウンディングボックスの対角（ドラッグしたハンドルと反対側）を固定点とし、
+      // 無修飾＝自由変形／Shift＝元の縦横比を維持して反対側の座標をマウス位置へ追従させる
+      const bx = Math.min(d.origX1, d.origX2), by = Math.min(d.origY1, d.origY2);
+      const bw = Math.abs(d.origX2 - d.origX1), bh = Math.abs(d.origY2 - d.origY1);
+      const fixedX = (d.handle === 'tl' || d.handle === 'bl') ? bx + bw : bx;
+      const fixedY = (d.handle === 'tl' || d.handle === 'tr') ? by + bh : by;
+      let movX = pos.x, movY = pos.y;
+      if (e.shiftKey) {
+        const ar = bh > 0 ? bw / bh : 1;
+        let w = Math.abs(movX - fixedX), h = Math.abs(movY - fixedY);
+        if (ar > 0 && w / (h || 1) > ar) w = h * ar; else if (ar > 0) h = w / ar;
+        movX = fixedX + (movX < fixedX ? -w : w);
+        movY = fixedY + (movY < fixedY ? -h : h);
+      }
+      if (Math.abs(movX - fixedX) < 10) movX = fixedX + (movX < fixedX ? -10 : 10);
+      if (Math.abs(movY - fixedY) < 10) movY = fixedY + (movY < fixedY ? -10 : 10);
+      layer.x1 = fixedX; layer.y1 = fixedY; layer.x2 = movX; layer.y2 = movY;
+    }
+    if (!resizeRaf) resizeRaf = requestAnimationFrame(() => { render(); resizeRaf = null; });
   } else if (editState.dragging.type === 'img-rotate') {
     const d = editState.dragging;
     const layer = editState.layers.find(l => l.id === d.layerId);
@@ -2566,7 +2671,7 @@ canvas.addEventListener('mouseup', e => {
     }
     render();
   } else if (editState.dragging.type === 'move') { saveHistory(); }
-  else if (editState.dragging.type === 'img-resize' || editState.dragging.type === 'img-rotate') { saveHistory(); render(); }
+  else if (editState.dragging.type === 'img-resize' || editState.dragging.type === 'img-rotate' || editState.dragging.type === 'shape-resize') { saveHistory(); render(); }
   editState.dragging = null;
   editState.moveSnap = null;
   render();
@@ -2596,7 +2701,7 @@ document.addEventListener('mouseup', () => {
   // （canvas mouseup が先に発火した場合は dragging=null になっているので何もしない）
   if (editState.dragging) {
     if (resizeRaf) { cancelAnimationFrame(resizeRaf); resizeRaf = null; }
-    if (editState.dragging.type === 'move' || editState.dragging.type === 'img-resize' || editState.dragging.type === 'img-rotate') {
+    if (editState.dragging.type === 'move' || editState.dragging.type === 'img-resize' || editState.dragging.type === 'img-rotate' || editState.dragging.type === 'shape-resize') {
       saveHistory(); render();
     }
     editState.dragging = null;
@@ -2707,7 +2812,7 @@ function updateLayerList() {
       } else if (ev.target.closest('.nudge-btn')) {
         // nudge-btn 自身の click ハンドラで処理（ここでは選択クリックにしない）
       } else {
-        editState.selectedLayerId = l.id; selectTool('select'); render(); updateLayerList();
+        editState.selectedLayerId = l.id; selectTool('select'); syncShapePanelFromLayer(l); render(); updateLayerList();
       }
     });
     div.querySelector('.nudge-btn[data-dir="up"]').addEventListener('click', ev => {
@@ -3605,7 +3710,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-06-25-05'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-06-25-06'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
