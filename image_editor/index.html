@@ -1329,6 +1329,14 @@ function render() {
 function drawText(l, tCtx) {
   if (!tCtx) tCtx = ctx;
   tCtx.save();
+  // 回転がある場合は中心点を軸に rotate（プレビュー描画(tCtx !== ctx)では回転しない）
+  if (tCtx === ctx && l.rotation) {
+    const b = getTextBounds(l);
+    const cx = l.x + b.w / 2, cy = l.y + b.h / 2;
+    tCtx.translate(cx, cy);
+    tCtx.rotate(l.rotation);
+    tCtx.translate(-cx, -cy);
+  }
   tCtx.font = getFontString(l);
   tCtx.textBaseline = 'top';
   if ('letterSpacing' in tCtx) tCtx.letterSpacing = `${l.letterSpacing ?? 0}px`;
@@ -1371,6 +1379,13 @@ function drawText(l, tCtx) {
         tCtx.fillStyle = '#fff'; tCtx.strokeStyle = '#ea580c'; tCtx.lineWidth = 1.5; tCtx.setLineDash([]);
         tCtx.beginPath(); tCtx.arc(hx, hy, 5, 0, Math.PI * 2); tCtx.fill(); tCtx.stroke();
       });
+      // 回転ハンドル（上辺中央の 22px 上）
+      const rcx = l.x + totalW / 2;
+      const rcy = l.y - 4;
+      tCtx.beginPath(); tCtx.moveTo(rcx, rcy); tCtx.lineTo(rcx, rcy - 16);
+      tCtx.strokeStyle = '#ea580c'; tCtx.lineWidth = 1.5; tCtx.setLineDash([]); tCtx.stroke();
+      tCtx.beginPath(); tCtx.arc(rcx, rcy - 22, 6, 0, Math.PI * 2);
+      tCtx.fillStyle = '#fff'; tCtx.fill(); tCtx.strokeStyle = '#ea580c'; tCtx.lineWidth = 1.5; tCtx.stroke();
     }
   } else {
     // 横書き: \n 改行対応
@@ -1396,6 +1411,13 @@ function drawText(l, tCtx) {
         tCtx.fillStyle = '#fff'; tCtx.strokeStyle = '#ea580c'; tCtx.lineWidth = 1.5; tCtx.setLineDash([]);
         tCtx.beginPath(); tCtx.arc(hx, hy, 5, 0, Math.PI * 2); tCtx.fill(); tCtx.stroke();
       });
+      // 回転ハンドル（上辺中央の 22px 上）
+      const rcx = l.x + maxW / 2;
+      const rcy = l.y - 4;
+      tCtx.beginPath(); tCtx.moveTo(rcx, rcy); tCtx.lineTo(rcx, rcy - 16);
+      tCtx.strokeStyle = '#ea580c'; tCtx.lineWidth = 1.5; tCtx.setLineDash([]); tCtx.stroke();
+      tCtx.beginPath(); tCtx.arc(rcx, rcy - 22, 6, 0, Math.PI * 2);
+      tCtx.fillStyle = '#fff'; tCtx.fill(); tCtx.strokeStyle = '#ea580c'; tCtx.lineWidth = 1.5; tCtx.stroke();
     }
   }
   tCtx.restore();
@@ -1557,10 +1579,23 @@ function getTextHandleHit(l, x, y) {
   const b = getTextBounds(l);
   const bx = l.x - 6, by = l.y - 4;
   const bw = b.w + 12, bh = b.h + 8;
-  if (Math.hypot(x - bx,        y - by)        <= 9) return 'tl';
-  if (Math.hypot(x - (bx + bw), y - by)        <= 9) return 'tr';
-  if (Math.hypot(x - bx,        y - (by + bh)) <= 9) return 'bl';
-  if (Math.hypot(x - (bx + bw), y - (by + bh)) <= 9) return 'br';
+  // 回転がある場合はマウス座標を逆回転して非回転空間で判定
+  let lx = x, ly = y;
+  if (l.rotation) {
+    const cx = l.x + b.w / 2, cy = l.y + b.h / 2;
+    const cos = Math.cos(-l.rotation), sin = Math.sin(-l.rotation);
+    const dx = x - cx, dy = y - cy;
+    lx = cx + dx * cos - dy * sin;
+    ly = cy + dx * sin + dy * cos;
+  }
+  // 回転ハンドル（上辺中央の 22px 上）
+  const rcx = bx + bw / 2, rcy = by - 22;
+  if (Math.hypot(lx - rcx, ly - rcy) <= 9) return 'rotate';
+  // 四隅ハンドル
+  if (Math.hypot(lx - bx,        ly - by)        <= 9) return 'tl';
+  if (Math.hypot(lx - (bx + bw), ly - by)        <= 9) return 'tr';
+  if (Math.hypot(lx - bx,        ly - (by + bh)) <= 9) return 'bl';
+  if (Math.hypot(lx - (bx + bw), ly - (by + bh)) <= 9) return 'br';
   return null;
 }
 
@@ -2550,6 +2585,19 @@ canvas.addEventListener('mousedown', e => {
       const selText = editState.layers.find(l => l.id === editState.selectedLayerId && l.type === 'text');
       if (selText) {
         const hit = getTextHandleHit(selText, pos.x, pos.y);
+        if (hit === 'rotate') {
+          e.preventDefault();
+          const b = getTextBounds(selText);
+          const cx = selText.x + b.w / 2, cy = selText.y + b.h / 2;
+          editState.dragging = {
+            type: 'text-rotate',
+            layerId: selText.id,
+            cx, cy,
+            origRot: selText.rotation || 0,
+            origAngle: Math.atan2(pos.y - cy, pos.x - cx)
+          };
+          return;
+        }
         if (hit) {
           e.preventDefault();
           const b = getTextBounds(selText);
@@ -2711,6 +2759,13 @@ canvas.addEventListener('mousemove', e => {
     if (d.handle === 'tl' || d.handle === 'bl') layer.x = d.origX + (d.origW - newW) / 2;
     if (d.handle === 'tl' || d.handle === 'tr') layer.y = d.origY + (d.origH - newH) / 2;
     if (!resizeRaf) resizeRaf = requestAnimationFrame(() => { render(); resizeRaf = null; });
+  } else if (editState.dragging.type === 'text-rotate') {
+    const d = editState.dragging;
+    const layer = editState.layers.find(l => l.id === d.layerId);
+    if (!layer) return;
+    const angle = Math.atan2(pos.y - d.cy, pos.x - d.cx);
+    layer.rotation = d.origRot + (angle - d.origAngle);
+    if (!resizeRaf) resizeRaf = requestAnimationFrame(() => { render(); resizeRaf = null; });
   } else if (editState.dragging.type === 'img-rotate') {
     const d = editState.dragging;
     const layer = editState.layers.find(l => l.id === d.layerId);
@@ -2741,7 +2796,7 @@ canvas.addEventListener('mouseup', e => {
     }
     render();
   } else if (editState.dragging.type === 'move') { saveHistory(); }
-  else if (editState.dragging.type === 'img-resize' || editState.dragging.type === 'img-rotate' || editState.dragging.type === 'shape-resize' || editState.dragging.type === 'text-resize') { saveHistory(); render(); }
+  else if (editState.dragging.type === 'img-resize' || editState.dragging.type === 'img-rotate' || editState.dragging.type === 'shape-resize' || editState.dragging.type === 'text-resize' || editState.dragging.type === 'text-rotate') { saveHistory(); render(); }
   editState.dragging = null;
   editState.moveSnap = null;
   render();
@@ -2771,7 +2826,7 @@ document.addEventListener('mouseup', () => {
   // （canvas mouseup が先に発火した場合は dragging=null になっているので何もしない）
   if (editState.dragging) {
     if (resizeRaf) { cancelAnimationFrame(resizeRaf); resizeRaf = null; }
-    if (editState.dragging.type === 'move' || editState.dragging.type === 'img-resize' || editState.dragging.type === 'img-rotate' || editState.dragging.type === 'shape-resize' || editState.dragging.type === 'text-resize') {
+    if (editState.dragging.type === 'move' || editState.dragging.type === 'img-resize' || editState.dragging.type === 'img-rotate' || editState.dragging.type === 'shape-resize' || editState.dragging.type === 'text-resize' || editState.dragging.type === 'text-rotate') {
       saveHistory(); render();
     }
     editState.dragging = null;
@@ -2788,8 +2843,17 @@ function findLayerAt(x, y) {
   for (let i = editState.layers.length - 1; i >= 0; i--) {
     const l = editState.layers[i];
     if (l.type === 'text') {
-      const { w, h } = getTextBounds(l);
-      if (x >= l.x - 6 && x <= l.x + w + 6 && y >= l.y - 4 && y <= l.y + h + 4) return l;
+      const b = getTextBounds(l);
+      const rot = l.rotation || 0;
+      let lx = x, ly = y;
+      if (rot) {
+        const cx = l.x + b.w / 2, cy = l.y + b.h / 2;
+        const cos = Math.cos(-rot), sin = Math.sin(-rot);
+        const dx = x - cx, dy = y - cy;
+        lx = cx + dx * cos - dy * sin;
+        ly = cy + dx * sin + dy * cos;
+      }
+      if (lx >= l.x - 6 && lx <= l.x + b.w + 6 && ly >= l.y - 4 && ly <= l.y + b.h + 4) return l;
     } else if (l.type === 'image') {
       const rot = l.rotation || 0;
       const cx = l.x + l.w / 2, cy = l.y + l.h / 2;
@@ -3780,7 +3844,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-06-26-02'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-06-26-03'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
