@@ -263,6 +263,14 @@ button.primary .shortcut { background: rgba(255,255,255,0.3); color: white; }
 .layer-item:hover { background: #fff7ed; }
 .layer-item.selected { background: #ffedd5; color: #c2410c; }
 .layer-item .del-btn { border: none; background: none; color: #dc2626; padding: 2px 6px; font-size: 14px; }
+.layer-item .nudge-btn {
+  border: none; background: none; color: #FF7F00;
+  padding: 2px 4px; display: flex; align-items: center; cursor: pointer;
+}
+.layer-item .nudge-btn:disabled { color: #cbd5e1; cursor: not-allowed; }
+.layer-item.dragging { opacity: .5; }
+.layer-item.drop-before { border-top: 2px solid #FF7F00; }
+.layer-item.drop-after { border-bottom: 2px solid #FF7F00; }
 
 /* ===== Edit mode canvas area ===== */
 .canvas-area {
@@ -2592,6 +2600,36 @@ function getLayerOrigin(l) {
 }
 
 // --- Layer list ---
+// --- レイヤー並び替え ---
+// editState.layers: index 0 = 最背面, 末尾 = 最前面
+let dragLayerId = null;
+
+const CHEVRON_UP_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>';
+const CHEVRON_DOWN_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
+
+function moveLayerInPanel(draggedId, targetId, before) {
+  if (!draggedId || draggedId === targetId) return;
+  // パネル表示順（上=前面）に合わせて reverse して操作
+  let visual = editState.layers.slice().reverse();
+  const fromIdx = visual.findIndex(l => l.id === draggedId);
+  if (fromIdx < 0) return;
+  const [moved] = visual.splice(fromIdx, 1);
+  const targetIdx = visual.findIndex(l => l.id === targetId);
+  if (targetIdx < 0) return;
+  visual.splice(before ? targetIdx : targetIdx + 1, 0, moved);
+  editState.layers = visual.reverse();
+  saveHistory(); render(); updateLayerList();
+}
+
+function nudgeLayer(id, dir) { // dir: 'up'=前面へ / 'down'=背面へ
+  const i = editState.layers.findIndex(l => l.id === id);
+  if (i < 0) return;
+  const j = dir === 'up' ? i + 1 : i - 1; // 前面=配列の後ろ(高index)
+  if (j < 0 || j >= editState.layers.length) return;
+  const t = editState.layers[i]; editState.layers[i] = editState.layers[j]; editState.layers[j] = t;
+  saveHistory(); render(); updateLayerList();
+}
+
 function updateLayerList() {
   const list = document.getElementById('layerList');
   if (editState.layers.length === 0) {
@@ -2602,8 +2640,12 @@ function updateLayerList() {
   list.innerHTML = '';
   for (let i = editState.layers.length - 1; i >= 0; i--) {
     const l = editState.layers[i];
+    const isTop = i === editState.layers.length - 1;
+    const isBottom = i === 0;
     const div = document.createElement('div');
     div.className = 'layer-item' + (editState.selectedLayerId === l.id ? ' selected' : '');
+    div.draggable = true;
+    div.dataset.layerId = l.id;
     const lbl = l.type === 'text'
       ? `T ${l.direction === 'vertical' ? '縦' : '横'} ${l.text.slice(0,10)}${l.text.length > 10 ? '…' : ''}`
       : l.type === 'image'
@@ -2612,18 +2654,55 @@ function updateLayerList() {
     const editBtn = l.type === 'text'
       ? `<button class="edit-layer-btn" style="border:none; background:none; color:#ea580c; padding:2px 6px; font-size:12px; cursor:pointer;">編集</button>`
       : '';
-    div.innerHTML = `<span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${lbl}</span>${editBtn}<button class="del-btn">×</button>`;
+    div.innerHTML = `<span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${lbl}</span>
+      <button class="nudge-btn" data-dir="up" draggable="false" ${isTop ? 'disabled' : ''} title="前面へ">${CHEVRON_UP_SVG}</button>
+      <button class="nudge-btn" data-dir="down" draggable="false" ${isBottom ? 'disabled' : ''} title="背面へ">${CHEVRON_DOWN_SVG}</button>
+      ${editBtn}<button class="del-btn" draggable="false">×</button>`;
     div.addEventListener('click', ev => {
-      if (ev.target.classList.contains('del-btn')) {
+      if (ev.target.closest('.del-btn')) {
         editState.layers = editState.layers.filter(x => x.id !== l.id);
         if (editState.selectedLayerId === l.id) editState.selectedLayerId = null;
         saveHistory(); render(); updateLayerList(); updateCanvasInfo();
-      } else if (ev.target.classList.contains('edit-layer-btn')) {
+      } else if (ev.target.closest('.edit-layer-btn')) {
         editState.selectedLayerId = l.id; selectTool('select'); render(); updateLayerList();
         openTextModal('edit', l);
+      } else if (ev.target.closest('.nudge-btn')) {
+        // nudge-btn 自身の click ハンドラで処理（ここでは選択クリックにしない）
       } else {
         editState.selectedLayerId = l.id; selectTool('select'); render(); updateLayerList();
       }
+    });
+    div.querySelector('.nudge-btn[data-dir="up"]').addEventListener('click', ev => {
+      ev.stopPropagation();
+      nudgeLayer(l.id, 'up');
+    });
+    div.querySelector('.nudge-btn[data-dir="down"]').addEventListener('click', ev => {
+      ev.stopPropagation();
+      nudgeLayer(l.id, 'down');
+    });
+    div.addEventListener('dragstart', ev => {
+      dragLayerId = l.id;
+      div.classList.add('dragging');
+      ev.dataTransfer.effectAllowed = 'move';
+    });
+    div.addEventListener('dragend', () => {
+      dragLayerId = null;
+      div.classList.remove('dragging');
+      list.querySelectorAll('.layer-item').forEach(el => el.classList.remove('drop-before', 'drop-after'));
+    });
+    div.addEventListener('dragover', ev => {
+      ev.preventDefault();
+      const rect = div.getBoundingClientRect();
+      const before = (ev.clientY - rect.top) < rect.height / 2;
+      list.querySelectorAll('.layer-item').forEach(el => el.classList.remove('drop-before', 'drop-after'));
+      div.classList.add(before ? 'drop-before' : 'drop-after');
+    });
+    div.addEventListener('drop', ev => {
+      ev.preventDefault();
+      const rect = div.getBoundingClientRect();
+      const before = (ev.clientY - rect.top) < rect.height / 2;
+      list.querySelectorAll('.layer-item').forEach(el => el.classList.remove('drop-before', 'drop-after'));
+      moveLayerInPanel(dragLayerId, l.id, before);
     });
     list.appendChild(div);
   }
@@ -3488,7 +3567,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-06-25-03'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-06-25-04'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
