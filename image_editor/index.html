@@ -1863,10 +1863,17 @@ function pasteClipboardItem(base64) {
       .map(l => parseInt(l.name.replace('Clip_', ''), 10));
     const nextNum = existingNums.length > 0 ? Math.max(...existingNums) + 1 : 1;
     const clipName = `Clip_${String(nextNum).padStart(3, '0')}`;
-    const x = Math.round((editState.baseWidth - img.width) / 2);
-    const y = Math.round((editState.baseHeight - img.height) / 2);
-    // src (base64) をそのまま保持 → JSON.stringify/parse でも壊れない
-    const layer = { id: uid(), type: 'image', name: clipName, x, y, w: img.width, h: img.height, src: base64 };
+    // キャンバスより大きい画像は縦横比維持で90%に収めて配置（ハンドルが画面内に収まる）
+    let w = img.width, h = img.height;
+    const maxW = editState.baseWidth * 0.9, maxH = editState.baseHeight * 0.9;
+    if (w > maxW || h > maxH) {
+      const scale = Math.min(maxW / w, maxH / h);
+      w = Math.round(w * scale); h = Math.round(h * scale);
+    }
+    const x = Math.round((editState.baseWidth - w) / 2);
+    const y = Math.round((editState.baseHeight - h) / 2);
+    // src (base64) をそのまま保持 → JSON.stringify/parse でも壊れない（フル解像度を保持するため表示縮小しても画質劣化しない）
+    const layer = { id: uid(), type: 'image', name: clipName, x, y, w, h, src: base64 };
     editState.layers.push(layer);
     editState.selectedLayerId = layer.id;
     selectTool('select');
@@ -2416,8 +2423,8 @@ canvas.addEventListener('mousemove', e => {
     else if (d.handle === 'tr') {                     ny = d.origY + dy; nw = d.origW + dx; nh = d.origH - dy; }
     else if (d.handle === 'bl') { nx = d.origX + dx;                    nw = d.origW - dx; nh = d.origH + dy; }
     else if (d.handle === 'br') {                                        nw = d.origW + dx; nh = d.origH + dy; }
-    // Shift 押下中: 元の縦横比を維持（幅主導で高さを算出し、固定点を再計算）
-    if (e.shiftKey && d.origAr > 0) {
+    // 無修飾時: 縦横比維持（Shiftで自由変形）（幅主導で高さを算出し、固定点を再計算）
+    if (!e.shiftKey && d.origAr > 0) {
       nh = nw / d.origAr;
       if (d.handle === 'tl')      { nx = d.origX + d.origW - nw; ny = d.origY + d.origH - nh; }
       else if (d.handle === 'tr') {                                ny = d.origY + d.origH - nh; }
@@ -3425,7 +3432,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-06-25-01'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-06-25-02'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
