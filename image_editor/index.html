@@ -649,16 +649,7 @@ canvas {
       <!-- 5. 図形 -->
       <div class="section" id="sec-shape">
         <div class="section-title">SHAPE</div>
-        <label style="margin-top:0;">線の色</label>
-        <input type="color" id="shapeColor" value="#000000" style="display:none;">
-        <div id="shapeColorPicker" class="color-picker"></div>
-        <label>線の太さ: <span id="strokeWidthLabel">6</span>px</label>
-        <input type="range" id="strokeWidth" min="1" max="20" value="6">
-        <label class="inline" style="margin-top:8px;"><input type="checkbox" id="shapeFill"> 塗りつぶし</label>
-        <label style="margin-top:8px;" id="shapeFillColorLabel">塗りつぶしの色</label>
-        <input type="color" id="shapeFillColor" value="#ffffff" disabled style="display:none;">
-        <div id="shapeFillColorPicker" class="color-picker" style="opacity:0.4; pointer-events:none;"></div>
-        <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #e5e5e5;">
+        <div style="margin-bottom:10px; padding-bottom:10px; border-bottom:1px dashed #e5e5e5;">
           <div class="row-2" style="margin-top:0;">
             <button class="tool-btn" data-tool="ellipse">〇 楕円<span class="shortcut">O</span></button>
             <button class="tool-btn" data-tool="rect">□ 四角<span class="shortcut">R</span></button>
@@ -669,6 +660,15 @@ canvas {
           </div>
           <button class="tool-btn active" data-tool="select" style="width:100%; margin-top:6px;">選択<span class="shortcut">V</span></button>
         </div>
+        <label style="margin-top:0;">線の色</label>
+        <input type="color" id="shapeColor" value="#000000" style="display:none;">
+        <div id="shapeColorPicker" class="color-picker"></div>
+        <label>線の太さ: <span id="strokeWidthLabel">6</span>px</label>
+        <input type="range" id="strokeWidth" min="1" max="20" value="6">
+        <label class="inline" style="margin-top:8px;"><input type="checkbox" id="shapeFill"> 塗りつぶし</label>
+        <label style="margin-top:8px;" id="shapeFillColorLabel">塗りつぶしの色</label>
+        <input type="color" id="shapeFillColor" value="#ffffff" disabled style="display:none;">
+        <div id="shapeFillColorPicker" class="color-picker" style="opacity:0.4; pointer-events:none;"></div>
       </div>
 
       <!-- 6. 保存（SAVE は常に最下部固定） -->
@@ -3780,7 +3780,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-06-26-01'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-06-26-02'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
