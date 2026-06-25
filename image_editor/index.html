@@ -308,6 +308,13 @@ canvas {
 .canvas-upload-prompt:hover { border-color: #FF7F00; background: #fff7ed; }
 .canvas-upload-prompt .upload-icon { margin-bottom: 12px; }
 .canvas-upload-prompt .upload-title { font-size: 15px; font-weight: 600; }
+.blank-canvas-divider { width: 80%; max-width: 280px; height: 1px; background: #e5e7eb; margin: 18px 0; }
+.blank-canvas-block { width: 100%; max-width: 280px; cursor: default; }
+.blank-canvas-bg-option {
+  flex: 1; justify-content: center; border: 1px solid #cbd5e1; border-radius: 4px;
+  padding: 6px 8px; font-family: 'DM Mono', 'Courier New', monospace;
+  font-size: 11px; text-transform: uppercase; cursor: pointer;
+}
 
 /* ===== Transparent mode ===== */
 #transparentModePanel { display: none; }
@@ -776,6 +783,32 @@ canvas {
         </div>
         <div class="upload-title">画像をドロップ、またはクリックして選択</div>
         <input type="file" id="canvasFileInput" accept="image/*" style="display:none">
+
+        <div class="blank-canvas-divider"></div>
+
+        <div id="blankCanvasBlock" class="blank-canvas-block">
+          <div class="section-title" style="margin-bottom:10px;">新規キャンバスを作成</div>
+          <div class="row-2">
+            <div>
+              <label style="margin-top:0;">WIDTH</label>
+              <input type="number" id="blankCanvasWidth" value="1280" min="1" max="8000">
+            </div>
+            <div>
+              <label style="margin-top:0;">HEIGHT</label>
+              <input type="number" id="blankCanvasHeight" value="670" min="1" max="8000">
+            </div>
+          </div>
+          <label style="margin-top:10px;">BG</label>
+          <div class="btn-row" style="margin-top:0;">
+            <label class="inline blank-canvas-bg-option">
+              <input type="radio" name="blankCanvasBg" value="white" checked> 白
+            </label>
+            <label class="inline blank-canvas-bg-option">
+              <input type="radio" name="blankCanvasBg" value="transparent"> 透明
+            </label>
+          </div>
+          <button id="createBlankCanvasBtn" class="primary btn-action" style="margin-top:12px;">作成</button>
+        </div>
       </div>
       <canvas id="canvas" width="800" height="500" style="display:none;"></canvas>
     </div>
@@ -1540,6 +1573,42 @@ const canvasUploadPrompt = document.getElementById('canvasUploadPrompt');
 const canvasFileInput = document.getElementById('canvasFileInput');
 canvasUploadPrompt.addEventListener('click', () => canvasFileInput.click());
 canvasFileInput.addEventListener('change', e => { if (e.target.files[0]) loadEditImage(e.target.files[0]); });
+
+// --- 新規キャンバスを作成 ---
+const BLANK_CANVAS_MAX_SIZE = 8000;
+
+function createBlankCanvas(w, h, transparent) {
+  canvas.width = w; canvas.height = h;
+  ctx.clearRect(0, 0, w, h);
+  if (!transparent) { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h); }
+  editState.baseImage = ctx.getImageData(0, 0, w, h);
+  editState.baseWidth = w; editState.baseHeight = h;
+  editState.aspectRatio = w / h;
+  editState.layers = []; editState.history = []; editState.historyIdx = -1;
+  document.getElementById('resizeWidth').value = w;
+  document.getElementById('resizeHeight').value = h;
+  document.getElementById('canvasUploadPrompt').style.display = 'none';
+  canvas.style.display = 'block';
+  zoomFit(); saveHistory(); render(); updateCanvasInfo(); updateLayerList();
+  toast(`${w}×${h} の新規キャンバスを作成しました`);
+}
+
+document.getElementById('blankCanvasBlock').addEventListener('click', e => e.stopPropagation());
+
+document.getElementById('createBlankCanvasBtn').addEventListener('click', () => {
+  const w = parseInt(document.getElementById('blankCanvasWidth').value, 10);
+  const h = parseInt(document.getElementById('blankCanvasHeight').value, 10);
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) {
+    toast('幅と高さを正しく入力してください');
+    return;
+  }
+  if (w > BLANK_CANVAS_MAX_SIZE || h > BLANK_CANVAS_MAX_SIZE) {
+    toast(`幅・高さは ${BLANK_CANVAS_MAX_SIZE}px 以下にしてください`);
+    return;
+  }
+  const transparent = document.querySelector('input[name="blankCanvasBg"]:checked').value === 'transparent';
+  createBlankCanvas(w, h, transparent);
+});
 
 canvasWrapper.addEventListener('dragover', e => { e.preventDefault(); canvasWrapper.classList.add('canvas-dragover'); });
 canvasWrapper.addEventListener('dragleave', e => {
@@ -3356,7 +3425,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-06-19-01'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-06-25-01'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
