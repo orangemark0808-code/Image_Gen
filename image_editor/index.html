@@ -146,18 +146,22 @@ body {
 
 /* ===== Common Sidebar Components ===== */
 .section {
-  margin-bottom: 16px;
-  padding-bottom: 14px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
   border-bottom: 1px solid #e5e7eb;
 }
 .section:last-child { border-bottom: none; margin-bottom: 0; }
 .section-title {
-  font-size: 11px;
-  font-weight: 700;
-  color: #000000;
-  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #3a2a1a;
+  margin-bottom: 10px;
+  margin-top: 4px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.06em;
+  padding-left: 10px;
+  border-left: 3px solid #FF7F00;
+  line-height: 1.4;
 }
 label {
   display: block;
@@ -655,8 +659,7 @@ canvas {
         <input type="color" id="shapeFillColor" value="#ffffff" disabled style="display:none;">
         <div id="shapeFillColorPicker" class="color-picker" style="opacity:0.4; pointer-events:none;"></div>
         <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #e5e5e5;">
-          <label style="margin-top:0; font-weight:600;">ツール</label>
-          <div class="row-2" style="margin-top:4px;">
+          <div class="row-2" style="margin-top:0;">
             <button class="tool-btn" data-tool="ellipse">〇 楕円<span class="shortcut">O</span></button>
             <button class="tool-btn" data-tool="rect">□ 四角<span class="shortcut">R</span></button>
           </div>
@@ -1362,6 +1365,12 @@ function drawText(l, tCtx) {
     if (tCtx === ctx && editState.selectedLayerId === l.id) {
       tCtx.strokeStyle = '#ea580c'; tCtx.lineWidth = 2; tCtx.setLineDash([4,4]);
       tCtx.strokeRect(l.x - 6, l.y - 4, totalW + 12, maxH + 8); tCtx.setLineDash([]);
+      // 四隅ハンドル
+      [[l.x - 6, l.y - 4], [l.x + totalW + 6, l.y - 4],
+       [l.x - 6, l.y + maxH + 4], [l.x + totalW + 6, l.y + maxH + 4]].forEach(([hx, hy]) => {
+        tCtx.fillStyle = '#fff'; tCtx.strokeStyle = '#ea580c'; tCtx.lineWidth = 1.5; tCtx.setLineDash([]);
+        tCtx.beginPath(); tCtx.arc(hx, hy, 5, 0, Math.PI * 2); tCtx.fill(); tCtx.stroke();
+      });
     }
   } else {
     // 横書き: \n 改行対応
@@ -1381,6 +1390,12 @@ function drawText(l, tCtx) {
     if (tCtx === ctx && editState.selectedLayerId === l.id) {
       tCtx.strokeStyle = '#ea580c'; tCtx.lineWidth = 2; tCtx.setLineDash([4,4]);
       tCtx.strokeRect(l.x - 6, l.y - 4, maxW + 12, textH + 8); tCtx.setLineDash([]);
+      // 四隅ハンドル
+      [[l.x - 6, l.y - 4], [l.x + maxW + 6, l.y - 4],
+       [l.x - 6, l.y + textH + 4], [l.x + maxW + 6, l.y + textH + 4]].forEach(([hx, hy]) => {
+        tCtx.fillStyle = '#fff'; tCtx.strokeStyle = '#ea580c'; tCtx.lineWidth = 1.5; tCtx.setLineDash([]);
+        tCtx.beginPath(); tCtx.arc(hx, hy, 5, 0, Math.PI * 2); tCtx.fill(); tCtx.stroke();
+      });
     }
   }
   tCtx.restore();
@@ -1534,6 +1549,18 @@ function getShapeHandleHit(l, x, y) {
   if (Math.hypot(x - (bx + bw), y - by) <= 8) return 'tr';
   if (Math.hypot(x - bx, y - (by + bh)) <= 8) return 'bl';
   if (Math.hypot(x - (bx + bw), y - (by + bh)) <= 8) return 'br';
+  return null;
+}
+
+// 選択中 text レイヤーのどのコーナーハンドルをクリックしたか判定
+function getTextHandleHit(l, x, y) {
+  const b = getTextBounds(l);
+  const bx = l.x - 6, by = l.y - 4;
+  const bw = b.w + 12, bh = b.h + 8;
+  if (Math.hypot(x - bx,        y - by)        <= 9) return 'tl';
+  if (Math.hypot(x - (bx + bw), y - by)        <= 9) return 'tr';
+  if (Math.hypot(x - bx,        y - (by + bh)) <= 9) return 'bl';
+  if (Math.hypot(x - (bx + bw), y - (by + bh)) <= 9) return 'br';
   return null;
 }
 
@@ -2519,6 +2546,28 @@ canvas.addEventListener('mousedown', e => {
           return;
         }
       }
+      // テキストレイヤーのコーナーハンドル判定
+      const selText = editState.layers.find(l => l.id === editState.selectedLayerId && l.type === 'text');
+      if (selText) {
+        const hit = getTextHandleHit(selText, pos.x, pos.y);
+        if (hit) {
+          e.preventDefault();
+          const b = getTextBounds(selText);
+          editState.dragging = {
+            type: 'text-resize',
+            layerId: selText.id,
+            handle: hit,
+            origX: selText.x,
+            origY: selText.y,
+            origSize: selText.size,
+            origW: b.w + 12,
+            origH: b.h + 8,
+            startX: pos.x,
+            startY: pos.y
+          };
+          return;
+        }
+      }
       const selShape = editState.layers.find(l => l.id === editState.selectedLayerId && l.type === 'shape');
       if (selShape) {
         const hit = getShapeHandleHit(selShape, pos.x, pos.y);
@@ -2641,6 +2690,27 @@ canvas.addEventListener('mousemove', e => {
       layer.x1 = fixedX; layer.y1 = fixedY; layer.x2 = movX; layer.y2 = movY;
     }
     if (!resizeRaf) resizeRaf = requestAnimationFrame(() => { render(); resizeRaf = null; });
+  } else if (editState.dragging.type === 'text-resize') {
+    const d = editState.dragging;
+    const layer = editState.layers.find(l => l.id === d.layerId);
+    if (!layer) return;
+    const dx = pos.x - d.startX, dy = pos.y - d.startY;
+    // ドラッグしたハンドルに応じてスケールを算出（幅主導）
+    let newW = d.origW, newH = d.origH;
+    if (d.handle === 'br')      { newW = d.origW + dx;  newH = d.origH + dy; }
+    else if (d.handle === 'bl') { newW = d.origW - dx;  newH = d.origH + dy; }
+    else if (d.handle === 'tr') { newW = d.origW + dx;  newH = d.origH - dy; }
+    else if (d.handle === 'tl') { newW = d.origW - dx;  newH = d.origH - dy; }
+    // 幅と高さの平均スケール比でフォントサイズを算出
+    const scaleW = newW / d.origW;
+    const scaleH = newH / d.origH;
+    const scale = (scaleW + scaleH) / 2;
+    const newSize = Math.max(8, Math.round(d.origSize * scale));
+    layer.size = newSize;
+    // tl/bl ハンドルはx座標を移動、tl/tr はy座標を移動
+    if (d.handle === 'tl' || d.handle === 'bl') layer.x = d.origX + (d.origW - newW) / 2;
+    if (d.handle === 'tl' || d.handle === 'tr') layer.y = d.origY + (d.origH - newH) / 2;
+    if (!resizeRaf) resizeRaf = requestAnimationFrame(() => { render(); resizeRaf = null; });
   } else if (editState.dragging.type === 'img-rotate') {
     const d = editState.dragging;
     const layer = editState.layers.find(l => l.id === d.layerId);
@@ -2671,7 +2741,7 @@ canvas.addEventListener('mouseup', e => {
     }
     render();
   } else if (editState.dragging.type === 'move') { saveHistory(); }
-  else if (editState.dragging.type === 'img-resize' || editState.dragging.type === 'img-rotate' || editState.dragging.type === 'shape-resize') { saveHistory(); render(); }
+  else if (editState.dragging.type === 'img-resize' || editState.dragging.type === 'img-rotate' || editState.dragging.type === 'shape-resize' || editState.dragging.type === 'text-resize') { saveHistory(); render(); }
   editState.dragging = null;
   editState.moveSnap = null;
   render();
@@ -2701,7 +2771,7 @@ document.addEventListener('mouseup', () => {
   // （canvas mouseup が先に発火した場合は dragging=null になっているので何もしない）
   if (editState.dragging) {
     if (resizeRaf) { cancelAnimationFrame(resizeRaf); resizeRaf = null; }
-    if (editState.dragging.type === 'move' || editState.dragging.type === 'img-resize' || editState.dragging.type === 'img-rotate' || editState.dragging.type === 'shape-resize') {
+    if (editState.dragging.type === 'move' || editState.dragging.type === 'img-resize' || editState.dragging.type === 'img-rotate' || editState.dragging.type === 'shape-resize' || editState.dragging.type === 'text-resize') {
       saveHistory(); render();
     }
     editState.dragging = null;
@@ -3710,7 +3780,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-06-25-06'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-06-26-01'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
