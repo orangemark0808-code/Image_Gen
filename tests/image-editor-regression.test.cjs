@@ -71,6 +71,34 @@ test('all inline scripts and modified service workers parse', () => {
   }
   for (const file of ['studio/sw.js', 'image_editor/service-worker.js']) new vm.Script(read(file));
 });
+test('freehand stroke remains drawable after moving, resizing, and serialization', () => {
+  const lines = [];
+  const context = vm.createContext({
+    uid: () => 'stroke', editState: {selectedLayerId: null},
+    ctx: {save() {}, restore() {}, beginPath() {}, moveTo(x, y) {lines.push(['start', x, y]);},
+      lineTo(x, y) {lines.push(['end', x, y]);}, stroke() {}, arc() {}, fill() {}},
+  });
+  vm.runInContext(extract('function createFreehandLayer(', 'function appendFreehandPoint(') +
+    extract('function drawShape(', 'function drawImageLayer('), context);
+  const layer = context.createFreehandLayer([{x: 10, y: 20}, {x: 30, y: 40}], '#000000', 6);
+  assert.equal(layer.shape, 'freehand');
+  context.drawShape(layer);
+  assert.deepEqual(lines, [['start', 10, 20], ['end', 30, 40]]);
+  lines.length = 0;
+  const restored = JSON.parse(JSON.stringify(layer));
+  restored.x1 += 5; restored.x2 += 15; restored.y1 += 10; restored.y2 += 20;
+  context.drawShape(restored);
+  assert.deepEqual(lines, [['start', 15, 30], ['end', 45, 60]]);
+});
+test('freehand layer survives state save and restore', async () => {
+  const e = environment();
+  e.state.layers = [{id: 'stroke', type: 'shape', shape: 'freehand', x1: 2, y1: 3, x2: 12, y2: 13,
+    points: [{x: 0, y: 0}, {x: 1, y: 1}], color: '#000000', strokeWidth: 6, fill: false}];
+  e.handlers.get('saveState:click')();
+  await e.handlers.get('loadState:click')();
+  assert.equal(e.state.layers[0].shape, 'freehand');
+  assert.deepEqual(JSON.parse(JSON.stringify(e.state.layers[0].points)), [{x: 0, y: 0}, {x: 1, y: 1}]);
+});
 test('state save omits image caches without changing active layers', () => {
   const e = environment();
   e.handlers.get('saveState:click')();

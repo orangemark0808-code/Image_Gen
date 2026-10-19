@@ -639,7 +639,10 @@ canvas {
             <button class="tool-btn" data-tool="arrow">→ 矢印<span class="shortcut">A</span></button>
             <button class="tool-btn" data-tool="line">／ 線<span class="shortcut">L</span></button>
           </div>
-          <button class="tool-btn active" data-tool="select" style="width:100%; margin-top:6px;">選択<span class="shortcut">V</span></button>
+          <div class="row-2" style="margin-top:6px;">
+            <button class="tool-btn" data-tool="freehand">✎ 手書き<span class="shortcut">P</span></button>
+            <button class="tool-btn active" data-tool="select">選択<span class="shortcut">V</span></button>
+          </div>
         </div>
         <label style="margin-top:0;">線の色</label>
         <input type="color" id="shapeColor" value="#000000" style="display:none;">
@@ -1295,6 +1298,7 @@ canvasWrapper.addEventListener('wheel', e => {
 // --- Cursor ---
 function updateCursor() {
   canvas.style.cursor = editState.currentTool === 'select' ? 'default' : 'crosshair';
+  canvas.style.touchAction = editState.currentTool === 'freehand' ? 'none' : '';
 }
 
 // --- Render ---
@@ -1464,7 +1468,20 @@ function drawShape(l) {
   ctx.strokeStyle = l.color; ctx.fillStyle = l.fill ? (l.fillColor || l.color) : l.color; ctx.lineWidth = l.strokeWidth;
   const x = Math.min(l.x1, l.x2); const y = Math.min(l.y1, l.y2);
   const w = Math.abs(l.x2 - l.x1); const h = Math.abs(l.y2 - l.y1);
-  if (l.shape === 'ellipse') {
+  if (l.shape === 'freehand') {
+    if (Array.isArray(l.points) && l.points.length) {
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      if (l.points.length === 1) {
+        ctx.beginPath(); ctx.arc(x, y, l.strokeWidth / 2, 0, Math.PI * 2);
+        ctx.fillStyle = l.color; ctx.fill();
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(x + l.points[0].x * w, y + l.points[0].y * h);
+        for (let i = 1; i < l.points.length; i++) ctx.lineTo(x + l.points[i].x * w, y + l.points[i].y * h);
+        ctx.stroke();
+      }
+    }
+  } else if (l.shape === 'ellipse') {
     ctx.beginPath(); ctx.ellipse(x + w/2, y + h/2, w/2, h/2, 0, 0, Math.PI * 2);
     if (l.fill) ctx.fill(); ctx.stroke();
   } else if (l.shape === 'rect') {
@@ -1477,7 +1494,7 @@ function drawShape(l) {
   if (editState.selectedLayerId === l.id) {
     ctx.strokeStyle = '#ea580c'; ctx.lineWidth = 1; ctx.setLineDash([4,4]);
     ctx.strokeRect(x - 4, y - 4, w + 8, h + 8); ctx.setLineDash([]);
-    // リサイズハンドル（rect/ellipse=四隅、line/arrow=両端点）
+    // リサイズハンドル（図形・手書き=四隅、線・矢印=両端点）
     ctx.setLineDash([]); ctx.fillStyle = '#fff'; ctx.strokeStyle = '#ea580c'; ctx.lineWidth = 1.5;
     const handlePoints = (l.shape === 'line' || l.shape === 'arrow')
       ? [[l.x1, l.y1], [l.x2, l.y2]]
@@ -1667,7 +1684,7 @@ function updateCanvasInfo() {
 }
 
 function toolName(t) {
-  return { select:'選択', crop:'トリミング', ellipse:'楕円', rect:'四角', arrow:'矢印', line:'線' }[t] || t;
+  return { select:'選択', crop:'トリミング', ellipse:'楕円', rect:'四角', arrow:'矢印', line:'線', freehand:'手書き' }[t] || t;
 }
 
 function updateCropStatus() {
@@ -1749,7 +1766,7 @@ document.querySelectorAll('.tool-btn').forEach(btn => {
 function selectTool(tool, revealSection = false) {
   if (revealSection) {
     if (tool === 'crop') showEditSection('sec-trim');
-    else if (['select', 'ellipse', 'rect', 'arrow', 'line'].includes(tool)) showEditSection('sec-shape');
+    else if (['select', 'ellipse', 'rect', 'arrow', 'line', 'freehand'].includes(tool)) showEditSection('sec-shape');
   }
   editState.currentTool = tool;
   document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
@@ -2584,12 +2601,98 @@ function getCanvasPos(e) {
   };
 }
 
+function createFreehandLayer(points, color, strokeWidth) {
+  let x1 = points[0].x, x2 = x1, y1 = points[0].y, y2 = y1;
+  for (const p of points) {
+    x1 = Math.min(x1, p.x); x2 = Math.max(x2, p.x);
+    y1 = Math.min(y1, p.y); y2 = Math.max(y2, p.y);
+  }
+  const w = x2 - x1 || 1, h = y2 - y1 || 1;
+  return { id: uid(), type: 'shape', shape: 'freehand', x1, y1, x2, y2,
+    points: points.map(p => ({ x: (p.x - x1) / w, y: (p.y - y1) / h })),
+    color, strokeWidth, fill: false };
+}
+
+function appendFreehandPoint(drag, event) {
+  const pos = getCanvasPos(event);
+  const x = Math.max(0, Math.min(canvas.width, pos.x));
+  const y = Math.max(0, Math.min(canvas.height, pos.y));
+  const last = drag.points[drag.points.length - 1];
+  if (!last || Math.hypot(x - last.x, y - last.y) >= 0.75) {
+    if (drag.points.length >= 100000) drag.points = drag.points.filter((_, i) => i % 2 === 0);
+    drag.points.push({ x, y });
+  }
+}
+
+function drawFreehandPreview(drag) {
+  render();
+  ctx.save();
+  ctx.strokeStyle = drag.color; ctx.fillStyle = drag.color;
+  ctx.lineWidth = drag.strokeWidth; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (drag.points.length === 1) {
+    ctx.beginPath();
+    ctx.arc(drag.points[0].x, drag.points[0].y, drag.strokeWidth / 2, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.beginPath(); ctx.moveTo(drag.points[0].x, drag.points[0].y);
+    for (let i = 1; i < drag.points.length; i++) ctx.lineTo(drag.points[i].x, drag.points[i].y);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+let freehandPreviewRaf = null;
+function finishFreehandStroke(event) {
+  const drag = editState.dragging;
+  if (!drag || drag.type !== 'freehand') return;
+  if (freehandPreviewRaf !== null) { cancelAnimationFrame(freehandPreviewRaf); freehandPreviewRaf = null; }
+  if (event) appendFreehandPoint(drag, event);
+  editState.dragging = null;
+  if (!editState.baseImage) return;
+  editState.layers.push(createFreehandLayer(drag.points, drag.color, drag.strokeWidth));
+  editState.selectedLayerId = null;
+  saveHistory(); render(); updateLayerList(); updateCanvasInfo();
+}
+
+canvas.addEventListener('pointerdown', e => {
+  if (editState.currentTool !== 'freehand' || !editState.baseImage || editState.spacePressed || editState.dragging ||
+      (e.pointerType === 'mouse' && e.button !== 0)) return;
+  e.preventDefault();
+  const drag = { type: 'freehand', pointerId: e.pointerId, points: [],
+    color: document.getElementById('shapeColor').value,
+    strokeWidth: parseInt(document.getElementById('strokeWidth').value, 10) };
+  appendFreehandPoint(drag, e);
+  editState.dragging = drag;
+  canvas.setPointerCapture(e.pointerId);
+  drawFreehandPreview(drag);
+});
+canvas.addEventListener('pointermove', e => {
+  const drag = editState.dragging;
+  if (!drag || drag.type !== 'freehand' || drag.pointerId !== e.pointerId) return;
+  e.preventDefault();
+  for (const sample of e.getCoalescedEvents?.() || [e]) appendFreehandPoint(drag, sample);
+  if (freehandPreviewRaf === null) freehandPreviewRaf = requestAnimationFrame(() => {
+    freehandPreviewRaf = null;
+    if (editState.dragging === drag) drawFreehandPreview(drag);
+  });
+});
+canvas.addEventListener('pointerup', e => {
+  if (editState.dragging?.type === 'freehand' && editState.dragging.pointerId === e.pointerId) finishFreehandStroke(e);
+});
+canvas.addEventListener('pointercancel', e => {
+  if (editState.dragging?.type === 'freehand' && editState.dragging.pointerId === e.pointerId) finishFreehandStroke();
+});
+canvas.addEventListener('lostpointercapture', e => {
+  if (editState.dragging?.type === 'freehand' && editState.dragging.pointerId === e.pointerId) finishFreehandStroke();
+});
+
 canvas.addEventListener('mousedown', e => {
   if (!editState.baseImage) return;
   if (editState.spacePressed) {
     editState.panning = { startX: e.clientX, startY: e.clientY, scrollLeft: canvasWrapper.scrollLeft, scrollTop: canvasWrapper.scrollTop };
     canvasWrapper.classList.add('panning'); e.preventDefault(); return;
   }
+  if (editState.currentTool === 'freehand') return; // 手書きは pointer イベントでマウス・ペン・タッチを統一処理
   const pos = getCanvasPos(e);
   const tool = editState.currentTool;
   if (tool === 'crop') { editState.dragging = { type: 'crop', startX: pos.x, startY: pos.y }; return; }
@@ -2668,6 +2771,7 @@ canvas.addEventListener('mousedown', e => {
 let resizeRaf = null; // img-resize/rotate 用 rAF スロットリング ID
 
 canvas.addEventListener('mousemove', e => {
+  if (editState.dragging?.type === 'freehand') return;
   if (editState.panning) {
     canvasWrapper.scrollLeft = editState.panning.scrollLeft - (e.clientX - editState.panning.startX);
     canvasWrapper.scrollTop = editState.panning.scrollTop - (e.clientY - editState.panning.startY);
@@ -2806,6 +2910,7 @@ canvas.addEventListener('mousemove', e => {
 });
 
 canvas.addEventListener('mouseup', e => {
+  if (editState.dragging?.type === 'freehand') return;
   if (editState.panning) { editState.panning = null; canvasWrapper.classList.remove('panning'); return; }
   if (!editState.dragging) return;
   // pending な rAF をキャンセルして、mouseup 時に最終描画を確実に行う
@@ -2850,6 +2955,7 @@ document.addEventListener('mousemove', e => {
   }
 });
 document.addEventListener('mouseup', () => {
+  if (editState.dragging?.type === 'freehand') return; // pointer capture 側の pointerup で確定
   if (editState.panning) { editState.panning = null; canvasWrapper.classList.remove('panning'); }
   // キャンバス外でマウスを離したとき: canvas の mouseup が発火しないのでここで解除
   // （canvas mouseup が先に発火した場合は dragging=null になっているので何もしない）
@@ -2956,7 +3062,7 @@ function updateLayerList() {
       ? `T ${l.direction === 'vertical' ? '縦' : '横'} ${l.text.slice(0,10)}${l.text.length > 10 ? '…' : ''}`
       : l.type === 'image'
       ? `[IMG] ${l.name}`
-      : `${l.shape === 'ellipse' ? '〇' : l.shape === 'rect' ? '□' : l.shape === 'arrow' ? '→' : '／'} 図形`;
+      : l.shape === 'freehand' ? '✎ 手書き' : `${l.shape === 'ellipse' ? '〇' : l.shape === 'rect' ? '□' : l.shape === 'arrow' ? '→' : '／'} 図形`;
     const editBtn = l.type === 'text'
       ? `<button class="edit-layer-btn" style="border:none; background:none; color:#ea580c; padding:2px 6px; font-size:12px; cursor:pointer;">編集</button>`
       : '';
@@ -3068,6 +3174,12 @@ async function prepareSavedState(data) {
     loadSavedImage(data.baseImageData),
     ...layers.map(async layer => {
       if (!layer || !['image', 'text', 'shape'].includes(layer.type)) throw new Error('レイヤーが不正です');
+      if (layer.type === 'shape' && layer.shape === 'freehand' &&
+          (!Array.isArray(layer.points) || layer.points.length < 1 || layer.points.length > 100000 ||
+           !layer.points.every(p => p && Number.isFinite(p.x) && Number.isFinite(p.y)) ||
+           ![layer.x1, layer.y1, layer.x2, layer.y2, layer.strokeWidth].every(Number.isFinite))) {
+        throw new Error('手書きレイヤーが不正です');
+      }
       if (layer.type === 'image') {
         if (typeof layer.src !== 'string' || !layer.src) throw new Error('画像がありません');
         layer._img = await loadSavedImage(layer.src);
@@ -3133,7 +3245,7 @@ document.getElementById('redoBtn').addEventListener('click', async () => {
 });
 
 // --- Keyboard shortcuts ---
-const shortcutMap = { v:'select', c:'crop', o:'ellipse', r:'rect', a:'arrow', l:'line' };
+const shortcutMap = { v:'select', c:'crop', o:'ellipse', r:'rect', a:'arrow', l:'line', p:'freehand' };
 
 document.addEventListener('keydown', e => {
   const inField = ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName);
@@ -3912,7 +4024,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-10-19-04'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-10-19-05'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
