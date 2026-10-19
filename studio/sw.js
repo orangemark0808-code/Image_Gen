@@ -1,4 +1,5 @@
-const CACHE_NAME = 'ohana-studio-2026-06-09-01';
+const CACHE_PREFIX = 'ohana-studio-';
+const CACHE_NAME = CACHE_PREFIX + '2026-10-19-01';
 
 // キャッシュする統合UI本体のアセット
 const ASSETS = [
@@ -11,32 +12,30 @@ const ASSETS = [
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
+    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting())
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
       Promise.all(
-        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+        keys.filter(key => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME).map(key => caches.delete(key))
       )
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
   // 別オリジンのiframeコンテンツはキャッシュしない（そのまま通す）
-  if (url.origin !== self.location.origin) {
+  if (event.request.method !== 'GET' || url.origin !== self.location.origin) {
     return;
   }
 
   event.respondWith(
-    caches.match(event.request).then(cached => {
+    caches.match(event.request, { cacheName: CACHE_NAME }).then(cached => {
       if (cached) return cached;
       return fetch(event.request).then(response => {
         // 正常レスポンスのみキャッシュ
@@ -44,7 +43,7 @@ self.addEventListener('fetch', event => {
           return response;
         }
         const toCache = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, toCache));
+        event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.put(event.request, toCache)));
         return response;
       });
     })

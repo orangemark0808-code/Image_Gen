@@ -1207,10 +1207,14 @@ const ctx = canvas.getContext('2d', { willReadFrequently: true });
 const canvasWrapper = document.getElementById('canvasWrapper');
 
 // --- History ---
+function serializeLayers(layers) {
+  return JSON.parse(JSON.stringify(layers, (key, value) => key === '_img' ? undefined : value));
+}
+
 function saveHistory() {
   editState.history = editState.history.slice(0, editState.historyIdx + 1);
   editState.history.push({
-    layers: JSON.parse(JSON.stringify(editState.layers, (key, value) => key === '_img' ? undefined : value)),
+    layers: serializeLayers(editState.layers),
     baseWidth: editState.baseWidth,
     baseHeight: editState.baseHeight,
     baseImageData: editState.baseImage ? canvasToDataURL_base() : null,
@@ -1906,45 +1910,92 @@ function executeCrop() {
   return true;
 }
 
-function executeResize() {
+function readResizeDimensions(width, height) {
   const mode = document.querySelector('input[name="resizeMode"]:checked').value;
   let newW, newH;
   if (mode === 'pixel') {
-    newW = parseInt(document.getElementById('resizeWidth').value);
-    newH = parseInt(document.getElementById('resizeHeight').value);
-    if (!newW || !newH) { toast('幅と高さを入力してください'); return false; }
+    newW = Number(document.getElementById('resizeWidth').value);
+    newH = Number(document.getElementById('resizeHeight').value);
   } else {
-    const pct = parseFloat(document.getElementById('resizePercent').value);
-    if (!pct || pct <= 0) { toast('倍率を入力してください'); return false; }
-    newW = Math.round(editState.baseWidth * pct / 100);
-    newH = Math.round(editState.baseHeight * pct / 100);
+    const pct = Number(document.getElementById('resizePercent').value);
+    if (!Number.isFinite(pct) || pct <= 0) { toast('倍率を正しく入力してください'); return null; }
+    newW = Math.round(width * pct / 100);
+    newH = Math.round(height * pct / 100);
   }
-  if (newW === editState.baseWidth && newH === editState.baseHeight) return true;
-  resizeCanvas(newW, newH);
+  if (!validResizeDimensions(newW, newH)) return null;
+  return { width: newW, height: newH };
+}
+
+function validResizeDimensions(w, h) {
+  if (!Number.isSafeInteger(w) || !Number.isSafeInteger(h) || w < 1 || h < 1 ||
+      w > BLANK_CANVAS_MAX_SIZE || h > BLANK_CANVAS_MAX_SIZE) {
+    toast(`幅・高さは1〜${BLANK_CANVAS_MAX_SIZE}pxの整数にしてください`);
+    return false;
+  }
   return true;
 }
 
-function resizeCanvas(newW, newH) {
-  const tmp = document.createElement('canvas');
-  tmp.width = editState.baseWidth; tmp.height = editState.baseHeight;
-  tmp.getContext('2d').putImageData(editState.baseImage, 0, 0);
+function executeResize(crop = null) {
+  const size = readResizeDimensions(crop ? Math.round(crop.w) : editState.baseWidth,
+    crop ? Math.round(crop.h) : editState.baseHeight);
+  if (!size) return false;
+  try {
+    resizeCanvas(size.width, size.height, crop);
+    return true;
+  } catch (e) {
+    toast('リサイズできませんでした。寸法を小さくして再実行してください');
+    return false;
+  }
+}
+
+function resizeCanvas(newW, newH, crop = null) {
+  if (!validResizeDimensions(newW, newH)) throw new Error('Invalid resize dimensions');
+  const source = document.createElement('canvas');
+  source.width = editState.baseWidth; source.height = editState.baseHeight;
+  if (crop) {
+    // 合成・切り抜きも一時Canvasで準備し、失敗時に編集状態を残す。
+    const selection = editState.selectedLayerId, previousCrop = editState.cropRect;
+    try {
+      editState.selectedLayerId = null; editState.cropRect = null;
+      render();
+      source.getContext('2d').drawImage(canvas, 0, 0);
+    } finally {
+      editState.selectedLayerId = selection; editState.cropRect = previousCrop;
+      render();
+    }
+  } else {
+    source.getContext('2d').putImageData(editState.baseImage, 0, 0);
+  }
+  const output = document.createElement('canvas');
+  output.width = newW; output.height = newH;
+  const outputCtx = output.getContext('2d');
+  if (crop) outputCtx.drawImage(source, crop.x, crop.y, crop.w, crop.h, 0, 0, newW, newH);
+  else outputCtx.drawImage(source, 0, 0, newW, newH);
+  const baseImage = outputCtx.getImageData(0, 0, newW, newH);
   const scaleX = newW / editState.baseWidth; const scaleY = newH / editState.baseHeight;
-  canvas.width = newW; canvas.height = newH; ctx.drawImage(tmp, 0, 0, newW, newH);
-  editState.baseImage = ctx.getImageData(0, 0, newW, newH);
-  editState.baseWidth = newW; editState.baseHeight = newH; editState.aspectRatio = newW / newH;
-  for (const l of editState.layers) {
+  const layers = crop ? [] : editState.layers.map(l => ({ ...l }));
+  for (const l of layers) {
     if (l.type === 'text')  { l.x *= scaleX; l.y *= scaleY; l.size *= (scaleX + scaleY) / 2; }
     else if (l.type === 'image') { l.x *= scaleX; l.y *= scaleY; l.w *= scaleX; l.h *= scaleY; }
     else { l.x1 *= scaleX; l.x2 *= scaleX; l.y1 *= scaleY; l.y2 *= scaleY; }
   }
-  // TRIM選択範囲もレイヤーと同様に拡縮し、リサイズ後の枠ズレを防ぐ
-  if (editState.cropRect) {
-    editState.cropRect.x *= scaleX;
-    editState.cropRect.y *= scaleY;
-    editState.cropRect.w *= scaleX;
-    editState.cropRect.h *= scaleY;
-    updateCropStatus();
+  const cropRect = crop || !editState.cropRect ? null : {
+    x: editState.cropRect.x * scaleX, y: editState.cropRect.y * scaleY,
+    w: editState.cropRect.w * scaleX, h: editState.cropRect.h * scaleY,
+  };
+  try {
+    canvas.width = newW; canvas.height = newH;
+    ctx.putImageData(baseImage, 0, 0);
+  } catch (e) {
+    canvas.width = editState.baseWidth; canvas.height = editState.baseHeight;
+    render();
+    throw e;
   }
+  editState.baseImage = baseImage;
+  editState.baseWidth = newW; editState.baseHeight = newH; editState.aspectRatio = newW / newH;
+  editState.layers = layers; editState.cropRect = cropRect;
+  if (crop) editState.selectedLayerId = null;
+  updateCropStatus();
   document.getElementById('resizeWidth').value = newW;
   document.getElementById('resizeHeight').value = newH;
 }
@@ -1953,7 +2004,6 @@ function resizeCanvas(newW, newH) {
 document.getElementById('doResizeBtn').addEventListener('click', () => {
   if (!editState.baseImage) { toast('先に画像を読み込んでください'); return; }
   const target = document.querySelector('input[name="resizeTarget"]:checked').value;
-  const mode   = document.querySelector('input[name="resizeMode"]:checked').value;
 
   if (target === 'canvas') {
     // 画像全体リサイズ（既存の executeResize を流用）
@@ -1966,20 +2016,11 @@ document.getElementById('doResizeBtn').addEventListener('click', () => {
     const sel = editState.layers.find(l => l.id === editState.selectedLayerId);
     if (!sel) { toast('レイヤーを選択してください'); return; }
     if (sel.type !== 'image') { toast('画像レイヤー（Clip）のみリサイズできます'); return; }
-    let newW, newH;
-    if (mode === 'pixel') {
-      newW = parseInt(document.getElementById('resizeWidth').value);
-      newH = parseInt(document.getElementById('resizeHeight').value);
-      if (!newW || !newH || newW < 1 || newH < 1) { toast('幅と高さを入力してください'); return; }
-    } else {
-      const pct = parseFloat(document.getElementById('resizePercent').value);
-      if (!pct || pct <= 0) { toast('倍率を入力してください'); return; }
-      newW = Math.round(sel.w * pct / 100);
-      newH = Math.round(sel.h * pct / 100);
-    }
-    sel.w = newW; sel.h = newH;
+    const size = readResizeDimensions(sel.w, sel.h);
+    if (!size) return;
+    sel.w = size.width; sel.h = size.height;
     saveHistory(); render(); updateCanvasInfo();
-    toast(`${sel.name} をリサイズしました: ${newW}×${newH}px`);
+    toast(`${sel.name} をリサイズしました: ${sel.w}×${sel.h}px`);
   }
 });
 
@@ -2111,7 +2152,7 @@ document.getElementById('applyBoth').addEventListener('click', () => {
   if (!editState.baseImage) { toast('先に画像を読み込んでください'); return; }
   const selImg = editState.layers.find(l => l.id === editState.selectedLayerId && l.type === 'image');
   if (selImg) { toast('画像レイヤー選択中は「トリミング実行」で画像だけを切り抜けます'); return; }
-  if (executeCrop() && executeResize()) { applyZoom(); saveHistory(); render(); updateCanvasInfo(); updateLayerList(); toast(`完了: ${editState.baseWidth}×${editState.baseHeight}px`); }
+  if (editState.cropRect && executeResize(editState.cropRect)) { applyZoom(); saveHistory(); render(); updateCanvasInfo(); updateLayerList(); toast(`完了: ${editState.baseWidth}×${editState.baseHeight}px`); }
 });
 
 // 選択中の図形レイヤー（type:'shape'）を返す。未選択時は undefined
@@ -3010,36 +3051,75 @@ document.getElementById('saveState').addEventListener('click', () => {
   if (!editState.baseImage) { toast('保存する状態がありません'); return; }
   try {
     localStorage.setItem(LS_KEY, JSON.stringify({
-      layers: editState.layers, baseWidth: editState.baseWidth, baseHeight: editState.baseHeight,
+      layers: serializeLayers(editState.layers), baseWidth: editState.baseWidth, baseHeight: editState.baseHeight,
       baseImageData: canvasToDataURL_base(), savedAt: new Date().toISOString(),
     }));
     toast('編集状態を保存しました');
   } catch (e) { toast('保存失敗：画像が大きすぎます'); }
 });
 
-document.getElementById('loadState').addEventListener('click', async () => {
-  const raw = localStorage.getItem(LS_KEY) || localStorage.getItem('note_editor_state');
-  if (!raw) { toast('保存された状態がありません'); return; }
-  const data = JSON.parse(raw);
-  const img = new Image();
-  await new Promise(res => {
-    img.onload = () => {
-      canvas.width = data.baseWidth; canvas.height = data.baseHeight;
-      ctx.drawImage(img, 0, 0);
-      editState.baseImage = ctx.getImageData(0, 0, data.baseWidth, data.baseHeight);
-      editState.baseWidth = data.baseWidth; editState.baseHeight = data.baseHeight;
-      editState.aspectRatio = data.baseWidth / data.baseHeight;
-      editState.layers = data.layers; editState.history = []; editState.historyIdx = -1;
-      document.getElementById('resizeWidth').value = editState.baseWidth;
-      document.getElementById('resizeHeight').value = editState.baseHeight;
-      document.getElementById('canvasUploadPrompt').style.display = 'none';
-      canvas.style.display = 'block';
-      zoomFit(); saveHistory(); res();
-    };
-    img.src = data.baseImageData;
+function loadSavedImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('画像を読み込めませんでした'));
+    img.src = src;
   });
-  render(); updateLayerList(); updateCanvasInfo();
-  toast(`復元しました (${new Date(data.savedAt).toLocaleString('ja-JP')})`);
+}
+
+async function prepareSavedState(data) {
+  if (!data || !Array.isArray(data.layers) ||
+      !Number.isSafeInteger(data.baseWidth) || data.baseWidth < 1 ||
+      !Number.isSafeInteger(data.baseHeight) || data.baseHeight < 1 ||
+      typeof data.baseImageData !== 'string' || !data.baseImageData) {
+    throw new Error('保存データの形式が不正です');
+  }
+  // 古い保存データの _img: {} も除去し、全画像が準備できてから反映する。
+  const layers = serializeLayers(data.layers);
+  const [img] = await Promise.all([
+    loadSavedImage(data.baseImageData),
+    ...layers.map(async layer => {
+      if (!layer || !['image', 'text', 'shape'].includes(layer.type)) throw new Error('レイヤーが不正です');
+      if (layer.type === 'image') {
+        if (typeof layer.src !== 'string' || !layer.src) throw new Error('画像がありません');
+        layer._img = await loadSavedImage(layer.src);
+      }
+    }),
+  ]);
+  const tmp = document.createElement('canvas');
+  tmp.width = data.baseWidth; tmp.height = data.baseHeight;
+  const tmpCtx = tmp.getContext('2d');
+  tmpCtx.drawImage(img, 0, 0);
+  return { layers, baseImage: tmpCtx.getImageData(0, 0, data.baseWidth, data.baseHeight) };
+}
+
+document.getElementById('loadState').addEventListener('click', async () => {
+  const button = document.getElementById('loadState');
+  if (button.disabled) return;
+  button.disabled = true;
+  try {
+    const raw = localStorage.getItem(LS_KEY) || localStorage.getItem('note_editor_state');
+    if (!raw) { toast('保存された状態がありません'); return; }
+    const data = JSON.parse(raw);
+    const prepared = await prepareSavedState(data);
+    if (clipboardPasteToken) { clipboardPasteToken.cancelled = true; clipboardPasteToken = null; }
+    canvas.width = data.baseWidth; canvas.height = data.baseHeight;
+    editState.baseImage = prepared.baseImage;
+    editState.baseWidth = data.baseWidth; editState.baseHeight = data.baseHeight;
+    editState.aspectRatio = data.baseWidth / data.baseHeight;
+    editState.layers = prepared.layers; editState.history = []; editState.historyIdx = -1;
+    editState.selectedLayerId = null; editState.cropRect = null; editState.dragging = null;
+    document.getElementById('resizeWidth').value = editState.baseWidth;
+    document.getElementById('resizeHeight').value = editState.baseHeight;
+    document.getElementById('canvasUploadPrompt').style.display = 'none';
+    canvas.style.display = 'block';
+    zoomFit(); saveHistory(); render(); updateLayerList(); updateCanvasInfo(); updateCropStatus();
+    toast(`復元しました (${new Date(data.savedAt).toLocaleString('ja-JP')})`);
+  } catch (e) {
+    toast('復元できませんでした。保存データや画像を確認してください');
+  } finally {
+    button.disabled = false;
+  }
 });
 
 document.getElementById('clearAll').addEventListener('click', () => {
@@ -3844,7 +3924,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-06-26-03'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-10-19-01'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
