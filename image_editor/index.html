@@ -33,7 +33,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 16px;
+  min-height: 44px;
+  padding: 6px 14px;
   background: white;
   border-bottom: 1px solid #e5e7eb;
   gap: 12px;
@@ -41,7 +42,6 @@ body {
   z-index: 50;
 }
 .app-title { font-size: 18px; font-weight: 700; color: #ea580c; }
-.app-subtitle { font-size: 12px; color: #64748b; }
 .version-badge {
   font-family: 'DM Mono', 'Courier New', monospace;
   font-size: 11px; font-weight: 400;
@@ -114,7 +114,10 @@ body {
   overflow-y: auto;
 }
 .layer-dock {
-  flex: 0 0 auto;
+  flex: 0 0 clamp(190px, 30vh, 280px);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   border-top: 1px solid #e5e7eb;
   margin-top: 8px;
   padding-top: 8px;
@@ -132,6 +135,7 @@ body {
   padding: 6px 2px;
 }
 .layer-dock-chevron { transition: transform 0.2s; color: #000000; }
+.layer-dock.collapsed { flex-basis: auto; }
 .layer-dock.collapsed .layer-dock-chevron { transform: rotate(-90deg); }
 .layer-dock.collapsed .layer-list { display: none; }
 
@@ -288,7 +292,7 @@ button.primary .shortcut { background: rgba(255,255,255,0.3); color: white; }
   }
 }
 .layer-list {
-  max-height: 180px; overflow-y: auto;
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
   border: 1px solid #e5e7eb; border-radius: 4px; padding: 4px;
 }
 .layer-item {
@@ -426,7 +430,7 @@ canvas {
 }
 .acc-menu[hidden] { display: none; }
 .acc-item {
-  font: inherit;
+  font-family: 'DM Mono', 'Courier New', monospace;
   font-size: 12px;
   font-weight: 600;
   padding: 8px 2px;
@@ -463,7 +467,7 @@ canvas {
     position: fixed; left: 0; top: 0; bottom: 0; z-index: 45;
     transform: translateX(-100%); transition: transform 0.25s ease;
     width: min(312px, calc(100vw - 24px)); box-shadow: 2px 0 12px rgba(0,0,0,0.12);
-    padding-top: 56px;
+    padding-top: 44px;
   }
   .sidebar.open { transform: translateX(0); }
   .sidebar-overlay.show { display: block; }
@@ -500,10 +504,7 @@ canvas {
 <div class="app-header">
   <div style="display:flex; align-items:center; gap:10px;">
     <button class="hamburger-btn" id="hamburgerBtn" aria-label="メニュー">☰</button>
-    <div>
-      <div class="app-title">画像エディター<span class="version-badge" id="appVersion"></span></div>
-      <div class="app-subtitle">Team Ohana</div>
-    </div>
+    <div class="app-title">画像エディター<span class="version-badge" id="appVersion"></span></div>
   </div>
   <button id="installBtn" class="primary" style="display:none; align-items:center; gap:6px; padding:7px 12px; font-size:12px;">
     📲 インストール
@@ -522,12 +523,12 @@ canvas {
         <button class="mode-btn" data-mode="transparent" aria-pressed="false">透過</button>
       </div>
       <div class="acc-menu" id="editAccMenu" role="group" aria-label="編集機能">
-        <button id="tab-trim" class="acc-item active" data-sec="sec-trim" aria-controls="sec-trim" aria-pressed="true">切り抜き</button>
-        <button id="tab-resize" class="acc-item" data-sec="sec-resize" aria-controls="sec-resize" aria-pressed="false">サイズ変更</button>
-        <button id="tab-apply" class="acc-item" data-sec="sec-apply" aria-controls="sec-apply" aria-pressed="false">組合せ</button>
-        <button id="tab-text" class="acc-item" data-sec="sec-text" aria-controls="sec-text" aria-pressed="false">文字</button>
-        <button id="tab-shape" class="acc-item" data-sec="sec-shape" aria-controls="sec-shape" aria-pressed="false">図形</button>
-        <button id="tab-save" class="acc-item" data-sec="sec-save" aria-controls="sec-save" aria-pressed="false">保存</button>
+        <button id="tab-trim" class="acc-item active" data-sec="sec-trim" aria-controls="sec-trim" aria-pressed="true">TRIM</button>
+        <button id="tab-resize" class="acc-item" data-sec="sec-resize" aria-controls="sec-resize" aria-pressed="false">RESIZE</button>
+        <button id="tab-apply" class="acc-item" data-sec="sec-apply" aria-controls="sec-apply" aria-pressed="false">APPLY</button>
+        <button id="tab-text" class="acc-item" data-sec="sec-text" aria-controls="sec-text" aria-pressed="false">TEXT</button>
+        <button id="tab-shape" class="acc-item" data-sec="sec-shape" aria-controls="sec-shape" aria-pressed="false">SHAPE</button>
+        <button id="tab-save" class="acc-item" data-sec="sec-save" aria-controls="sec-save" aria-pressed="false">SAVE</button>
       </div>
     </nav>
 
@@ -3911,7 +3912,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-10-19-02'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-10-19-03'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
