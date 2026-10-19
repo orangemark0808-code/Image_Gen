@@ -55,27 +55,24 @@ body {
   overflow: hidden;
 }
 
-/* ===== Mode Nav (left strip) ===== */
+/* ===== Mode Nav (inside the settings sidebar) ===== */
 .mode-nav {
-  background: white;
-  border-right: 1px solid #e5e7eb;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 10px 6px;
-  flex-shrink: 0;
+  flex: 0 0 auto;
+  gap: 10px;
+  margin-bottom: 14px;
 }
 .mode-nav-inner {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   background: rgba(228, 228, 230, 0.7);
   border-radius: 100px;
   padding: 4px;
 }
 .mode-btn {
-  display: block;
-  padding: 10px 14px;
+  flex: 1;
+  padding: 8px 12px;
   border: none;
   border-radius: 100px;
   font-size: 13px;
@@ -96,7 +93,7 @@ body {
 
 /* ===== Sidebar ===== */
 .sidebar {
-  width: 272px;
+  width: 312px;
   background: white;
   border-right: 1px solid #e5e7eb;
   flex-shrink: 0;
@@ -109,6 +106,8 @@ body {
   min-height: 0;
   overflow-y: auto;
 }
+#editModePanel > .section[hidden] { display: none; }
+#editModePanel > .section { margin: 0; padding: 0; border: 0; }
 #transparentModePanel {
   flex: 1 1 auto;
   min-height: 0;
@@ -419,34 +418,29 @@ canvas {
 }
 .toast.show { opacity: 1; }
 
-/* ===== Accordion Section Nav ===== */
-.mode-accordion { display: flex; flex-direction: column; }
+/* ===== Tool selection inside the sidebar ===== */
 .acc-menu {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  transition: max-height 0.25s ease;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
 }
-.acc-menu.closed { max-height: 0; }
-.acc-menu.open   { max-height: 300px; }
+.acc-menu[hidden] { display: none; }
 .acc-item {
-  font-family: 'DM Mono', 'Courier New', monospace;
-  font-size: 13px;
+  font: inherit;
+  font-size: 12px;
   font-weight: 600;
-  padding: 6px 12px 6px 20px;
-  border: none;
-  border-left: 2px solid #e5e7eb;
-  margin-left: 12px;
-  background: transparent;
-  color: #0a0a0a;
+  padding: 8px 2px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  color: #3a3a3c;
   cursor: pointer;
-  text-align: left;
-  transition: color 0.15s, border-color 0.15s;
+  text-align: center;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
   white-space: nowrap;
 }
 .acc-item:hover { color: #ea580c; border-color: #fbd38d; }
-.acc-item.active { color: #FF7F00; border-left: 3px solid #FF7F00; font-weight: 600; }
-.acc-arrow { font-size: 9px; margin-left: 4px; }
+.acc-item.active { color: #c2410c; border-color: #fb923c; background: #fff7ed; }
 
 /* ===== Hamburger (mobile) ===== */
 .hamburger-btn {
@@ -463,20 +457,12 @@ canvas {
 
 /* ===== Mobile ===== */
 @media (max-width: 768px) {
-  .mode-nav {
-    width: 100%; flex-direction: row; justify-content: flex-start;
-    border-right: none; border-bottom: 1px solid #e5e7eb;
-    padding: 6px 10px;
-  }
-  .mode-nav-inner { flex-direction: row; }
-  .mode-btn { padding: 7px 16px; font-size: 13px; }
-
   .app-body { flex-direction: column; }
 
   .sidebar {
     position: fixed; left: 0; top: 0; bottom: 0; z-index: 45;
     transform: translateX(-100%); transition: transform 0.25s ease;
-    width: 280px; box-shadow: 2px 0 12px rgba(0,0,0,0.12);
+    width: min(312px, calc(100vw - 24px)); box-shadow: 2px 0 12px rgba(0,0,0,0.12);
     padding-top: 56px;
   }
   .sidebar.open { transform: translateX(0); }
@@ -528,34 +514,28 @@ canvas {
 
 <div class="app-body">
 
-  <!-- ===== Mode Navigation ===== -->
-  <nav class="mode-nav" id="modeNav">
-    <div class="mode-nav-inner">
-      <div class="mode-accordion">
-        <button class="mode-btn active" data-mode="edit">編集<span class="acc-arrow">▲</span></button>
-        <div class="acc-menu open" id="editAccMenu">
-          <button class="acc-item active" data-sec="sec-trim">TRIM</button>
-          <button class="acc-item" data-sec="sec-resize">RESIZE</button>
-          <button class="acc-item" data-sec="sec-apply">APPLY</button>
-          <button class="acc-item" data-sec="sec-text">TEXT</button>
-          <button class="acc-item" data-sec="sec-shape">SHAPE</button>
-          <!-- LAYER はサイドバー下部に常時固定（layerDock）のためジャンプボタンなし -->
-          <!-- SAVE は常に最下部固定 -->
-          <button class="acc-item" data-sec="sec-save">SAVE</button>
-        </div>
-      </div>
-      <button class="mode-btn" data-mode="transparent">透過</button>
-    </div>
-  </nav>
-
   <!-- ===== Sidebar ===== -->
   <aside class="sidebar" id="sidebar">
+    <nav class="mode-nav" id="modeNav" aria-label="編集メニュー">
+      <div class="mode-nav-inner">
+        <button class="mode-btn active" data-mode="edit" aria-pressed="true">編集</button>
+        <button class="mode-btn" data-mode="transparent" aria-pressed="false">透過</button>
+      </div>
+      <div class="acc-menu" id="editAccMenu" role="group" aria-label="編集機能">
+        <button id="tab-trim" class="acc-item active" data-sec="sec-trim" aria-controls="sec-trim" aria-pressed="true">切り抜き</button>
+        <button id="tab-resize" class="acc-item" data-sec="sec-resize" aria-controls="sec-resize" aria-pressed="false">サイズ変更</button>
+        <button id="tab-apply" class="acc-item" data-sec="sec-apply" aria-controls="sec-apply" aria-pressed="false">組合せ</button>
+        <button id="tab-text" class="acc-item" data-sec="sec-text" aria-controls="sec-text" aria-pressed="false">文字</button>
+        <button id="tab-shape" class="acc-item" data-sec="sec-shape" aria-controls="sec-shape" aria-pressed="false">図形</button>
+        <button id="tab-save" class="acc-item" data-sec="sec-save" aria-controls="sec-save" aria-pressed="false">保存</button>
+      </div>
+    </nav>
 
     <!-- ==== EDIT MODE PANEL ==== -->
     <div id="editModePanel">
 
       <!-- 1. トリミング -->
-      <div class="section" id="sec-trim">
+      <div class="section" id="sec-trim" role="region" aria-labelledby="tab-trim">
         <div class="section-title">TRIM</div>
         <div class="row-2" style="margin-bottom:7px;">
           <button class="tool-btn" data-tool="crop">トリミング<span class="shortcut">C</span></button>
@@ -578,7 +558,7 @@ canvas {
       </div>
 
       <!-- 2. リサイズ -->
-      <div class="section" id="sec-resize">
+      <div class="section" id="sec-resize" role="region" aria-labelledby="tab-resize" hidden>
         <div class="section-title">RESIZE</div>
         <!-- TARGET -->
         <div style="margin-bottom:10px; padding-bottom:10px; border-bottom:1px dashed #e8e2d8;">
@@ -620,7 +600,7 @@ canvas {
       </div>
 
       <!-- 3. 実行 -->
-      <div class="section" id="sec-apply">
+      <div class="section" id="sec-apply" role="region" aria-labelledby="tab-apply" hidden>
         <div class="section-title">APPLY</div>
         <button id="applyBoth" class="primary btn-action" disabled>
           トリミング+リサイズを実行
@@ -640,14 +620,14 @@ canvas {
       </div>
 
       <!-- 4. テキスト -->
-      <div class="section" id="sec-text">
+      <div class="section" id="sec-text" role="region" aria-labelledby="tab-text" hidden>
         <div class="section-title">TEXT</div>
         <button id="addText" class="primary btn-action" style="margin-bottom:6px;">テキストを追加</button>
         <button id="editTextBtn" style="width:100%; display:none;">選択中のテキストを編集</button>
       </div>
 
       <!-- 5. 図形 -->
-      <div class="section" id="sec-shape">
+      <div class="section" id="sec-shape" role="region" aria-labelledby="tab-shape" hidden>
         <div class="section-title">SHAPE</div>
         <div style="margin-bottom:10px; padding-bottom:10px; border-bottom:1px dashed #e5e5e5;">
           <div class="row-2" style="margin-top:0;">
@@ -671,8 +651,8 @@ canvas {
         <div id="shapeFillColorPicker" class="color-picker" style="opacity:0.4; pointer-events:none;"></div>
       </div>
 
-      <!-- 6. 保存（SAVE は常に最下部固定） -->
-      <div class="section" id="sec-save">
+      <!-- 6. 保存 -->
+      <div class="section" id="sec-save" role="region" aria-labelledby="tab-save" hidden>
         <div class="section-title">SAVE</div>
         <label style="margin-top:0;">ファイル名</label>
         <input type="text" id="fileName" placeholder="note_image" value="note_image">
@@ -1118,24 +1098,27 @@ const editModeArea = document.getElementById('editModeArea');
 const transparentModeArea = document.getElementById('transparentModeArea');
 
 const editAccMenu = document.getElementById('editAccMenu');
+const editSectionButtons = [...editAccMenu.querySelectorAll('.acc-item')];
+const editSections = editSectionButtons.map(btn => document.getElementById(btn.dataset.sec));
 
-function setAccordion(open) {
-  const arrow = document.querySelector('[data-mode="edit"] .acc-arrow');
-  if (open) {
-    editAccMenu.classList.remove('closed');
-    editAccMenu.classList.add('open');
-    if (arrow) arrow.textContent = '▲';
-  } else {
-    editAccMenu.classList.remove('open');
-    editAccMenu.classList.add('closed');
-    if (arrow) arrow.textContent = '▼';
-  }
+function showEditSection(sectionId) {
+  if (!editSectionButtons.some(btn => btn.dataset.sec === sectionId)) return;
+  if (currentMode !== 'edit') switchMode('edit');
+  editSectionButtons.forEach(btn => {
+    const active = btn.dataset.sec === sectionId;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', String(active));
+  });
+  editSections.forEach(section => { section.hidden = section.id !== sectionId; });
+  editModePanel.scrollTop = 0;
 }
 
 function switchMode(mode) {
   currentMode = mode;
   document.querySelectorAll('.mode-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.mode === mode);
+    const active = btn.dataset.mode === mode;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', String(active));
   });
   if (mode === 'edit') {
     editModePanel.style.display = '';
@@ -1143,7 +1126,7 @@ function switchMode(mode) {
     transparentModePanel.style.display = 'none';
     editModeArea.style.display = 'flex';
     transparentModeArea.style.display = 'none';
-    setAccordion(true);
+    editAccMenu.hidden = false;
   } else {
     editModePanel.style.display = 'none';
     layerDock.style.display = 'none';
@@ -1151,9 +1134,9 @@ function switchMode(mode) {
     transparentModePanel.style.display = 'block';
     editModeArea.style.display = 'none';
     transparentModeArea.style.display = 'flex';
-    setAccordion(false);
+    editAccMenu.hidden = true;
   }
-  closeSidebar();
+  if (mode === 'transparent') closeSidebar();
 }
 
 document.querySelectorAll('.mode-btn').forEach(btn => {
@@ -1759,10 +1742,14 @@ canvasWrapper.addEventListener('drop', e => {
 
 // --- Tool selection ---
 document.querySelectorAll('.tool-btn').forEach(btn => {
-  btn.addEventListener('click', () => selectTool(btn.dataset.tool));
+  btn.addEventListener('click', () => selectTool(btn.dataset.tool, true));
 });
 
-function selectTool(tool) {
+function selectTool(tool, revealSection = false) {
+  if (revealSection) {
+    if (tool === 'crop') showEditSection('sec-trim');
+    else if (['select', 'ellipse', 'rect', 'arrow', 'line'].includes(tool)) showEditSection('sec-shape');
+  }
   editState.currentTool = tool;
   document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
   if (tool !== 'select') {
@@ -3168,7 +3155,7 @@ document.addEventListener('keydown', e => {
     editState.selectedLayerId = null; saveHistory(); render(); updateLayerList(); updateCanvasInfo(); return;
   }
   const key = e.key.toLowerCase();
-  if (shortcutMap[key] && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); selectTool(shortcutMap[key]); }
+  if (shortcutMap[key] && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); selectTool(shortcutMap[key], true); }
 });
 
 document.addEventListener('keyup', e => {
@@ -3924,7 +3911,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-10-19-01'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-10-19-02'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
@@ -3985,50 +3972,16 @@ layerDockToggle.addEventListener('click', () => setLayerDockCollapsed(!layerDock
 setLayerDockCollapsed(localStorage.getItem('ie_layerDockCollapsed') === '1'); // 既定=開く
 
 // ============================================================
-// === ACCORDION SECTION NAV ===
+// === SECTION NAV ===
 // ============================================================
-(function() {
-  // サイドバー自体はスクロールしなくなったため、中段スクロール領域を root にする
-  const scrollRoot = document.getElementById('editModePanel');
-  const accItems = document.querySelectorAll('.acc-item');
-
-  // クリック → スムーズスクロール＆アクティブ切替
-  accItems.forEach(btn => {
-    btn.addEventListener('click', () => {
-      accItems.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      const target = document.getElementById(btn.dataset.sec);
-      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
+editSectionButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const currentSection = editSectionButtons.find(item => item.classList.contains('active'))?.dataset.sec;
+    if (currentSection !== btn.dataset.sec && editState.currentTool !== 'select') selectTool('select');
+    showEditSection(btn.dataset.sec);
+    closeSidebar();
   });
-
-  // IntersectionObserver でスクロール連動ハイライト
-  const sections = [...accItems]
-    .map(b => document.getElementById(b.dataset.sec))
-    .filter(Boolean);
-
-  const observer = new IntersectionObserver(entries => {
-    let topEntry = null;
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        if (!topEntry || entry.boundingClientRect.top < topEntry.boundingClientRect.top) {
-          topEntry = entry;
-        }
-      }
-    });
-    if (topEntry) {
-      accItems.forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.sec === topEntry.target.id);
-      });
-    }
-  }, {
-    root: scrollRoot,
-    rootMargin: '0px 0px -70% 0px',
-    threshold: 0,
-  });
-
-  sections.forEach(sec => observer.observe(sec));
-})();
+});
 </script>
 </body>
 </html>
