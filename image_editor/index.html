@@ -649,10 +649,12 @@ canvas {
         <div id="shapeColorPicker" class="color-picker"></div>
         <label>線の太さ: <span id="strokeWidthLabel">6</span>px</label>
         <input type="range" id="strokeWidth" min="1" max="20" value="6">
-        <label class="inline" style="margin-top:8px;"><input type="checkbox" id="shapeFill"> 塗りつぶし</label>
-        <label style="margin-top:8px;" id="shapeFillColorLabel">塗りつぶしの色</label>
-        <input type="color" id="shapeFillColor" value="#ffffff" disabled style="display:none;">
-        <div id="shapeFillColorPicker" class="color-picker" style="opacity:0.4; pointer-events:none;"></div>
+        <div id="shapeFillOptions">
+          <label class="inline" style="margin-top:8px;"><input type="checkbox" id="shapeFill"> 塗りつぶし</label>
+          <label style="margin-top:8px;" id="shapeFillColorLabel">塗りつぶしの色</label>
+          <input type="color" id="shapeFillColor" value="#ffffff" disabled style="display:none;">
+          <div id="shapeFillColorPicker" class="color-picker" style="opacity:0.4; pointer-events:none;"></div>
+        </div>
       </div>
 
       <!-- 6. 保存 -->
@@ -3043,6 +3045,8 @@ function nudgeLayer(id, dir) { // dir: 'up'=前面へ / 'down'=背面へ
 }
 
 function updateLayerList() {
+  const selectedShape = getSelectedShapeLayer();
+  document.getElementById('shapeFillOptions').hidden = editState.currentTool === 'freehand' || selectedShape?.shape === 'freehand';
   const list = document.getElementById('layerList');
   if (editState.layers.length === 0) {
     list.innerHTML = '<div style="padding:8px; color:#000000; font-size:12px; text-align:center;">レイヤーなし</div>';
