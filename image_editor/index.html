@@ -259,6 +259,12 @@ button.primary .shortcut { background: rgba(255,255,255,0.3); color: white; }
   border: 1px solid #DFE4EA; border-radius: 8px;
   cursor: pointer; box-shadow: none; transition: border-color 0.15s;
 }
+#shapeColorPicker .color-swatches {
+  display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 4px;
+}
+#shapeColorPicker .color-swatch {
+  width: 100%; min-width: 0; height: auto; aspect-ratio: 1; border-radius: 6px;
+}
 .color-swatch:hover { border-color: #FF7F00; background: inherit; }
 .color-swatch.active { border: 2px solid #FF7F00; }
 .color-hex-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
@@ -637,15 +643,18 @@ canvas {
           </div>
           <div class="row-2" style="margin-top:6px;">
             <button class="tool-btn" data-tool="arrow">→ 矢印<span class="shortcut">A</span></button>
-            <button class="tool-btn" data-tool="line">／ 線<span class="shortcut">L</span></button>
+            <button class="tool-btn" data-tool="doubleArrow">↔ 両矢印<span class="shortcut">D</span></button>
           </div>
           <div class="row-2" style="margin-top:6px;">
+            <button class="tool-btn" data-tool="line">／ 線<span class="shortcut">L</span></button>
             <button class="tool-btn" data-tool="freehand">✎ 手書き<span class="shortcut">P</span></button>
+          </div>
+          <div class="row-2" style="margin-top:6px;">
             <button class="tool-btn active" data-tool="select">選択<span class="shortcut">V</span></button>
           </div>
         </div>
         <label style="margin-top:0;">線の色</label>
-        <input type="color" id="shapeColor" value="#000000" style="display:none;">
+        <input type="color" id="shapeColor" value="#ff0000" style="display:none;">
         <div id="shapeColorPicker" class="color-picker"></div>
         <label>線の太さ: <span id="strokeWidthLabel">6</span>px</label>
         <input type="range" id="strokeWidth" min="1" max="20" value="6">
@@ -1490,15 +1499,15 @@ function drawShape(l) {
     if (l.fill) ctx.fillRect(x, y, w, h); ctx.strokeRect(x, y, w, h);
   } else if (l.shape === 'line') {
     ctx.beginPath(); ctx.moveTo(l.x1, l.y1); ctx.lineTo(l.x2, l.y2); ctx.stroke();
-  } else if (l.shape === 'arrow') {
-    drawArrow(l.x1, l.y1, l.x2, l.y2, l.strokeWidth);
+  } else if (l.shape === 'arrow' || l.shape === 'doubleArrow') {
+    drawArrow(l.x1, l.y1, l.x2, l.y2, l.strokeWidth, l.shape === 'doubleArrow');
   }
   if (editState.selectedLayerId === l.id) {
     ctx.strokeStyle = '#ea580c'; ctx.lineWidth = 1; ctx.setLineDash([4,4]);
     ctx.strokeRect(x - 4, y - 4, w + 8, h + 8); ctx.setLineDash([]);
     // リサイズハンドル（図形・手書き=四隅、線・矢印=両端点）
     ctx.setLineDash([]); ctx.fillStyle = '#fff'; ctx.strokeStyle = '#ea580c'; ctx.lineWidth = 1.5;
-    const handlePoints = (l.shape === 'line' || l.shape === 'arrow')
+    const handlePoints = (l.shape === 'line' || l.shape === 'arrow' || l.shape === 'doubleArrow')
       ? [[l.x1, l.y1], [l.x2, l.y2]]
       : [[x, y], [x + w, y], [x, y + h], [x + w, y + h]];
     for (const [hx, hy] of handlePoints) {
@@ -1567,7 +1576,7 @@ function getImageHandleHit(l, x, y) {
 
 // 選択中 shape レイヤーのどのハンドルをクリックしたか判定（canvas 座標で渡す）
 function getShapeHandleHit(l, x, y) {
-  if (l.shape === 'line' || l.shape === 'arrow') {
+  if (l.shape === 'line' || l.shape === 'arrow' || l.shape === 'doubleArrow') {
     if (Math.hypot(x - l.x1, y - l.y1) <= 9) return 'p1';
     if (Math.hypot(x - l.x2, y - l.y2) <= 9) return 'p2';
     return null;
@@ -1606,7 +1615,7 @@ function getTextHandleHit(l, x, y) {
   return null;
 }
 
-function drawArrow(x1, y1, x2, y2, sw) {
+function drawArrow(x1, y1, x2, y2, sw, doubleHead = false) {
   const headLen = Math.max(10, sw * 3);
   const angle = Math.atan2(y2 - y1, x2 - x1);
   ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
@@ -1614,6 +1623,12 @@ function drawArrow(x1, y1, x2, y2, sw) {
   ctx.lineTo(x2 - headLen * Math.cos(angle - Math.PI/6), y2 - headLen * Math.sin(angle - Math.PI/6));
   ctx.lineTo(x2 - headLen * Math.cos(angle + Math.PI/6), y2 - headLen * Math.sin(angle + Math.PI/6));
   ctx.closePath(); ctx.fill();
+  if (doubleHead) {
+    ctx.beginPath(); ctx.moveTo(x1, y1);
+    ctx.lineTo(x1 + headLen * Math.cos(angle - Math.PI/6), y1 + headLen * Math.sin(angle - Math.PI/6));
+    ctx.lineTo(x1 + headLen * Math.cos(angle + Math.PI/6), y1 + headLen * Math.sin(angle + Math.PI/6));
+    ctx.closePath(); ctx.fill();
+  }
 }
 
 function drawMoveGuides() {
@@ -1686,7 +1701,7 @@ function updateCanvasInfo() {
 }
 
 function toolName(t) {
-  return { select:'選択', crop:'トリミング', ellipse:'楕円', rect:'四角', arrow:'矢印', line:'線', freehand:'手書き' }[t] || t;
+  return { select:'選択', crop:'トリミング', ellipse:'楕円', rect:'四角', arrow:'矢印', doubleArrow:'両矢印', line:'線', freehand:'手書き' }[t] || t;
 }
 
 function updateCropStatus() {
@@ -1768,7 +1783,7 @@ document.querySelectorAll('.tool-btn').forEach(btn => {
 function selectTool(tool, revealSection = false) {
   if (revealSection) {
     if (tool === 'crop') showEditSection('sec-trim');
-    else if (['select', 'ellipse', 'rect', 'arrow', 'line', 'freehand'].includes(tool)) showEditSection('sec-shape');
+    else if (['select', 'ellipse', 'rect', 'arrow', 'doubleArrow', 'line', 'freehand'].includes(tool)) showEditSection('sec-shape');
   }
   editState.currentTool = tool;
   document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
@@ -2698,7 +2713,7 @@ canvas.addEventListener('mousedown', e => {
   const pos = getCanvasPos(e);
   const tool = editState.currentTool;
   if (tool === 'crop') { editState.dragging = { type: 'crop', startX: pos.x, startY: pos.y }; return; }
-  if (['ellipse','rect','arrow','line'].includes(tool)) { editState.dragging = { type: 'shape', startX: pos.x, startY: pos.y, shape: tool }; return; }
+  if (['ellipse','rect','arrow','doubleArrow','line'].includes(tool)) { editState.dragging = { type: 'shape', startX: pos.x, startY: pos.y, shape: tool }; return; }
   if (tool === 'select') {
     // 選択中 image レイヤーのハンドルを最優先でチェック
     if (editState.selectedLayerId) {
@@ -2850,7 +2865,7 @@ canvas.addEventListener('mousemove', e => {
     const d = editState.dragging;
     const layer = editState.layers.find(l => l.id === d.layerId);
     if (!layer) return;
-    if (layer.shape === 'line' || layer.shape === 'arrow') {
+    if (layer.shape === 'line' || layer.shape === 'arrow' || layer.shape === 'doubleArrow') {
       if (d.handle === 'p1') { layer.x1 = pos.x; layer.y1 = pos.y; }
       else { layer.x2 = pos.x; layer.y2 = pos.y; }
     } else {
@@ -3066,7 +3081,7 @@ function updateLayerList() {
       ? `T ${l.direction === 'vertical' ? '縦' : '横'} ${l.text.slice(0,10)}${l.text.length > 10 ? '…' : ''}`
       : l.type === 'image'
       ? `[IMG] ${l.name}`
-      : l.shape === 'freehand' ? '✎ 手書き' : `${l.shape === 'ellipse' ? '〇' : l.shape === 'rect' ? '□' : l.shape === 'arrow' ? '→' : '／'} 図形`;
+      : l.shape === 'freehand' ? '✎ 手書き' : `${l.shape === 'ellipse' ? '〇' : l.shape === 'rect' ? '□' : l.shape === 'arrow' ? '→' : l.shape === 'doubleArrow' ? '↔' : '／'} 図形`;
     const editBtn = l.type === 'text'
       ? `<button class="edit-layer-btn" style="border:none; background:none; color:#ea580c; padding:2px 6px; font-size:12px; cursor:pointer;">編集</button>`
       : '';
@@ -3249,7 +3264,7 @@ document.getElementById('redoBtn').addEventListener('click', async () => {
 });
 
 // --- Keyboard shortcuts ---
-const shortcutMap = { v:'select', c:'crop', o:'ellipse', r:'rect', a:'arrow', l:'line', p:'freehand' };
+const shortcutMap = { v:'select', c:'crop', o:'ellipse', r:'rect', a:'arrow', d:'doubleArrow', l:'line', p:'freehand' };
 
 document.addEventListener('keydown', e => {
   const inField = ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName);
@@ -4028,7 +4043,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-10-19-05'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-10-23-01'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
@@ -4102,3 +4117,4 @@ editSectionButtons.forEach(btn => {
 </script>
 </body>
 </html>
+

@@ -99,6 +99,29 @@ test('freehand layer survives state save and restore', async () => {
   assert.equal(e.state.layers[0].shape, 'freehand');
   assert.deepEqual(JSON.parse(JSON.stringify(e.state.layers[0].points)), [{x: 0, y: 0}, {x: 1, y: 1}]);
 });
+test('double arrows draw heads at both endpoints after serialization in every direction', () => {
+  const starts = [], heads = [];
+  const context = vm.createContext({editState: {selectedLayerId: null}, ctx: {
+    save() {}, restore() {}, beginPath() {},
+    moveTo(x, y) {starts.push([x, y]);}, lineTo() {}, stroke() {}, closePath() {},
+    fill() {heads.push(starts.at(-1));},
+  }});
+  vm.runInContext(extract('function drawShape(', 'function drawImageLayer(') +
+    extract('function drawArrow(', 'function drawMoveGuides(') +
+    extract('function getShapeHandleHit(', '// 選択中 text レイヤー'), context);
+  for (const [x2, y2] of [[100, 20], [-100, 20], [10, 100], [80, -60]]) {
+    starts.length = 0; heads.length = 0;
+    const layer = JSON.parse(JSON.stringify({id: 'double', type: 'shape', shape: 'doubleArrow',
+      x1: 10, y1: 20, x2, y2, color: '#ff0000', strokeWidth: 6, fill: false}));
+    context.drawShape(layer);
+    assert.deepEqual(heads, [[x2, y2], [10, 20]]);
+    assert.equal(context.getShapeHandleHit(layer, 10, 20), 'p1');
+    assert.equal(context.getShapeHandleHit(layer, x2, y2), 'p2');
+  }
+  heads.length = 0;
+  context.drawArrow(0, 0, 100, 0, 6);
+  assert.equal(heads.length, 1);
+});
 test('state save omits image caches without changing active layers', () => {
   const e = environment();
   e.handlers.get('saveState:click')();
@@ -236,3 +259,4 @@ for (const file of ['studio/sw.js', 'image_editor/service-worker.js']) {
     assert.equal(intercepted, false);
   });
 }
+

@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'ohana-studio-';
-const CACHE_NAME = CACHE_PREFIX + '2026-10-19-02';
+const CACHE_NAME = CACHE_PREFIX + '2026-10-23-01';
 
 // キャッシュする統合UI本体のアセット
 const ASSETS = [
@@ -49,3 +49,4 @@ self.addEventListener('fetch', event => {
     })
   );
 });
+
