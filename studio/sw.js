@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'ohana-studio-';
-const CACHE_NAME = CACHE_PREFIX + '2026-10-23-02';
+const CACHE_NAME = CACHE_PREFIX + '2026-10-23-04';
 
 // キャッシュする統合UI本体のアセット
 const ASSETS = [
@@ -31,6 +31,23 @@ self.addEventListener('fetch', event => {
 
   // 別オリジンのiframeコンテンツはキャッシュしない（そのまま通す）
   if (event.request.method !== 'GET' || url.origin !== self.location.origin) {
+    return;
+  }
+
+  // ページはネットワーク優先で更新し、オフライン時だけ保存済みページを使う。
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request, { cache: 'no-cache' }).then(async response => {
+        if (response && response.status === 200 && response.type === 'basic') {
+          const cache = await caches.open(CACHE_NAME);
+          await cache.put(event.request, response.clone());
+        }
+        return response;
+      }).catch(async () =>
+        (await caches.match(event.request, { cacheName: CACHE_NAME })) ||
+        caches.match('./index.html', { cacheName: CACHE_NAME })
+      )
+    );
     return;
   }
 
