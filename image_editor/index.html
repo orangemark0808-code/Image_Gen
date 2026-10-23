@@ -319,17 +319,18 @@ button.primary .shortcut { background: rgba(255,255,255,0.3); color: white; }
 
 /* ===== Edit mode canvas area ===== */
 .canvas-area {
-  flex: 1; overflow: hidden; display: flex; flex-direction: column; padding: 16px;
+  flex: 1; min-width: 0; overflow: hidden; display: flex; flex-direction: column; padding: 16px;
 }
 .toolbar {
   display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 10px; flex-wrap: wrap; gap: 8px;
+  margin-bottom: 10px; flex-wrap: nowrap; gap: 8px;
+  flex-shrink: 0; overflow-x: auto; padding-bottom: 2px;
 }
-.canvas-info { font-size: 12px; color: #64748b; }
-.zoom-control { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #000000; }
+.canvas-info { flex: 1; min-width: 0; font-size: 12px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.zoom-control { display: flex; flex: 0 0 auto; align-items: center; gap: 5px; font-size: 12px; color: #000000; white-space: nowrap; }
 .zoom-control input[type="range"] { width: 100px; }
 .zoom-control button { padding: 3px 7px; font-size: 11px; }
-.toolbar-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.toolbar-actions { display: flex; flex: 0 0 auto; align-items: center; flex-wrap: nowrap; gap: 6px; }
 .history-actions { display: flex; gap: 6px; }
 .clear-all-action { border-left: 1px solid #cbd5e1; margin-left: 6px; padding-left: 12px; }
 .toolbar-actions button { white-space: nowrap; }
@@ -4052,7 +4053,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-10-23-02'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-10-23-03'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
