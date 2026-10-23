@@ -2,7 +2,7 @@
 // 画像エディター PWA - オフラインキャッシュ担当
 
 // バージョン番号: HTMLや機能を更新した時はここを書き換えると古いキャッシュが破棄される
-const CACHE_VERSION = '2026-10-23-03';
+const CACHE_VERSION = '2026-10-23-04';
 const CACHE_PREFIX = 'ohana-image-editor-';
 const CACHE_NAME = CACHE_PREFIX + CACHE_VERSION;
 
@@ -45,6 +45,23 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   // GET以外はスルー
   if (event.request.method !== 'GET') return;
+
+  // ページはネットワーク優先で更新し、オフライン時だけ保存済みページを使う。
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request, { cache: 'no-cache' }).then(async response => {
+        if (response && response.status === 200 && response.type === 'basic') {
+          const cache = await caches.open(CACHE_NAME);
+          await cache.put(event.request, response.clone());
+        }
+        return response;
+      }).catch(async () =>
+        (await caches.match(event.request, { cacheName: CACHE_NAME })) ||
+        caches.match('./index.html', { cacheName: CACHE_NAME })
+      )
+    );
+    return;
+  }
 
   event.respondWith(
     caches.match(event.request, { cacheName: CACHE_NAME }).then((cached) => {
