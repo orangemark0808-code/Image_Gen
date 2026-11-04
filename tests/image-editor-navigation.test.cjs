@@ -79,7 +79,8 @@ test('six category buttons show only the matching settings panel', () => {
     }
     assert.equal(ui.element('editModePanel').scrollTop, 0);
   }
-  assert.deepEqual(ui.selectedTools, ['select']);
+  // 既定ツール: TRIM=crop / SHAPE=rect / その他=select
+  assert.deepEqual(ui.selectedTools, ['select', 'rect', 'select']);
   assert.equal(ui.closeCount, sectionIds.length);
 });
 

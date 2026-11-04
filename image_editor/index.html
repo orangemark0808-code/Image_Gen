@@ -551,7 +551,7 @@ canvas {
       <div class="section" id="sec-trim" role="region" aria-labelledby="tab-trim">
         <div class="section-title">TRIM</div>
         <div class="row-2" style="margin-bottom:7px;">
-          <button class="tool-btn" data-tool="crop">トリミング<span class="shortcut">C</span></button>
+          <button class="tool-btn active" data-tool="crop">トリミング<span class="shortcut">C</span></button>
           <button id="deselectBtn" class="btn-ghost">選択解除<span class="shortcut">Esc</span></button>
         </div>
         <label class="inline" style="margin-top:0;">
@@ -562,9 +562,9 @@ canvas {
           <span>:</span>
           <input type="number" id="cropRatioH" value="9" min="1" disabled>
         </div>
-        <div class="help-box" style="margin-top:7px;">「トリミング」ツール(C)でキャンバス上をドラッグ</div>
+        <div class="help-box" style="margin-top:7px;">画像全体にトリミング枠が表示されます。枠の四隅・辺をドラッグして範囲を調整、枠の内側をドラッグで移動、Enterで確定します（枠の外をドラッグすると範囲を引き直せます）</div>
         <div class="help-box" style="margin-top:7px;">画像レイヤーを選択中は、その画像だけを切り抜きます（キャンバス・他のレイヤーはそのまま）</div>
-        <div id="cropStatus" class="status-pill">範囲未選択</div>
+        <div id="cropStatus" class="status-pill">画像を読み込むと範囲が表示されます</div>
         <button id="applyCropOnly" class="primary btn-action" style="margin-top:14px;" disabled>
           トリミング実行<span class="shortcut">Enter</span>
         </button>
@@ -656,7 +656,7 @@ canvas {
             <button class="tool-btn" data-tool="freehand">✎ 手書き<span class="shortcut">P</span></button>
           </div>
           <div class="row-2" style="margin-top:6px;">
-            <button class="tool-btn active" data-tool="select">選択<span class="shortcut">V</span></button>
+            <button class="tool-btn" data-tool="select">選択<span class="shortcut">V</span></button>
           </div>
         </div>
         <label style="margin-top:0;">線の色</label>
@@ -1197,9 +1197,11 @@ const editState = {
   baseHeight: 0,
   layers: [],
   selectedLayerId: null,
-  currentTool: 'select',
+  currentTool: 'crop', // 起動時の既定は TRIM（トリミング）
   textDirection: 'horizontal',
   cropRect: null,
+  cropRectFor: null, // cropRect を初期化した時の選択レイヤーID（変わったら範囲を初期化し直す）
+  cropHidden: false, // true の間はトリミング枠を描画しない（書き出し・切り抜き用の描画）
   dragging: null,
   moveSnap: null,
   history: [],
@@ -1324,6 +1326,7 @@ function updateCursor() {
 
 // --- Render ---
 function render() {
+  ensureCropRect();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (editState.baseImage) ctx.putImageData(editState.baseImage, 0, 0);
   for (const layer of editState.layers) {
@@ -1331,7 +1334,7 @@ function render() {
     else if (layer.type === 'shape') drawShape(layer);
     else if (layer.type === 'image') drawImageLayer(layer);
   }
-  if (editState.currentTool === 'crop' && editState.cropRect) drawCropOverlay();
+  if (editState.currentTool === 'crop' && editState.cropRect && !editState.cropHidden) drawCropOverlay();
   if (editState.dragging && editState.dragging.type === 'move') {
     const ml = editState.layers.find(l => l.id === editState.dragging.layerId);
     if (ml && ml.type === 'image') drawMoveGuides();
@@ -1663,15 +1666,129 @@ function drawMoveGuides() {
   ctx.restore();
 }
 
+// Photoshop のトリミングと同様、画像全体（画像レイヤー選択中はその画像）を初期範囲にする。
+function defaultCropRect() {
+  const sel = editState.layers.find(l => l.id === editState.selectedLayerId && l.type === 'image');
+  if (sel && !sel.rotation) {
+    const x = Math.max(0, sel.x), y = Math.max(0, sel.y);
+    const w = Math.min(canvas.width, sel.x + sel.w) - x, h = Math.min(canvas.height, sel.y + sel.h) - y;
+    if (w > 5 && h > 5) return { x, y, w, h };
+  }
+  return { x: 0, y: 0, w: canvas.width, h: canvas.height };
+}
+
+function ensureCropRect() {
+  if (editState.currentTool !== 'crop' || !editState.baseImage || editState.cropHidden) return;
+  if (editState.cropRect && editState.cropRectFor === editState.selectedLayerId) return;
+  editState.cropRect = defaultCropRect();
+  editState.cropRectFor = editState.selectedLayerId;
+  updateCropStatus();
+}
+
+const CROP_HANDLES = {
+  nw: r => [r.x, r.y], n: r => [r.x + r.w / 2, r.y], ne: r => [r.x + r.w, r.y],
+  e: r => [r.x + r.w, r.y + r.h / 2], se: r => [r.x + r.w, r.y + r.h], s: r => [r.x + r.w / 2, r.y + r.h],
+  sw: r => [r.x, r.y + r.h], w: r => [r.x, r.y + r.h / 2],
+};
+const CROP_CURSORS = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize',
+  n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize', move: 'move' };
+
 function drawCropOverlay() {
   const r = editState.cropRect;
-  ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  const z = editState.zoom || 1; // 画面上の見た目を一定にするため倍率で割る
+  ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.5)';
   ctx.fillRect(0, 0, canvas.width, r.y);
   ctx.fillRect(0, r.y + r.h, canvas.width, canvas.height - r.y - r.h);
   ctx.fillRect(0, r.y, r.x, r.h);
   ctx.fillRect(r.x + r.w, r.y, canvas.width - r.x - r.w, r.h);
-  ctx.strokeStyle = '#ea580c'; ctx.lineWidth = 2; ctx.setLineDash([6,4]);
-  ctx.strokeRect(r.x, r.y, r.w, r.h); ctx.restore();
+  // 三分割ガイド
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1 / z; ctx.setLineDash([]);
+  ctx.beginPath();
+  for (let i = 1; i <= 2; i++) {
+    ctx.moveTo(r.x + r.w * i / 3, r.y); ctx.lineTo(r.x + r.w * i / 3, r.y + r.h);
+    ctx.moveTo(r.x, r.y + r.h * i / 3); ctx.lineTo(r.x + r.w, r.y + r.h * i / 3);
+  }
+  ctx.stroke();
+  // 枠線
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2 / z;
+  ctx.strokeRect(r.x, r.y, r.w, r.h);
+  // 8方向ハンドル
+  const hs = 10 / z;
+  ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#ea580c'; ctx.lineWidth = 1.5 / z;
+  for (const name in CROP_HANDLES) {
+    const [hx, hy] = CROP_HANDLES[name](r);
+    ctx.fillRect(hx - hs / 2, hy - hs / 2, hs, hs);
+    ctx.strokeRect(hx - hs / 2, hy - hs / 2, hs, hs);
+  }
+  ctx.restore();
+}
+
+// ポインタ位置 → 'nw'|'n'|…|'move'|null
+function cropHitTest(pos) {
+  const r = editState.cropRect;
+  if (!r) return null;
+  const tol = 12 / (editState.zoom || 1);
+  for (const name in CROP_HANDLES) {
+    const [hx, hy] = CROP_HANDLES[name](r);
+    if (Math.abs(pos.x - hx) <= tol && Math.abs(pos.y - hy) <= tol) return name;
+  }
+  if (pos.x >= r.x && pos.x <= r.x + r.w && pos.y >= r.y && pos.y <= r.y + r.h) return 'move';
+  return null;
+}
+
+function cropRatio() {
+  if (!document.getElementById('cropFixRatio').checked) return 0;
+  const rw = parseFloat(document.getElementById('cropRatioW').value) || 1;
+  const rh = parseFloat(document.getElementById('cropRatioH').value) || 1;
+  return rw / rh;
+}
+
+// ハンドルをドラッグした時の新しいトリミング範囲（キャンバス内に収める。比率固定にも対応）
+function resizeCropRect(r0, handle, pos) {
+  const W = canvas.width, H = canvas.height, MIN = 10;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  let l = r0.x, t = r0.y, rr = r0.x + r0.w, b = r0.y + r0.h;
+  const hasW = handle.includes('w'), hasE = handle.includes('e'), hasN = handle.includes('n'), hasS = handle.includes('s');
+  if (hasW) l = clamp(pos.x, 0, rr - MIN);
+  if (hasE) rr = clamp(pos.x, l + MIN, W);
+  if (hasN) t = clamp(pos.y, 0, b - MIN);
+  if (hasS) b = clamp(pos.y, t + MIN, H);
+  const ratio = cropRatio();
+  if (ratio) {
+    let w = rr - l, h = b - t;
+    if ((hasW || hasE) && (hasN || hasS)) {            // 角: 反対側の角を固定
+      if (w / h > ratio) h = w / ratio; else w = h * ratio;
+      const s = Math.min(1, (hasW ? r0.x + r0.w : W - r0.x) / w, (hasN ? r0.y + r0.h : H - r0.y) / h);
+      w *= s; h *= s;
+      if (hasW) l = r0.x + r0.w - w; else rr = r0.x + w;
+      if (hasN) t = r0.y + r0.h - h; else b = r0.y + h;
+      if (hasW) rr = r0.x + r0.w; else l = r0.x;
+      if (hasN) b = r0.y + r0.h; else t = r0.y;
+    } else if (hasW || hasE) {                          // 左右の辺: 縦は中央基準
+      const cy = (r0.y + r0.h / 2);
+      h = w / ratio;
+      const maxH = 2 * Math.min(cy, H - cy);
+      if (h > maxH) { h = maxH; w = h * ratio; if (hasW) l = rr - w; else rr = l + w; }
+      t = cy - h / 2; b = cy + h / 2;
+    } else {                                            // 上下の辺: 横は中央基準
+      const cx = (r0.x + r0.w / 2);
+      w = h * ratio;
+      const maxW = 2 * Math.min(cx, W - cx);
+      if (w > maxW) { w = maxW; h = w / ratio; if (hasN) t = b - h; else b = t + h; }
+      l = cx - w / 2; rr = cx + w / 2;
+    }
+  }
+  return { x: l, y: t, w: rr - l, h: b - t };
+}
+
+// 比率固定をオンにした時／比率を変えた時: 現在の枠の中に収まるよう中央基準で調整
+function fitCropRectToRatio() {
+  const ratio = cropRatio(), r = editState.cropRect;
+  if (!ratio || !r) return;
+  let w = r.w, h = r.h;
+  if (w / h > ratio) w = h * ratio; else h = w / ratio;
+  editState.cropRect = { x: r.x + (r.w - w) / 2, y: r.y + (r.h - h) / 2, w, h };
+  updateCropStatus(); render();
 }
 
 // --- Image loading (edit mode) ---
@@ -1718,10 +1835,10 @@ function updateCropStatus() {
   const el = document.getElementById('cropStatus');
   const hasCrop = !!editState.cropRect && editState.cropRect.w > 5 && editState.cropRect.h > 5;
   if (hasCrop) {
-    el.textContent = `範囲選択中: ${Math.round(editState.cropRect.w)} × ${Math.round(editState.cropRect.h)} px`;
+    el.textContent = `トリミング範囲: ${Math.round(editState.cropRect.w)} × ${Math.round(editState.cropRect.h)} px`;
     el.classList.add('ready');
   } else {
-    el.textContent = '範囲未選択'; el.classList.remove('ready');
+    el.textContent = '画像を読み込むと範囲が表示されます'; el.classList.remove('ready');
   }
   document.getElementById('applyCropOnly').disabled = !hasCrop;
   document.getElementById('applyBoth').disabled = !hasCrop;
@@ -1876,7 +1993,9 @@ document.getElementById('cropFixRatio').addEventListener('change', e => {
   const on = e.target.checked;
   document.getElementById('cropRatioW').disabled = !on;
   document.getElementById('cropRatioH').disabled = !on;
+  fitCropRectToRatio();
 });
+['cropRatioW', 'cropRatioH'].forEach(id => document.getElementById(id).addEventListener('change', fitCropRectToRatio));
 
 // --- 画像レイヤー専用トリミング ---
 function cropSelectedImageLayer() {
@@ -1930,7 +2049,7 @@ function executeCrop() {
   const cw = Math.round(r.w); const ch = Math.round(r.h);
   const tmp = document.createElement('canvas');
   tmp.width = cw; tmp.height = ch;
-  editState.cropRect = null; render();
+  editState.cropRect = null; editState.cropHidden = true; render(); editState.cropHidden = false;
   tmp.getContext('2d').drawImage(canvas, r.x, r.y, r.w, r.h, 0, 0, cw, ch);
   canvas.width = cw; canvas.height = ch; ctx.drawImage(tmp, 0, 0);
   editState.baseImage = ctx.getImageData(0, 0, cw, ch);
@@ -1988,10 +2107,11 @@ function resizeCanvas(newW, newH, crop = null) {
     // 合成・切り抜きも一時Canvasで準備し、失敗時に編集状態を残す。
     const selection = editState.selectedLayerId, previousCrop = editState.cropRect;
     try {
-      editState.selectedLayerId = null; editState.cropRect = null;
+      editState.selectedLayerId = null; editState.cropRect = null; editState.cropHidden = true;
       render();
       source.getContext('2d').drawImage(canvas, 0, 0);
     } finally {
+      editState.cropHidden = false;
       editState.selectedLayerId = selection; editState.cropRect = previousCrop;
       render();
     }
@@ -2148,7 +2268,7 @@ document.getElementById('saveClipboardBtn').addEventListener('click', () => {
   if (!editState.baseImage) { toast('保存できる内容がありません'); return; }
   const r = editState.cropRect;
   const hasCrop = r && r.w > 5 && r.h > 5;
-  editState.cropRect = null; render();
+  editState.cropRect = null; editState.cropHidden = true; render();
   const tmp = document.createElement('canvas');
   if (hasCrop) {
     tmp.width = Math.round(r.w); tmp.height = Math.round(r.h);
@@ -2157,7 +2277,7 @@ document.getElementById('saveClipboardBtn').addEventListener('click', () => {
     tmp.width = canvas.width; tmp.height = canvas.height;
     tmp.getContext('2d').drawImage(canvas, 0, 0);
   }
-  editState.cropRect = r; render();
+  editState.cropHidden = false; editState.cropRect = r; render();
   addToClipboard(tmp.toDataURL('image/png'));
 });
 
@@ -2722,7 +2842,13 @@ canvas.addEventListener('mousedown', e => {
   if (editState.currentTool === 'freehand') return; // 手書きは pointer イベントでマウス・ペン・タッチを統一処理
   const pos = getCanvasPos(e);
   const tool = editState.currentTool;
-  if (tool === 'crop') { editState.dragging = { type: 'crop', startX: pos.x, startY: pos.y }; return; }
+  if (tool === 'crop') {
+    const hit = cropHitTest(pos);
+    if (hit === 'move') editState.dragging = { type: 'crop-move', dx: pos.x - editState.cropRect.x, dy: pos.y - editState.cropRect.y };
+    else if (hit) editState.dragging = { type: 'crop-resize', handle: hit, rect0: { ...editState.cropRect } };
+    else editState.dragging = { type: 'crop', startX: pos.x, startY: pos.y }; // 枠の外 → 範囲を引き直す
+    return;
+  }
   if (['ellipse','rect','arrow','doubleArrow','line'].includes(tool)) { editState.dragging = { type: 'shape', startX: pos.x, startY: pos.y, shape: tool }; return; }
   if (tool === 'select') {
     // 選択中 image レイヤーのハンドルを最優先でチェック
@@ -2804,9 +2930,23 @@ canvas.addEventListener('mousemove', e => {
     canvasWrapper.scrollTop = editState.panning.scrollTop - (e.clientY - editState.panning.startY);
     return;
   }
-  if (!editState.dragging) return;
+  if (!editState.dragging) {
+    if (editState.currentTool === 'crop' && editState.cropRect && editState.baseImage && !editState.spacePressed) {
+      canvas.style.cursor = CROP_CURSORS[cropHitTest(getCanvasPos(e))] || 'crosshair';
+    }
+    return;
+  }
   const pos = getCanvasPos(e);
-  if (editState.dragging.type === 'crop') {
+  if (editState.dragging.type === 'crop-move') {
+    const r = editState.cropRect;
+    editState.cropRect = { ...r,
+      x: Math.max(0, Math.min(canvas.width - r.w, pos.x - editState.dragging.dx)),
+      y: Math.max(0, Math.min(canvas.height - r.h, pos.y - editState.dragging.dy)) };
+    updateCropStatus(); render();
+  } else if (editState.dragging.type === 'crop-resize') {
+    editState.cropRect = resizeCropRect(editState.dragging.rect0, editState.dragging.handle, pos);
+    updateCropStatus(); render();
+  } else if (editState.dragging.type === 'crop') {
     let x1 = editState.dragging.startX, y1 = editState.dragging.startY;
     let w = Math.abs(pos.x - x1), h = Math.abs(pos.y - y1);
     if (document.getElementById('cropFixRatio').checked) {
@@ -3161,9 +3301,9 @@ document.getElementById('saveBtn').addEventListener('click', () => {
   const name = raw || 'note_image';
   const format = document.getElementById('fileFormat').value;
   const prevSel = editState.selectedLayerId; const prevCrop = editState.cropRect;
-  editState.selectedLayerId = null; editState.cropRect = null; render();
+  editState.selectedLayerId = null; editState.cropRect = null; editState.cropHidden = true; render();
   const dataURL = canvas.toDataURL(`image/${format}`, format === 'jpeg' ? 0.92 : undefined);
-  editState.selectedLayerId = prevSel; editState.cropRect = prevCrop; render();
+  editState.cropHidden = false; editState.selectedLayerId = prevSel; editState.cropRect = prevCrop; render();
   downloadFile(dataURL, `${name}.${format === 'jpeg' ? 'jpg' : 'png'}`);
 });
 
@@ -3291,7 +3431,7 @@ document.addEventListener('keydown', e => {
     return;
   }
   if (e.key === 'Escape') { editState.selectedLayerId = null; editState.cropRect = null; render(); updateLayerList(); updateCanvasInfo(); return; }
-  if (e.key === 'Enter' && editState.cropRect) { e.preventDefault(); document.getElementById('applyCropOnly').click(); return; }
+  if (e.key === 'Enter' && editState.currentTool === 'crop' && editState.cropRect) { e.preventDefault(); document.getElementById('applyCropOnly').click(); return; }
   if ((e.key === 'Delete' || e.key === 'Backspace') && editState.selectedLayerId) {
     editState.layers = editState.layers.filter(l => l.id !== editState.selectedLayerId);
     editState.selectedLayerId = null; saveHistory(); render(); updateLayerList(); updateCanvasInfo(); return;
@@ -4053,7 +4193,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-10-23-04'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-11-04-01'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
@@ -4116,10 +4256,13 @@ setLayerDockCollapsed(localStorage.getItem('ie_layerDockCollapsed') === '1'); //
 // ============================================================
 // === SECTION NAV ===
 // ============================================================
+// 各タブを開いた時の既定ツール（TRIM=トリミング / SHAPE=四角 / その他=選択）
+const SECTION_DEFAULT_TOOL = { 'sec-trim': 'crop', 'sec-shape': 'rect' };
 editSectionButtons.forEach(btn => {
   btn.addEventListener('click', () => {
     const currentSection = editSectionButtons.find(item => item.classList.contains('active'))?.dataset.sec;
-    if (currentSection !== btn.dataset.sec && editState.currentTool !== 'select') selectTool('select');
+    const defaultTool = SECTION_DEFAULT_TOOL[btn.dataset.sec] || 'select';
+    if (currentSection !== btn.dataset.sec && editState.currentTool !== defaultTool) selectTool(defaultTool);
     showEditSection(btn.dataset.sec);
     closeSidebar();
   });

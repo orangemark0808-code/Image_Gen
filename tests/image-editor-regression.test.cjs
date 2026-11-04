@@ -46,7 +46,7 @@ function environment() {
   }
   const state = {baseImage: {pixels: 'original'}, baseWidth: 100, baseHeight: 80,
     layers: [{type: 'image', id: 'clip', src: 'clip', x: 2, y: 3, w: 10, h: 20, _img: {ready: true}}],
-    cropRect: {x: 2, y: 4, w: 50, h: 40}, selectedLayerId: 'clip', history: ['original'], historyIdx: 0};
+    cropRect: {x: 2, y: 4, w: 50, h: 40}, cropHidden: false, selectedLayerId: 'clip', history: ['original'], historyIdx: 0};
   const sandbox = {
     document: {getElementById: element,
       querySelector: selector => ({value: selector.includes('resizeTarget') ? options.target : options.mode}),
@@ -260,3 +260,58 @@ for (const file of ['studio/sw.js', 'image_editor/service-worker.js']) {
   });
 }
 
+
+// --- Photoshop 風トリミング枠 ---
+function cropEnv(tool = 'crop') {
+  const state = {currentTool: tool, baseImage: {}, layers: [], selectedLayerId: null, cropRect: null,
+    cropRectFor: null, cropHidden: false, zoom: 1};
+  const ratio = {checked: false}, rw = {value: '16'}, rh = {value: '9'};
+  const ids = {cropFixRatio: ratio, cropRatioW: rw, cropRatioH: rh};
+  const context = vm.createContext({editState: state, canvas: {width: 200, height: 100},
+    document: {getElementById: id => ids[id]}, updateCropStatus() {}, render() {}});
+  vm.runInContext(extract('// Photoshop のトリミングと同様', '// --- Image loading (edit mode) ---'), context);
+  return {state, ratio, context};
+}
+test('crop tool starts with the whole canvas selected', () => {
+  const e = cropEnv();
+  e.context.ensureCropRect();
+  assert.deepEqual({...e.state.cropRect}, {x: 0, y: 0, w: 200, h: 100});
+  const other = cropEnv('rect'); other.context.ensureCropRect();
+  assert.equal(other.state.cropRect, null);
+});
+test('crop range follows a selected image layer and resets when selection changes', () => {
+  const e = cropEnv();
+  e.state.layers = [{id: 'a', type: 'image', x: -10, y: 20, w: 60, h: 50}];
+  e.state.selectedLayerId = 'a'; e.context.ensureCropRect();
+  assert.deepEqual({...e.state.cropRect}, {x: 0, y: 20, w: 50, h: 50});
+  e.state.cropRect = {x: 1, y: 1, w: 9, h: 9};
+  e.context.ensureCropRect();
+  assert.equal(e.state.cropRect.w, 9);
+  e.state.selectedLayerId = null; e.context.ensureCropRect();
+  assert.equal(e.state.cropRect.w, 200);
+});
+test('crop handles and body are hit-tested; empty areas start a new range', () => {
+  const e = cropEnv(); e.state.cropRect = {x: 50, y: 20, w: 100, h: 60};
+  assert.equal(e.context.cropHitTest({x: 50, y: 20}), 'nw');
+  assert.equal(e.context.cropHitTest({x: 150, y: 50}), 'e');
+  assert.equal(e.context.cropHitTest({x: 100, y: 50}), 'move');
+  assert.equal(e.context.cropHitTest({x: 5, y: 5}), null);
+});
+test('dragging a handle resizes within the canvas and the minimum size', () => {
+  const e = cropEnv(); const r0 = {x: 0, y: 0, w: 200, h: 100};
+  assert.deepEqual({...e.context.resizeCropRect(r0, 'e', {x: 120, y: 50})}, {x: 0, y: 0, w: 120, h: 100});
+  assert.deepEqual({...e.context.resizeCropRect(r0, 'nw', {x: -30, y: 40})}, {x: 0, y: 40, w: 200, h: 60});
+  assert.equal(e.context.resizeCropRect(r0, 'w', {x: 500, y: 0}).w, 10);
+});
+test('fixed ratio keeps the opposite corner and stays inside the canvas', () => {
+  const e = cropEnv(); e.ratio.checked = true;
+  const r0 = {x: 0, y: 0, w: 200, h: 100};
+  const r = e.context.resizeCropRect(r0, 'se', {x: 80, y: 90});
+  assert.equal(r.x, 0); assert.equal(r.y, 0);
+  assert.ok(Math.abs(r.w / r.h - 16 / 9) < 1e-9);
+  const big = e.context.resizeCropRect({x: 0, y: 0, w: 50, h: 50}, 'se', {x: 400, y: 400});
+  assert.ok(big.x + big.w <= 200 + 1e-9 && big.y + big.h <= 100 + 1e-9);
+  assert.ok(Math.abs(big.w / big.h - 16 / 9) < 1e-9);
+  e.state.cropRect = {x: 0, y: 0, w: 200, h: 100}; e.context.fitCropRectToRatio();
+  assert.ok(Math.abs(e.state.cropRect.w / e.state.cropRect.h - 16 / 9) < 1e-9);
+});
