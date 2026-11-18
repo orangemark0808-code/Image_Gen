@@ -1093,18 +1093,6 @@ canvas {
   </div>
 </div>
 
-<!-- ===== 置き換え確認（編集中に外部から画像が渡されたとき） ===== -->
-<div id="replaceModal" role="alertdialog" aria-modal="true" aria-labelledby="replaceTitle" style="display:none; position:fixed; inset:0; z-index:300; background:rgba(58,42,26,0.35); align-items:center; justify-content:center; padding:16px;">
-  <div style="width:380px; max-width:100%; background:#fff; border:1px solid #d8d0c4; border-radius:14px; padding:20px; color:#3a2a1a; line-height:1.7;">
-    <div id="replaceTitle" style="font-size:15px; font-weight:700;">今の編集を破棄して新しい画像に置き換えますか？</div>
-    <div style="font-size:12px; color:#8a7060; margin-top:6px;">まだ書き出していない変更があります。置き換えると元に戻せません。</div>
-    <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:16px;">
-      <button id="replaceCancelBtn" class="btn-ghost" type="button" style="padding:7px 16px;">キャンセル</button>
-      <button id="replaceOkBtn" class="primary" type="button" style="padding:7px 16px;">置き換える</button>
-    </div>
-  </div>
-</div>
-
 <div class="toast" id="toast"></div>
 
 <script>
@@ -4426,7 +4414,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-11-18-03'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-11-18-04'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
@@ -4620,39 +4608,24 @@ document.getElementById('copyImageBtnSave').addEventListener('click', copyImageT
 // ============================================================
 // === 取り込み共通（クリップボード検知・ファイル渡し起動）===
 // ============================================================
-// 書き出していない変更があるか（読み込み直後・保存/コピー直後は false）
-function hasEditsInProgress() {
-  return !!editState.baseImage && editState.unsaved;
-}
-
-// 置き換え確認（アプリ内の枠。ブラウザ標準の confirm は iframe 内や前面化の直後に出ないことがあるため使わない）
-let replaceAsk = null;
-function askReplaceEdits() {
-  if (replaceAsk) return Promise.resolve(false); // すでに確認中なら、後から来た画像は読み込まない
-  return new Promise(resolve => {
-    const modal = document.getElementById('replaceModal');
-    const done = answer => {
-      modal.style.display = 'none';
-      document.removeEventListener('keydown', onKey, true);
-      replaceAsk = null;
-      resolve(answer);
-    };
-    const onKey = e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(false); } };
-    replaceAsk = done;
-    document.getElementById('replaceOkBtn').onclick = () => done(true);
-    document.getElementById('replaceCancelBtn').onclick = () => done(false);
-    document.addEventListener('keydown', onKey, true);
-    modal.style.display = 'flex';
-    document.getElementById('replaceCancelBtn').focus();
-  });
-}
-
-// 外から来た画像を読み込む。書き出していない編集がある時だけ確認し、勝手には上書きしない。読み込んだら true
+// 外から来た画像（クリップボードのバナー・ファイルを渡して起動）の取り込み。通常の Ctrl/Cmd+V と同じ動き:
+// 土台が無ければ1枚目として読み込み、土台がある時は新しいレイヤーとして追加する（編集は壊さない）
 async function importImageBlob(blob, message) {
-  if (hasEditsInProgress() && !(await askReplaceEdits())) return false;
   if (currentMode === 'transparent') switchMode('edit');
-  loadEditImage(blob, message);
-  return true;
+  if (!editState.baseImage) { loadEditImage(blob, message); return true; }
+  try {
+    const dataURL = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+    pasteClipboardItem(dataURL); // 「Clip_NNN を貼り付けました」
+    return true;
+  } catch (e) {
+    toast('画像を読み込めませんでした');
+    return false;
+  }
 }
 
 // ============================================================
