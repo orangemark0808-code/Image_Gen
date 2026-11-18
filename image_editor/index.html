@@ -4409,7 +4409,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-11-18-01'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-11-18-02'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
@@ -4705,6 +4705,14 @@ if ('launchQueue' in window && window.launchQueue && typeof window.launchQueue.s
     }
   });
 }
+
+// Studio（iframe の親）から渡された画像を読み込む。iframe 内では launchQueue が使えないため親が中継する
+window.addEventListener('message', e => {
+  if (e.origin !== location.origin || !e.data || e.data.type !== 'ohana-open-image') return;
+  const file = e.data.file;
+  if (!(file instanceof Blob) || !file.type.startsWith('image/')) return;
+  importImageBlob(file, `${file.name || '画像'} を読み込みました`);
+});
 
 // ============================================================
 // === SECTION NAV ===

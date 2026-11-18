@@ -193,7 +193,7 @@
 <div class="iframe-container">
   <iframe
     id="iframe-image_editor"
-    src="https://orangemark0808-code.github.io/Image_Gen/image_editor/?v=2026-11-04-01"
+    src="https://orangemark0808-code.github.io/Image_Gen/image_editor/?v=2026-11-18-02"
     title="画像editer"
     allow="clipboard-read; clipboard-write"
   ></iframe>
@@ -218,7 +218,7 @@
 </div>
 
 <script>
-  const APP_VERSION = '2026-11-18-01';
+  const APP_VERSION = '2026-11-18-02';
   const STORAGE_KEY = 'ohana-studio-active-tab';
   const DEFAULT_TAB = 'image_editor';
 
@@ -256,6 +256,26 @@
   } catch (_) {}
 
   switchTab(savedTab);
+
+  // ファイルを渡して起動（右クリック →「このアプリケーションで開く」）: 画像editer タブへ渡す。
+  // iframe 内では launchQueue が使えないので、親のここで受けて postMessage で中継する
+  const editorFrame = document.getElementById('iframe-image_editor');
+  let editorLoaded = false;
+  editorFrame.addEventListener('load', () => { editorLoaded = true; });
+  function sendToEditor(file) {
+    const post = () => editorFrame.contentWindow.postMessage({ type: 'ohana-open-image', file }, location.origin);
+    if (editorLoaded) post(); else editorFrame.addEventListener('load', post, { once: true });
+  }
+  if ('launchQueue' in window && window.launchQueue && typeof window.launchQueue.setConsumer === 'function') {
+    window.launchQueue.setConsumer(async params => {
+      try {
+        if (!params || !params.files || !params.files.length) return;
+        const file = await params.files[0].getFile();
+        switchTab('image_editor');
+        sendToEditor(file);
+      } catch (_) {}
+    });
+  }
 
   // Service Worker 登録
   if ('serviceWorker' in navigator) {
