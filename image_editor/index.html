@@ -4466,7 +4466,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-11-18-06'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-11-18-07'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
@@ -4665,6 +4665,7 @@ document.getElementById('copyImageBtnTop').addEventListener('click', copyImageTo
 // 土台が無ければ1枚目として読み込み、土台がある時は新しいレイヤーとして追加する（編集は壊さない）
 async function importImageBlob(blob, message) {
   if (currentMode === 'transparent') switchMode('edit');
+  rememberClipboardImage(blob); // クリップボードに同じ画像が残っていても、バナーで二重に提案しない
   if (!editState.baseImage) { loadEditImage(blob, message); return true; }
   try {
     const dataURL = await new Promise((resolve, reject) => {
@@ -4686,18 +4687,31 @@ async function importImageBlob(blob, message) {
 // 権限なし・非対応・読み取り失敗は黙って無視。従来の Ctrl/Cmd+V はそのまま動く
 // ============================================================
 const CLIP_SIG_KEY = 'ie_lastClipboardSig';
-const clipWatch = { busy: false, lastCheck: 0, lastSig: null, shown: null }; // shown: { blob, sig }
+const clipWatch = { busy: false, lastCheck: 0, lastSig: null, pendingSig: null, shown: null }; // shown: { blob, sig }
 try { clipWatch.lastSig = localStorage.getItem(CLIP_SIG_KEY); } catch {}
 
-// 種別・サイズ・サンプリングしたバイト列のハッシュで簡易判定する
+// 「同じ画像か」の判定用の指紋。ファイルのバイト列ではなく見た目（縮小したピクセル）で決める。
+// 履歴アプリがファイルに書き出した画像とクリップボード上の画像は、エンコードが違っても同じ指紋になる
 async function clipboardSignature(blob) {
-  let h = 2166136261;
   try {
-    const bytes = new Uint8Array(await blob.arrayBuffer());
-    const step = Math.max(1, Math.floor(bytes.length / 4096));
-    for (let i = 0; i < bytes.length; i += step) { h ^= bytes[i]; h = Math.imul(h, 16777619) >>> 0; }
-  } catch {}
-  return `${blob.type}:${blob.size}:${h.toString(36)}`;
+    const bmp = await createImageBitmap(blob);
+    const N = 16, c = document.createElement('canvas');
+    c.width = N; c.height = N;
+    const x = c.getContext('2d', { willReadFrequently: true });
+    x.drawImage(bmp, 0, 0, N, N);
+    const d = x.getImageData(0, 0, N, N).data;
+    let h = 2166136261;
+    for (let i = 0; i < d.length; i += 4) {
+      // 色の僅かな差（色変換・再圧縮）は無視するため 4bit に丸める。透明は黒扱い
+      const a = d[i + 3] > 127;
+      for (let k = 0; k < 3; k++) { h ^= a ? (d[i + k] >> 4) : 0; h = Math.imul(h, 16777619) >>> 0; }
+    }
+    const sig = `${bmp.width}x${bmp.height}:${h.toString(36)}`;
+    if (bmp.close) bmp.close();
+    return sig;
+  } catch {
+    return `${blob.type}:${blob.size}`; // デコードできない時の保険
+  }
 }
 
 function setLastClipSig(sig) {
@@ -4706,7 +4720,9 @@ function setLastClipSig(sig) {
 }
 // Ctrl/Cmd+V で取り込んだ画像・バナーで読み込んだ画像は、同じものを二度提案しない
 function rememberClipboardImage(blob) {
-  clipboardSignature(blob).then(sig => { setLastClipSig(sig); hideClipBanner(); }).catch(() => {});
+  // 指紋が決まったら記録してバナーを閉じる（検知が先に走ってバナーが出ていても、ここで消える）
+  const pending = clipboardSignature(blob).then(sig => { clipWatch.pendingSig = sig; setLastClipSig(sig); hideClipBanner(); return sig; }).catch(() => {});
+  return pending;
 }
 
 const clipBanner = document.getElementById('clipBanner');
@@ -4740,7 +4756,7 @@ async function checkClipboardImage() {
       if (!type) continue;
       const blob = await item.getType(type);
       const sig = await clipboardSignature(blob);
-      if (sig === clipWatch.lastSig) { hideClipBanner(); return; }
+      if (sig === clipWatch.lastSig || sig === clipWatch.pendingSig) { hideClipBanner(); return; }
       if (!clipWatch.shown || clipWatch.shown.sig !== sig) showClipBanner(blob, sig);
       return;
     }

@@ -2,7 +2,7 @@
 // 画像エディター PWA - オフラインキャッシュ担当
 
 // バージョン番号: HTMLや機能を更新した時はここを書き換えると古いキャッシュが破棄される
-const CACHE_VERSION = '2026-11-18-06';
+const CACHE_VERSION = '2026-11-18-07';
 const CACHE_PREFIX = 'ohana-image-editor-';
 const CACHE_NAME = CACHE_PREFIX + CACHE_VERSION;
 
