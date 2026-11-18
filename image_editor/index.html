@@ -516,8 +516,7 @@ canvas {
 #textModalCloseBtn .ico { margin: 0; }
 
 /* ===== レイヤー欄の土台（最背面・読み取り専用） ===== */
-.layer-item.layer-base { cursor: default; color: #8a7060; }
-.layer-item.layer-base .base-tag { font-family: 'DM Mono', 'Courier New', monospace; font-size: 10px; letter-spacing: .08em; }
+.layer-item.layer-base .base-tag { font-family: 'DM Mono', 'Courier New', monospace; font-size: 10px; letter-spacing: .06em; color: #8a7060; margin-left: 4px; }
 
 /* ===== 注釈モード ===== */
 #annotateModePanel { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
@@ -1331,6 +1330,7 @@ const editState = {
   moveSnap: null,
   history: [],
   historyIdx: -1,
+  baseIndex: 0, // 土台より下にあるレイヤーの数（0=土台が最背面）。土台も他のレイヤーと同じく並べ替えられる
   unsaved: false, // 書き出していない変更がある（編集すると true／読み込み・保存・コピーで false）
   aspectRatio: 1,
   zoom: 1,
@@ -1354,6 +1354,7 @@ function saveHistory() {
     layers: serializeLayers(editState.layers),
     baseWidth: editState.baseWidth,
     baseHeight: editState.baseHeight,
+    baseIndex: editState.baseIndex,
     baseImageData: editState.baseImage ? canvasToDataURL_base() : null,
   });
   editState.historyIdx++;
@@ -1379,6 +1380,7 @@ async function restoreFromHistory(idx) {
   if (clipboardPasteToken) { clipboardPasteToken.cancelled = true; clipboardPasteToken = null; }
   const h = editState.history[idx];
   editState.layers = JSON.parse(JSON.stringify(h.layers));
+  editState.baseIndex = Math.max(0, Math.min(h.baseIndex || 0, editState.layers.length));
   // _img は HTMLImageElement で JSON 非対応のため削除し、drawImageLayer に再ロードを促す
   editState.layers.forEach(l => { if ('_img' in l) delete l._img; });
   editState.selectedLayerId = null; // 無効な選択IDが残らないようにリセット
@@ -1455,8 +1457,11 @@ function updateCursor() {
 function render() {
   ensureCropRect();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (editState.baseImage) ctx.putImageData(editState.baseImage, 0, 0);
-  for (const layer of editState.layers) {
+  const baseAt = Math.max(0, Math.min(editState.baseIndex || 0, editState.layers.length));
+  for (let i = 0; i <= editState.layers.length; i++) {
+    if (i === baseAt && editState.baseImage) ctx.drawImage(getBaseCanvas(), 0, 0); // 土台（透明部分は下のレイヤーが見える）
+    const layer = editState.layers[i];
+    if (!layer) continue;
     if (layer.type === 'text') drawText(layer);
     else if (layer.type === 'shape') drawShape(layer);
     else if (layer.type === 'image') drawImageLayer(layer);
@@ -1466,6 +1471,18 @@ function render() {
     const ml = editState.layers.find(l => l.id === editState.dragging.layerId);
     if (ml && ml.type === 'image') drawMoveGuides();
   }
+}
+
+// 土台の ImageData を drawImage で重ねられるよう canvas にして使い回す（baseImage が変わったら作り直す）
+let baseCanvasCache = { src: null, canvas: null };
+function getBaseCanvas() {
+  if (baseCanvasCache.src !== editState.baseImage) {
+    const c = document.createElement('canvas');
+    c.width = editState.baseImage.width; c.height = editState.baseImage.height;
+    c.getContext('2d').putImageData(editState.baseImage, 0, 0);
+    baseCanvasCache = { src: editState.baseImage, canvas: c };
+  }
+  return baseCanvasCache.canvas;
 }
 
 // tCtx を省略するとメインcanvasのctxを使用（プレビュー描画でも流用可能）
@@ -1999,7 +2016,7 @@ function loadEditImage(file, message = '画像を読み込みました') {
       editState.baseImage = ctx.getImageData(0, 0, w, h);
       editState.baseWidth = w; editState.baseHeight = h;
       editState.aspectRatio = w / h;
-      editState.layers = []; editState.history = []; editState.historyIdx = -1;
+      editState.layers = []; editState.baseIndex = 0; editState.history = []; editState.historyIdx = -1;
       document.getElementById('resizeWidth').value = w;
       document.getElementById('resizeHeight').value = h;
       document.getElementById('canvasUploadPrompt').style.display = 'none';
@@ -2063,7 +2080,7 @@ function createBlankCanvas(w, h, transparent) {
   editState.baseImage = ctx.getImageData(0, 0, w, h);
   editState.baseWidth = w; editState.baseHeight = h;
   editState.aspectRatio = w / h;
-  editState.layers = []; editState.history = []; editState.historyIdx = -1;
+  editState.layers = []; editState.baseIndex = 0; editState.history = []; editState.historyIdx = -1;
   document.getElementById('resizeWidth').value = w;
   document.getElementById('resizeHeight').value = h;
   document.getElementById('canvasUploadPrompt').style.display = 'none';
@@ -2252,7 +2269,7 @@ function executeCrop() {
   editState.baseImage = ctx.getImageData(0, 0, cw, ch);
   editState.baseWidth = cw; editState.baseHeight = ch;
   editState.aspectRatio = cw / ch;
-  editState.layers = []; editState.cropRect = null;
+  editState.layers = []; editState.baseIndex = 0; editState.cropRect = null;
   document.getElementById('resizeWidth').value = cw;
   document.getElementById('resizeHeight').value = ch;
   return true;
@@ -2346,6 +2363,7 @@ function resizeCanvas(newW, newH, crop = null) {
   editState.baseImage = baseImage;
   editState.baseWidth = newW; editState.baseHeight = newH; editState.aspectRatio = newW / newH;
   editState.layers = layers; editState.cropRect = cropRect;
+  if (crop) editState.baseIndex = 0; // 切り抜きでレイヤーは土台に焼き込まれる
   if (crop) editState.selectedLayerId = null;
   updateCropStatus();
   document.getElementById('resizeWidth').value = newW;
@@ -3404,61 +3422,79 @@ let dragLayerId = null;
 const CHEVRON_UP_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>';
 const CHEVRON_DOWN_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
 
+// 土台もレイヤーと同じ「1枚の項目」として並べ替えられる。配列の先頭=最背面
+const BASE_ID = '__base__';
+const BASE_LAYER_NAME = 'Clip_000';
+function layerItems() {
+  const items = editState.layers.slice();
+  items.splice(Math.max(0, Math.min(editState.baseIndex || 0, items.length)), 0, { id: BASE_ID, type: 'base' });
+  return items;
+}
+function applyLayerItems(items) {
+  editState.baseIndex = items.findIndex(x => x.id === BASE_ID);
+  editState.layers = items.filter(x => x.id !== BASE_ID);
+}
+
+// レイヤー削除（土台は消せない。土台より下のレイヤーを消したら土台の位置を詰める）
+function removeLayerById(id) {
+  if (id === BASE_ID) { toast('土台は削除できません'); return false; }
+  const i = editState.layers.findIndex(l => l.id === id);
+  if (i < 0) return false;
+  if (i < editState.baseIndex) editState.baseIndex--;
+  editState.layers.splice(i, 1);
+  if (editState.selectedLayerId === id) editState.selectedLayerId = null;
+  return true;
+}
+
 function moveLayerInPanel(draggedId, targetId, before) {
   if (!draggedId || draggedId === targetId) return;
   // パネル表示順（上=前面）に合わせて reverse して操作
-  let visual = editState.layers.slice().reverse();
+  let visual = layerItems().reverse();
   const fromIdx = visual.findIndex(l => l.id === draggedId);
   if (fromIdx < 0) return;
   const [moved] = visual.splice(fromIdx, 1);
   const targetIdx = visual.findIndex(l => l.id === targetId);
   if (targetIdx < 0) return;
   visual.splice(before ? targetIdx : targetIdx + 1, 0, moved);
-  editState.layers = visual.reverse();
+  applyLayerItems(visual.reverse());
   saveHistory(); render(); updateLayerList();
 }
 
 function nudgeLayer(id, dir) { // dir: 'up'=前面へ / 'down'=背面へ
-  const i = editState.layers.findIndex(l => l.id === id);
+  const items = layerItems();
+  const i = items.findIndex(l => l.id === id);
   if (i < 0) return;
   const j = dir === 'up' ? i + 1 : i - 1; // 前面=配列の後ろ(高index)
-  if (j < 0 || j >= editState.layers.length) return;
-  const t = editState.layers[i]; editState.layers[i] = editState.layers[j]; editState.layers[j] = t;
+  if (j < 0 || j >= items.length) return;
+  const t = items[i]; items[i] = items[j]; items[j] = t;
+  applyLayerItems(items);
   saveHistory(); render(); updateLayerList();
-}
-
-// 土台（読み込んだ1枚目）をレイヤー欄の最下段に表示する。動かしたり消したりはできない最背面の画像
-function appendBaseLayerRow(list) {
-  if (!editState.baseImage) return;
-  const div = document.createElement('div');
-  div.className = 'layer-item layer-base';
-  div.title = '土台の画像（すべてのレイヤーの下）。クリックで選択解除';
-  div.innerHTML = `<span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${icon('image')}土台 ${editState.baseWidth}×${editState.baseHeight}</span><span class="base-tag">BASE</span>`;
-  div.addEventListener('click', () => { editState.selectedLayerId = null; render(); updateLayerList(); });
-  list.appendChild(div);
 }
 
 function updateLayerList() {
   const selectedShape = getSelectedShapeLayer();
   document.getElementById('shapeFillOptions').hidden = editState.currentTool === 'freehand' || selectedShape?.shape === 'freehand';
   const list = document.getElementById('layerList');
-  if (editState.layers.length === 0) {
-    list.innerHTML = editState.baseImage ? '' : '<div style="padding:8px; color:#000000; font-size:12px; text-align:center;">レイヤーなし</div>';
-    appendBaseLayerRow(list);
+  if (editState.layers.length === 0 && !editState.baseImage) {
+    list.innerHTML = '<div style="padding:8px; color:#000000; font-size:12px; text-align:center;">レイヤーなし</div>';
     document.getElementById('editTextBtn').style.display = 'none';
     syncAnnotatePanel();
     return;
   }
   list.innerHTML = '';
-  for (let i = editState.layers.length - 1; i >= 0; i--) {
-    const l = editState.layers[i];
-    const isTop = i === editState.layers.length - 1;
+  const items = layerItems(); // 土台を含む（上=前面）
+  for (let i = items.length - 1; i >= 0; i--) {
+    const l = items[i];
+    const isBase = l.id === BASE_ID;
+    const isTop = i === items.length - 1;
     const isBottom = i === 0;
     const div = document.createElement('div');
-    div.className = 'layer-item' + (editState.selectedLayerId === l.id ? ' selected' : '');
+    div.className = 'layer-item' + (isBase ? ' layer-base' : '') + (editState.selectedLayerId === l.id ? ' selected' : '');
     div.draggable = true;
     div.dataset.layerId = l.id;
-    const lbl = l.type === 'text'
+    const lbl = isBase
+      ? `${icon('image')}${BASE_LAYER_NAME} <span class="base-tag">土台 ${editState.baseWidth}×${editState.baseHeight}</span>`
+      : l.type === 'text'
       ? `${icon('type')}${l.direction === 'vertical' ? '縦' : '横'} ${l.text.slice(0,10)}${l.text.length > 10 ? '…' : ''}`
       : l.type === 'image'
       ? `${icon('image')}${l.name}`
@@ -3472,12 +3508,10 @@ function updateLayerList() {
     div.innerHTML = `<span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${lbl}</span>
       <button class="nudge-btn" data-dir="up" draggable="false" ${isTop ? 'disabled' : ''} title="前面へ">${CHEVRON_UP_SVG}</button>
       <button class="nudge-btn" data-dir="down" draggable="false" ${isBottom ? 'disabled' : ''} title="背面へ">${CHEVRON_DOWN_SVG}</button>
-      ${editBtn}<button class="del-btn" draggable="false">×</button>`;
+      ${editBtn}${isBase ? '' : '<button class="del-btn" draggable="false">×</button>'}`;
     div.addEventListener('click', ev => {
       if (ev.target.closest('.del-btn')) {
-        editState.layers = editState.layers.filter(x => x.id !== l.id);
-        if (editState.selectedLayerId === l.id) editState.selectedLayerId = null;
-        saveHistory(); render(); updateLayerList(); updateCanvasInfo();
+        if (removeLayerById(l.id)) { saveHistory(); render(); updateLayerList(); updateCanvasInfo(); }
       } else if (ev.target.closest('.edit-layer-btn')) {
         editState.selectedLayerId = l.id; selectTool('select'); render(); updateLayerList();
         openTextModal('edit', l);
@@ -3521,7 +3555,6 @@ function updateLayerList() {
     });
     list.appendChild(div);
   }
-  appendBaseLayerRow(list);
   // サイドバーの「編集」ボタン表示切替
   const selLayer = editState.layers.find(l => l.id === editState.selectedLayerId && l.type === 'text');
   document.getElementById('editTextBtn').style.display = selLayer ? 'block' : 'none';
@@ -3550,7 +3583,7 @@ document.getElementById('saveState').addEventListener('click', () => {
   if (!editState.baseImage) { toast('保存する状態がありません'); return; }
   try {
     localStorage.setItem(LS_KEY, JSON.stringify({
-      layers: serializeLayers(editState.layers), baseWidth: editState.baseWidth, baseHeight: editState.baseHeight,
+      layers: serializeLayers(editState.layers), baseIndex: editState.baseIndex, baseWidth: editState.baseWidth, baseHeight: editState.baseHeight,
       baseImageData: canvasToDataURL_base(), savedAt: new Date().toISOString(),
     }));
     toast('編集状態を保存しました');
@@ -3613,6 +3646,7 @@ document.getElementById('loadState').addEventListener('click', async () => {
     editState.baseWidth = data.baseWidth; editState.baseHeight = data.baseHeight;
     editState.aspectRatio = data.baseWidth / data.baseHeight;
     editState.layers = prepared.layers; editState.history = []; editState.historyIdx = -1;
+    editState.baseIndex = Number.isInteger(data.baseIndex) ? Math.max(0, Math.min(data.baseIndex, prepared.layers.length)) : 0;
     editState.selectedLayerId = null; editState.cropRect = null; editState.dragging = null;
     document.getElementById('resizeWidth').value = editState.baseWidth;
     document.getElementById('resizeHeight').value = editState.baseHeight;
@@ -3629,7 +3663,7 @@ document.getElementById('loadState').addEventListener('click', async () => {
 
 document.getElementById('clearAll').addEventListener('click', () => {
   if (!confirm('すべてクリアしますか？')) return;
-  editState.baseImage = null; editState.layers = []; editState.selectedLayerId = null; editState.unsaved = false;
+  editState.baseImage = null; editState.layers = []; editState.baseIndex = 0; editState.selectedLayerId = null; editState.unsaved = false;
   editState.cropRect = null; editState.history = []; editState.historyIdx = -1;
   canvas.width = 800; canvas.height = 500;
   canvas.style.width = ''; canvas.style.height = ''; canvas.style.display = 'none';
@@ -3671,8 +3705,8 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { editState.selectedLayerId = null; editState.cropRect = null; render(); updateLayerList(); updateCanvasInfo(); return; }
   if (e.key === 'Enter' && editState.currentTool === 'crop' && editState.cropRect) { e.preventDefault(); document.getElementById('applyCropOnly').click(); return; }
   if ((e.key === 'Delete' || e.key === 'Backspace') && editState.selectedLayerId) {
-    editState.layers = editState.layers.filter(l => l.id !== editState.selectedLayerId);
-    editState.selectedLayerId = null; saveHistory(); render(); updateLayerList(); updateCanvasInfo(); return;
+    if (removeLayerById(editState.selectedLayerId)) { saveHistory(); render(); updateLayerList(); updateCanvasInfo(); }
+    return;
   }
   const key = e.key.toLowerCase();
   const keyMap = currentMode === 'annotate' ? annotateShortcutMap : shortcutMap;
@@ -4432,7 +4466,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-11-18-05'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-11-18-06'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
