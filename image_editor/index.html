@@ -1093,6 +1093,18 @@ canvas {
   </div>
 </div>
 
+<!-- ===== 置き換え確認（編集中に外部から画像が渡されたとき） ===== -->
+<div id="replaceModal" role="alertdialog" aria-modal="true" aria-labelledby="replaceTitle" style="display:none; position:fixed; inset:0; z-index:300; background:rgba(58,42,26,0.35); align-items:center; justify-content:center; padding:16px;">
+  <div style="width:380px; max-width:100%; background:#fff; border:1px solid #d8d0c4; border-radius:14px; padding:20px; color:#3a2a1a; line-height:1.7;">
+    <div id="replaceTitle" style="font-size:15px; font-weight:700;">今の編集を破棄して新しい画像に置き換えますか？</div>
+    <div style="font-size:12px; color:#8a7060; margin-top:6px;">まだ書き出していない変更があります。置き換えると元に戻せません。</div>
+    <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:16px;">
+      <button id="replaceCancelBtn" class="btn-ghost" type="button" style="padding:7px 16px;">キャンセル</button>
+      <button id="replaceOkBtn" class="primary" type="button" style="padding:7px 16px;">置き換える</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1118,7 +1130,7 @@ function downloadBlob(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
-// dataURL をファイル保存する（showSaveFilePicker 対応・キャンセル時はトースト出さない）
+// dataURL をファイル保存する（showSaveFilePicker 対応・キャンセル時はトースト出さない）。保存できたら true
 async function downloadFile(dataURL, filename) {
   const ext = filename.split('.').pop().toLowerCase();
   const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'image/png';
@@ -1136,13 +1148,16 @@ async function downloadFile(dataURL, filename) {
       await writable.write(new Blob([bytes], { type: mime }));
       await writable.close();
       toast(`${fh.name} を保存しました`); // 実際に保存されたファイル名（OS ダイアログで変更された場合も正確に反映）
+      return true;
     } catch (e) {
       if (e.name !== 'AbortError') toast('保存に失敗しました');
+      return false;
     }
   } else {
     const a = document.createElement('a');
     a.href = dataURL; a.download = filename; a.click();
     toast(`${filename} を保存しました`);
+    return true;
   }
 }
 
@@ -1323,6 +1338,7 @@ const editState = {
   moveSnap: null,
   history: [],
   historyIdx: -1,
+  unsaved: false, // 書き出していない変更がある（編集すると true／読み込み・保存・コピーで false）
   aspectRatio: 1,
   zoom: 1,
   spacePressed: false,
@@ -1339,6 +1355,7 @@ function serializeLayers(layers) {
 }
 
 function saveHistory() {
+  editState.unsaved = true; // 編集のたびに呼ばれる。読み込み直後・書き出し後に呼び出し側で false に戻す
   editState.history = editState.history.slice(0, editState.historyIdx + 1);
   editState.history.push({
     layers: serializeLayers(editState.layers),
@@ -1994,7 +2011,7 @@ function loadEditImage(file, message = '画像を読み込みました') {
       document.getElementById('resizeHeight').value = h;
       document.getElementById('canvasUploadPrompt').style.display = 'none';
       canvas.style.display = 'block';
-      zoomFit(); saveHistory(); render(); updateCanvasInfo(); updateLayerList();
+      zoomFit(); saveHistory(); editState.unsaved = false; render(); updateCanvasInfo(); updateLayerList();
       toast(message);
     };
     img.src = e.target.result;
@@ -2058,7 +2075,7 @@ function createBlankCanvas(w, h, transparent) {
   document.getElementById('resizeHeight').value = h;
   document.getElementById('canvasUploadPrompt').style.display = 'none';
   canvas.style.display = 'block';
-  zoomFit(); saveHistory(); render(); updateCanvasInfo(); updateLayerList();
+  zoomFit(); saveHistory(); editState.unsaved = false; render(); updateCanvasInfo(); updateLayerList();
   toast(`${w}×${h} の新規キャンバスを作成しました`);
 }
 
@@ -3517,7 +3534,7 @@ document.getElementById('saveBtn').addEventListener('click', () => {
   editState.selectedLayerId = null; editState.cropRect = null; editState.cropHidden = true; render();
   const dataURL = canvas.toDataURL(`image/${format}`, format === 'jpeg' ? 0.92 : undefined);
   editState.cropHidden = false; editState.selectedLayerId = prevSel; editState.cropRect = prevCrop; render();
-  downloadFile(dataURL, `${name}.${format === 'jpeg' ? 'jpg' : 'png'}`);
+  downloadFile(dataURL, `${name}.${format === 'jpeg' ? 'jpg' : 'png'}`).then(saved => { if (saved) editState.unsaved = false; });
 });
 
 // --- State persistence ---
@@ -3595,7 +3612,7 @@ document.getElementById('loadState').addEventListener('click', async () => {
     document.getElementById('resizeHeight').value = editState.baseHeight;
     document.getElementById('canvasUploadPrompt').style.display = 'none';
     canvas.style.display = 'block';
-    zoomFit(); saveHistory(); render(); updateLayerList(); updateCanvasInfo(); updateCropStatus();
+    zoomFit(); saveHistory(); editState.unsaved = false; render(); updateLayerList(); updateCanvasInfo(); updateCropStatus();
     toast(`復元しました (${new Date(data.savedAt).toLocaleString('ja-JP')})`);
   } catch (e) {
     toast('復元できませんでした。保存データや画像を確認してください');
@@ -3606,7 +3623,7 @@ document.getElementById('loadState').addEventListener('click', async () => {
 
 document.getElementById('clearAll').addEventListener('click', () => {
   if (!confirm('すべてクリアしますか？')) return;
-  editState.baseImage = null; editState.layers = []; editState.selectedLayerId = null;
+  editState.baseImage = null; editState.layers = []; editState.selectedLayerId = null; editState.unsaved = false;
   editState.cropRect = null; editState.history = []; editState.historyIdx = -1;
   canvas.width = 800; canvas.height = 500;
   canvas.style.width = ''; canvas.style.height = ''; canvas.style.display = 'none';
@@ -4409,7 +4426,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-11-18-02'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-11-18-03'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
@@ -4583,12 +4600,14 @@ async function copyImageToClipboard() {
       throw new Error('clipboard write unsupported');
     }
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })]);
+    editState.unsaved = false; // 書き出し済み
     toast('画像をコピーしました');
   } catch (err) {
     try {
       const blob = await blobPromise;
       const name = (document.getElementById('fileName').value.replace(/[\x00-\x1f\\/:*?"<>|]/g, '_').trim() || 'note_image') + '.png';
       downloadBlob(blob, name);
+      editState.unsaved = false; // フォールバックで PNG を保存した
       toast('コピーできなかったため、PNG を保存しました');
     } catch (e2) {
       toast('コピーに失敗しました');
@@ -4601,14 +4620,36 @@ document.getElementById('copyImageBtnSave').addEventListener('click', copyImageT
 // ============================================================
 // === 取り込み共通（クリップボード検知・ファイル渡し起動）===
 // ============================================================
-// 編集済みの内容があるか（画像だけ読み込んだ直後は false）
+// 書き出していない変更があるか（読み込み直後・保存/コピー直後は false）
 function hasEditsInProgress() {
-  return !!editState.baseImage && (editState.layers.length > 0 || editState.history.length > 1);
+  return !!editState.baseImage && editState.unsaved;
 }
 
-// 外から来た画像を読み込む。編集中の内容がある時だけ確認し、勝手には上書きしない
-function importImageBlob(blob, message) {
-  if (hasEditsInProgress() && !confirm('編集中の画像を、新しい画像で置き換えますか？\n（置き換えると元に戻せません）')) return false;
+// 置き換え確認（アプリ内の枠。ブラウザ標準の confirm は iframe 内や前面化の直後に出ないことがあるため使わない）
+let replaceAsk = null;
+function askReplaceEdits() {
+  if (replaceAsk) return Promise.resolve(false); // すでに確認中なら、後から来た画像は読み込まない
+  return new Promise(resolve => {
+    const modal = document.getElementById('replaceModal');
+    const done = answer => {
+      modal.style.display = 'none';
+      document.removeEventListener('keydown', onKey, true);
+      replaceAsk = null;
+      resolve(answer);
+    };
+    const onKey = e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(false); } };
+    replaceAsk = done;
+    document.getElementById('replaceOkBtn').onclick = () => done(true);
+    document.getElementById('replaceCancelBtn').onclick = () => done(false);
+    document.addEventListener('keydown', onKey, true);
+    modal.style.display = 'flex';
+    document.getElementById('replaceCancelBtn').focus();
+  });
+}
+
+// 外から来た画像を読み込む。書き出していない編集がある時だけ確認し、勝手には上書きしない。読み込んだら true
+async function importImageBlob(blob, message) {
+  if (hasEditsInProgress() && !(await askReplaceEdits())) return false;
   if (currentMode === 'transparent') switchMode('edit');
   loadEditImage(blob, message);
   return true;
@@ -4646,10 +4687,10 @@ const clipBanner = document.getElementById('clipBanner');
 function showClipBanner(blob, sig) { clipWatch.shown = { blob, sig }; clipBanner.hidden = false; }
 function hideClipBanner() { clipWatch.shown = null; clipBanner.hidden = true; }
 
-document.getElementById('clipBannerLoad').addEventListener('click', () => {
+document.getElementById('clipBannerLoad').addEventListener('click', async () => {
   const shown = clipWatch.shown;
   if (!shown) return;
-  if (importImageBlob(shown.blob, 'クリップボードの画像を読み込みました')) {
+  if (await importImageBlob(shown.blob, 'クリップボードの画像を読み込みました')) {
     setLastClipSig(shown.sig); hideClipBanner();
   }
 });
@@ -4698,7 +4739,7 @@ if ('launchQueue' in window && window.launchQueue && typeof window.launchQueue.s
       if (!handles || !handles.length) return;
       const file = await handles[0].getFile();
       if (!file.type.startsWith('image/')) { toast('画像ファイルではありません'); return; }
-      importImageBlob(file, `${file.name || '画像'} を読み込みました`);
+      await importImageBlob(file, `${file.name || '画像'} を読み込みました`);
       if (handles.length > 1) toast(`${handles.length}枚のうち最初の1枚を読み込みました`);
     } catch (e) {
       toast('ファイルを開けませんでした');
