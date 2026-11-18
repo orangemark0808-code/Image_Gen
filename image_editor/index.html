@@ -6,7 +6,7 @@
 <title>画像エディター</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ea580c">
-<meta name="description" content="画像のトリミング・リサイズ・テキスト/図形追加・白背景透過を行うシンプルなエディター">
+<meta name="description" content="画像のトリミング・リサイズ・テキスト/図形追加・スクショ注釈・白背景透過を行うシンプルなエディター">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="画像エディター">
@@ -14,7 +14,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Yomogi&family=M+PLUS+Rounded+1c:wght@500;700;900&family=Dela+Gothic+One&family=Mochiy+Pop+One&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Yomogi&family=M+PLUS+Rounded+1c:wght@500;700;900&family=Dela+Gothic+One&family=Mochiy+Pop+One&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 /* ===== Reset & Base ===== */
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -508,18 +508,74 @@ canvas {
 .clip-slot img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .clip-slot.empty { cursor: default; }
 
+/* ===== Lucide icons (sprite) ===== */
+.ico { width: 1.15em; height: 1.15em; flex-shrink: 0; vertical-align: -0.2em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tool-btn .ico, .btn-action .ico, #undoBtn .ico, #redoBtn .ico, #tpUndoBtn .ico, #tpRedoBtn .ico, #installBtn .ico, .layer-item .ico, .clip-banner .ico { margin-right: 5px; }
+#tpRedoBtn .ico { margin-right: 0; margin-left: 5px; }
+.hamburger-btn .ico { width: 20px; height: 20px; margin: 0; }
+#textModalCloseBtn .ico { margin: 0; }
+
+/* ===== 注釈モード ===== */
+#annotateModePanel { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+#annotateModePanel > .section { margin: 0 0 16px; padding: 0 0 14px; border-bottom: 1px solid #e5e7eb; }
+#annotateModePanel > .section:last-child { border-bottom: none; }
+/* 「画像をコピー」はスクロールしても常に見える位置に固定 */
+#annotateModePanel > .section:first-child { position: sticky; top: 0; z-index: 3; background: #fff; padding-top: 2px; }
+.mono-label { font-family: 'DM Mono', 'Courier New', monospace; font-size: 11px; letter-spacing: .08em; color: #8a7060; text-transform: uppercase; margin: 12px 0 6px; display: block; }
+.ann-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.ann-tools .tool-btn { display: flex; align-items: center; justify-content: flex-start; text-align: left; }
+.ann-tools .tool-btn .shortcut { margin-left: auto; }
+.ann-colors { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.ann-colors .color-swatch { width: 100%; height: auto; aspect-ratio: 1; border-radius: 8px; }
+.ann-hint { font-size: 12px; color: #3a2a1a; background: #faf8f4; padding: 8px 10px; border-radius: 14px; line-height: 1.7; margin-top: 10px; }
+#annStrokeWidth { width: 100%; }
+
+/* ===== クリップボード画像バナー ===== */
+#editModeArea { position: relative; }
+.clip-banner {
+  position: absolute; top: 62px; left: 50%; transform: translateX(-50%); z-index: 30;
+  display: flex; align-items: center; gap: 10px; max-width: calc(100% - 32px);
+  background: #fff; color: #3a2a1a; border: 1px solid #d8d0c4; border-radius: 14px;
+  padding: 8px 10px 8px 14px; font-size: 13px; line-height: 1.7; box-shadow: none;
+}
+.clip-banner[hidden] { display: none; }
+.clip-banner > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.clip-banner button { padding: 4px 12px; font-size: 12px; border-radius: 14px; box-shadow: none; white-space: nowrap; }
+
 </style>
 </head>
 <body>
 
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <!-- Lucide (https://lucide.dev) -->
+  <symbol id="i-menu" viewBox="0 0 24 24"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></symbol>
+  <symbol id="i-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></symbol>
+  <symbol id="i-square" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/></symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+  <symbol id="i-move-horizontal" viewBox="0 0 24 24"><polyline points="18 8 22 12 18 16"/><polyline points="6 8 2 12 6 16"/><line x1="2" x2="22" y1="12" y2="12"/></symbol>
+  <symbol id="i-slash" viewBox="0 0 24 24"><path d="M22 2 2 22"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></symbol>
+  <symbol id="i-pointer" viewBox="0 0 24 24"><path d="M4.037 4.688a.495.495 0 0 1 .651-.651l16 6.5a.5.5 0 0 1-.063.947l-6.124 1.58a2 2 0 0 0-1.438 1.435l-1.579 6.126a.5.5 0 0 1-.947.063z"/></symbol>
+  <symbol id="i-type" viewBox="0 0 24 24"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></symbol>
+  <symbol id="i-hash-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m10 9.5 2-1.5v8"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></symbol>
+  <symbol id="i-clipboard" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></symbol>
+</svg>
+
 <!-- ===== App Header ===== -->
 <div class="app-header">
   <div style="display:flex; align-items:center; gap:10px;">
-    <button class="hamburger-btn" id="hamburgerBtn" aria-label="メニュー">☰</button>
+    <button class="hamburger-btn" id="hamburgerBtn" aria-label="メニュー"><svg class="ico" aria-hidden="true"><use href="#i-menu"/></svg></button>
     <div class="app-title">画像エディター<span class="version-badge" id="appVersion"></span></div>
   </div>
   <button id="installBtn" class="primary" style="display:none; align-items:center; gap:6px; padding:7px 12px; font-size:12px;">
-    📲 インストール
+    <svg class="ico" aria-hidden="true"><use href="#i-download"/></svg>インストール
   </button>
 </div>
 
@@ -532,6 +588,7 @@ canvas {
     <nav class="mode-nav" id="modeNav" aria-label="編集メニュー">
       <div class="mode-nav-inner">
         <button class="mode-btn active" data-mode="edit" aria-pressed="true">編集</button>
+        <button class="mode-btn" data-mode="annotate" aria-pressed="false">注釈</button>
         <button class="mode-btn" data-mode="transparent" aria-pressed="false">透過</button>
       </div>
       <div class="acc-menu" id="editAccMenu" role="group" aria-label="編集機能">
@@ -619,15 +676,15 @@ canvas {
           トリミング+リサイズを実行
         </button>
         <div class="help-box" style="margin-top:6px;">「両方実行」はトリミング範囲を選択中の時のみ有効です</div>
-        <!-- CLIPBOARD -->
+        <!-- STOCK（内部キー・ID は clipboard のまま） -->
         <div style="margin-top:16px; padding-top:12px; border-top:1px solid #e8e2d8;">
-          <div class="section-title" style="font-family:'DM Mono',monospace; letter-spacing:.08em; font-size:11px; color:#8a7060; margin-bottom:10px;">CLIPBOARD</div>
+          <div class="section-title" style="font-family:'DM Mono',monospace; letter-spacing:.08em; font-size:11px; color:#8a7060; margin-bottom:10px;">STOCK</div>
           <div id="clipboardThumbs" style="display:flex; gap:8px; margin-bottom:8px;">
             <div class="clip-slot" data-idx="0"></div>
             <div class="clip-slot" data-idx="1"></div>
             <div class="clip-slot" data-idx="2"></div>
           </div>
-          <button id="saveClipboardBtn" class="primary btn-action" style="margin-bottom:6px;">クリップボードに保存</button>
+          <button id="saveClipboardBtn" class="primary btn-action" style="margin-bottom:6px;">ストックに保存</button>
           <button id="clearClipboardBtn" style="width:100%; padding:5px; font-size:12px; border:1px solid #d0c8be; border-radius:14px; background:transparent; color:#8a7060; cursor:pointer; box-shadow:none;" disabled>全てクリア</button>
         </div>
       </div>
@@ -644,19 +701,19 @@ canvas {
         <div class="section-title">SHAPE</div>
         <div style="margin-bottom:10px; padding-bottom:10px; border-bottom:1px dashed #e5e5e5;">
           <div class="row-2" style="margin-top:0;">
-            <button class="tool-btn" data-tool="ellipse">〇 楕円<span class="shortcut">O</span></button>
-            <button class="tool-btn" data-tool="rect">□ 四角<span class="shortcut">R</span></button>
+            <button class="tool-btn" data-tool="ellipse"><svg class="ico" aria-hidden="true"><use href="#i-circle"/></svg>楕円<span class="shortcut">O</span></button>
+            <button class="tool-btn" data-tool="rect"><svg class="ico" aria-hidden="true"><use href="#i-square"/></svg>四角<span class="shortcut">R</span></button>
           </div>
           <div class="row-2" style="margin-top:6px;">
-            <button class="tool-btn" data-tool="arrow">→ 矢印<span class="shortcut">A</span></button>
-            <button class="tool-btn" data-tool="doubleArrow">↔ 両矢印<span class="shortcut">D</span></button>
+            <button class="tool-btn" data-tool="arrow"><svg class="ico" aria-hidden="true"><use href="#i-arrow-right"/></svg>矢印<span class="shortcut">A</span></button>
+            <button class="tool-btn" data-tool="doubleArrow"><svg class="ico" aria-hidden="true"><use href="#i-move-horizontal"/></svg>両矢印<span class="shortcut">D</span></button>
           </div>
           <div class="row-2" style="margin-top:6px;">
-            <button class="tool-btn" data-tool="line">／ 線<span class="shortcut">L</span></button>
-            <button class="tool-btn" data-tool="freehand">✎ 手書き<span class="shortcut">P</span></button>
+            <button class="tool-btn" data-tool="line"><svg class="ico" aria-hidden="true"><use href="#i-slash"/></svg>線<span class="shortcut">L</span></button>
+            <button class="tool-btn" data-tool="freehand"><svg class="ico" aria-hidden="true"><use href="#i-pencil"/></svg>手書き<span class="shortcut">P</span></button>
           </div>
           <div class="row-2" style="margin-top:6px;">
-            <button class="tool-btn" data-tool="select">選択<span class="shortcut">V</span></button>
+            <button class="tool-btn" data-tool="select"><svg class="ico" aria-hidden="true"><use href="#i-pointer"/></svg>選択<span class="shortcut">V</span></button>
           </div>
         </div>
         <label style="margin-top:0;">線の色</label>
@@ -683,6 +740,7 @@ canvas {
           <option value="jpeg">JPEG</option>
         </select>
         <button id="saveBtn" class="primary btn-action" style="margin-top:8px;">ダウンロード</button>
+        <button id="copyImageBtnSave" class="btn-ghost btn-action" style="margin-top:8px;" type="button"><svg class="ico" aria-hidden="true"><use href="#i-copy"/></svg>画像をコピー</button>
         <div class="row-2" style="margin-top:8px;">
           <button id="saveState" class="btn-ghost">状態保存</button>
           <button id="loadState" class="btn-ghost">復元</button>
@@ -690,6 +748,38 @@ canvas {
       </div>
 
     </div><!-- /editModePanel -->
+
+    <!-- ==== ANNOTATE MODE PANEL（スクショ注釈の最短ルート） ==== -->
+    <div id="annotateModePanel" style="display:none;">
+      <div class="section">
+        <div class="section-title">ANNOTATE</div>
+        <button id="annCopyBtn" class="primary btn-action" type="button"><svg class="ico" aria-hidden="true"><use href="#i-copy"/></svg>画像をコピー</button>
+        <div class="ann-hint" id="annCopyHint">注釈を入れたら「画像をコピー」。そのままAIチャットに貼り付けできます</div>
+      </div>
+      <div class="section">
+        <div class="section-title">TOOLS</div>
+        <div class="ann-tools">
+          <button class="tool-btn" data-tool="rect"><svg class="ico" aria-hidden="true"><use href="#i-square"/></svg>四角<span class="shortcut">R</span></button>
+          <button class="tool-btn" data-tool="ellipse"><svg class="ico" aria-hidden="true"><use href="#i-circle"/></svg>楕円<span class="shortcut">O</span></button>
+          <button class="tool-btn" data-tool="arrow"><svg class="ico" aria-hidden="true"><use href="#i-arrow-right"/></svg>矢印<span class="shortcut">A</span></button>
+          <button class="tool-btn" data-tool="line"><svg class="ico" aria-hidden="true"><use href="#i-slash"/></svg>線<span class="shortcut">L</span></button>
+          <button class="tool-btn" data-tool="freehand"><svg class="ico" aria-hidden="true"><use href="#i-pencil"/></svg>手書き<span class="shortcut">P</span></button>
+          <button class="tool-btn" data-tool="text"><svg class="ico" aria-hidden="true"><use href="#i-type"/></svg>テキスト<span class="shortcut">T</span></button>
+          <button class="tool-btn" data-tool="marker"><svg class="ico" aria-hidden="true"><use href="#i-hash-circle"/></svg>番号<span class="shortcut">N</span></button>
+          <button class="tool-btn" data-tool="mosaic"><svg class="ico" aria-hidden="true"><use href="#i-grid"/></svg>モザイク<span class="shortcut">M</span></button>
+          <button class="tool-btn" data-tool="select"><svg class="ico" aria-hidden="true"><use href="#i-pointer"/></svg>選択<span class="shortcut">V</span></button>
+        </div>
+        <div class="ann-hint" id="annHint"></div>
+      </div>
+      <div class="section">
+        <div class="section-title">STYLE</div>
+        <span class="mono-label" style="margin-top:0;">COLOR</span>
+        <div class="ann-colors" id="annColors"></div>
+        <span class="mono-label">WIDTH <span id="annStrokeWidthLabel">6</span> PX</span>
+        <input type="range" id="annStrokeWidth" min="1" max="20" value="6">
+        <label class="inline" id="annFillLabel" style="margin-top:10px;"><input type="checkbox" id="annFill"> 塗りつぶし</label>
+      </div>
+    </div><!-- /annotateModePanel -->
 
     <!-- ==== LAYER DOCK（サイドバー下部に常時固定） ==== -->
     <div id="layerDock" class="layer-dock">
@@ -751,8 +841,8 @@ canvas {
             </label>
           </div>
           <div style="display:flex; gap:6px; margin-top:8px;">
-            <button id="tpUndoBtn" style="flex:1;" disabled>↶ 戻る</button>
-            <button id="tpRedoBtn" style="flex:1;" disabled>進む ↷</button>
+            <button id="tpUndoBtn" style="flex:1;" disabled><svg class="ico" aria-hidden="true"><use href="#i-undo"/></svg>戻る</button>
+            <button id="tpRedoBtn" style="flex:1;" disabled>進む<svg class="ico" aria-hidden="true"><use href="#i-redo"/></svg></button>
             <button id="tpClearSelectionBtn" style="flex:1;" disabled>クリア</button>
           </div>
         </div>
@@ -802,6 +892,11 @@ canvas {
 
   <!-- ===== Edit Mode Canvas Area ===== -->
   <div id="editModeArea" class="canvas-area">
+    <div class="clip-banner" id="clipBanner" role="status" hidden>
+      <svg class="ico" aria-hidden="true"><use href="#i-clipboard"/></svg><span>クリップボードに画像があります</span>
+      <button id="clipBannerLoad" class="primary" type="button">読み込む</button>
+      <button id="clipBannerClose" class="btn-ghost" type="button">閉じる</button>
+    </div>
     <div class="toolbar">
       <div class="canvas-info" id="canvasInfo">画像をアップロードしてください</div>
       <div class="zoom-control">
@@ -815,8 +910,8 @@ canvas {
       </div>
       <div class="toolbar-actions">
         <div class="history-actions">
-          <button id="undoBtn" disabled>↶ Undo<span class="shortcut">Ctrl+Z</span></button>
-          <button id="redoBtn" disabled>↷ Redo<span class="shortcut">Ctrl+Y</span></button>
+          <button id="undoBtn" disabled><svg class="ico" aria-hidden="true"><use href="#i-undo"/></svg>Undo<span class="shortcut">Ctrl+Z</span></button>
+          <button id="redoBtn" disabled><svg class="ico" aria-hidden="true"><use href="#i-redo"/></svg>Redo<span class="shortcut">Ctrl+Y</span></button>
         </div>
         <div class="clear-all-action">
           <button id="clearAll" class="danger" type="button">すべてクリア</button>
@@ -941,7 +1036,7 @@ canvas {
     <!-- ヘッダー -->
     <div style="padding:12px 16px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #e5e7eb; flex-shrink:0;">
       <span id="textModalTitle" style="font-size:11px; font-weight:700; font-family:'DM Mono','Courier New',monospace; text-transform:uppercase; letter-spacing:0.5px; color:#000000;">TEXT — 新規追加</span>
-      <button id="textModalCloseBtn" style="font-size:12px; padding:3px 9px;">✕</button>
+      <button id="textModalCloseBtn" style="font-size:12px; padding:3px 9px;" aria-label="閉じる"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button>
     </div>
     <!-- 2カラムボディ -->
     <div class="text-modal-body" style="display:flex; flex-wrap:wrap; flex:1; min-height:0;">
@@ -1011,6 +1106,17 @@ function toast(msg) {
   setTimeout(() => t.classList.remove('show'), 2500);
 }
 function uid() { return Math.random().toString(36).slice(2, 9); }
+
+// Lucide アイコン（HTML 冒頭のスプライト）を文字列で返す。動的に組み立てるラベル用
+function icon(name) { return `<svg class="ico" aria-hidden="true"><use href="#i-${name}"/></svg>`; }
+
+// Blob を <a download> で保存する（コピー失敗時のフォールバック用。ダイアログなし）
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
 
 // dataURL をファイル保存する（showSaveFilePicker 対応・キャンセル時はトースト出さない）
 async function downloadFile(dataURL, filename) {
@@ -1119,6 +1225,7 @@ let currentMode = 'edit';
 const editModePanel = document.getElementById('editModePanel');
 const layerDock = document.getElementById('layerDock');
 const transparentModePanel = document.getElementById('transparentModePanel');
+const annotateModePanel = document.getElementById('annotateModePanel');
 const editModeArea = document.getElementById('editModeArea');
 const transparentModeArea = document.getElementById('transparentModeArea');
 
@@ -1139,21 +1246,31 @@ function showEditSection(sectionId) {
 }
 
 function switchMode(mode) {
+  const prevMode = currentMode;
   currentMode = mode;
   document.querySelectorAll('.mode-btn').forEach(btn => {
     const active = btn.dataset.mode === mode;
     btn.classList.toggle('active', active);
     btn.setAttribute('aria-pressed', String(active));
   });
-  if (mode === 'edit') {
-    editModePanel.style.display = '';
+  if (mode === 'edit' || mode === 'annotate') {
+    // 注釈モードも編集モードと同じキャンバス・レイヤー・Undo/Redo を共有し、左パネルだけ差し替える
+    editModePanel.style.display = mode === 'edit' ? '' : 'none';
+    annotateModePanel.style.display = mode === 'annotate' ? '' : 'none';
     layerDock.style.display = '';
     transparentModePanel.style.display = 'none';
     editModeArea.style.display = 'flex';
     transparentModeArea.style.display = 'none';
-    editAccMenu.hidden = false;
+    editAccMenu.hidden = mode !== 'edit';
+    if (mode === 'annotate' && prevMode !== 'annotate') selectTool('rect');
+    // 注釈モードから編集モードへ戻ったら、表示中セクションの既定ツールへ（テキスト/番号/モザイクのままだと操作できない）
+    if (mode === 'edit' && prevMode === 'annotate') {
+      const sec = editSectionButtons.find(b => b.classList.contains('active'))?.dataset.sec;
+      selectTool(sec === 'sec-trim' ? 'crop' : sec === 'sec-shape' ? 'rect' : 'select');
+    }
   } else {
     editModePanel.style.display = 'none';
+    annotateModePanel.style.display = 'none';
     layerDock.style.display = 'none';
     // CSSで #transparentModePanel に display:none が指定されているため明示的に 'block' を指定
     transparentModePanel.style.display = 'block';
@@ -1514,6 +1631,14 @@ function drawShape(l) {
     ctx.beginPath(); ctx.moveTo(l.x1, l.y1); ctx.lineTo(l.x2, l.y2); ctx.stroke();
   } else if (l.shape === 'arrow' || l.shape === 'doubleArrow') {
     drawArrow(l.x1, l.y1, l.x2, l.y2, l.strokeWidth, l.shape === 'doubleArrow');
+  } else if (l.shape === 'marker') {
+    drawMarker(l, x, y, w, h);
+  } else if (l.shape === 'mosaic') {
+    drawMosaic(x, y, w, h, l.block);
+    if (l.id === 'preview') { // ドラッグ中だけ範囲の輪郭を出す
+      ctx.strokeStyle = '#ea580c'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+      ctx.strokeRect(x, y, w, h); ctx.setLineDash([]);
+    }
   }
   if (editState.selectedLayerId === l.id) {
     ctx.strokeStyle = '#ea580c'; ctx.lineWidth = 1; ctx.setLineDash([4,4]);
@@ -1526,6 +1651,67 @@ function drawShape(l) {
     for (const [hx, hy] of handlePoints) {
       ctx.fillRect(hx - 5, hy - 5, 10, 10);
       ctx.strokeRect(hx - 5, hy - 5, 10, 10);
+    }
+  }
+  ctx.restore();
+}
+
+// ----- 注釈: 番号マーカー（外接ボックス＋円＋連番。番号はレイヤー順から自動で決まる） -----
+function markerNumber(l) {
+  const markers = editState.layers.filter(x => x.type === 'shape' && x.shape === 'marker');
+  const i = markers.indexOf(l);
+  return i >= 0 ? i + 1 : markers.length + 1;
+}
+
+function contrastColor(hex) {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '');
+  if (!m) return '#ffffff';
+  const [r, g, b] = [m[1], m[2], m[3]].map(v => parseInt(v, 16));
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 160 ? '#000000' : '#ffffff';
+}
+
+function drawMarker(l, x, y, w, h) {
+  const d = Math.min(w, h), r = d / 2, cx = x + w / 2, cy = y + h / 2;
+  const fg = contrastColor(l.color);
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = l.color; ctx.fill();
+  ctx.lineWidth = Math.max(2, d * 0.07); ctx.strokeStyle = fg; ctx.stroke();
+  const n = String(markerNumber(l));
+  const fontSize = Math.round(d * (n.length > 2 ? 0.4 : n.length > 1 ? 0.5 : 0.6));
+  ctx.font = `700 ${fontSize}px "DM Mono", "Nunito", -apple-system, sans-serif`;
+  ctx.fillStyle = fg; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(n, cx, cy + d * 0.04);
+}
+
+// ----- 注釈: モザイク（直下の合成結果をブロック平均でピクセル化。非破壊なので Undo/移動/リサイズできる） -----
+function defaultMosaicBlock() {
+  return Math.max(8, Math.round(Math.max(canvas.width, canvas.height) / 90));
+}
+
+function drawMosaic(x, y, w, h, block) {
+  const sx = Math.max(0, Math.floor(x)), sy = Math.max(0, Math.floor(y));
+  const sw = Math.min(canvas.width, Math.ceil(x + w)) - sx;
+  const sh = Math.min(canvas.height, Math.ceil(y + h)) - sy;
+  if (sw < 1 || sh < 1) return;
+  const b = Math.max(2, Math.round(block || defaultMosaicBlock()));
+  const src = ctx.getImageData(sx, sy, sw, sh).data;
+  ctx.save();
+  for (let by = 0; by < sh; by += b) {
+    for (let bx = 0; bx < sw; bx += b) {
+      const bw = Math.min(b, sw - bx), bh = Math.min(b, sh - by);
+      let r = 0, g = 0, bl = 0, a = 0;
+      for (let yy = by; yy < by + bh; yy++) {
+        for (let xx = bx; xx < bx + bw; xx++) {
+          const i = (yy * sw + xx) * 4, al = src[i + 3];
+          r += src[i] * al; g += src[i + 1] * al; bl += src[i + 2] * al; a += al;
+        }
+      }
+      const n = bw * bh;
+      ctx.clearRect(sx + bx, sy + by, bw, bh); // 下の元画素と混ざらないよう置き換える
+      if (a > 0) {
+        ctx.fillStyle = `rgba(${Math.round(r / a)},${Math.round(g / a)},${Math.round(bl / a)},${a / n / 255})`;
+        ctx.fillRect(sx + bx, sy + by, bw, bh);
+      }
     }
   }
   ctx.restore();
@@ -1828,7 +2014,7 @@ function updateCanvasInfo() {
 }
 
 function toolName(t) {
-  return { select:'選択', crop:'トリミング', ellipse:'楕円', rect:'四角', arrow:'矢印', doubleArrow:'両矢印', line:'線', freehand:'手書き' }[t] || t;
+  return { select:'選択', crop:'トリミング', ellipse:'楕円', rect:'四角', arrow:'矢印', doubleArrow:'両矢印', line:'線', freehand:'手書き', text:'テキスト', marker:'番号', mosaic:'モザイク' }[t] || t;
 }
 
 function updateCropStatus() {
@@ -1848,7 +2034,7 @@ function updateCropStatus() {
 document.body.addEventListener('dragover', e => e.preventDefault());
 document.body.addEventListener('drop', e => {
   e.preventDefault();
-  if (currentMode !== 'edit') return;
+  if (currentMode === 'transparent') return;
   if (e.dataTransfer.files[0]) loadEditImage(e.dataTransfer.files[0]);
 });
 
@@ -1908,7 +2094,8 @@ document.querySelectorAll('.tool-btn').forEach(btn => {
 });
 
 function selectTool(tool, revealSection = false) {
-  if (revealSection) {
+  // 注釈モードでは編集モードのセクションへ切り替えず、その場でツールだけ変える
+  if (revealSection && currentMode !== 'annotate') {
     if (tool === 'crop') showEditSection('sec-trim');
     else if (['select', 'ellipse', 'rect', 'arrow', 'doubleArrow', 'line', 'freehand'].includes(tool)) showEditSection('sec-shape');
   }
@@ -1922,7 +2109,7 @@ function selectTool(tool, revealSection = false) {
       editState.selectedLayerId = null;
     }
   }
-  updateCursor(); render(); updateCanvasInfo(); updateLayerList();
+  updateCursor(); render(); updateCanvasInfo(); updateLayerList(); syncAnnotatePanel();
 }
 
 document.getElementById('deselectBtn').addEventListener('click', () => {
@@ -2129,7 +2316,10 @@ function resizeCanvas(newW, newH, crop = null) {
   for (const l of layers) {
     if (l.type === 'text')  { l.x *= scaleX; l.y *= scaleY; l.size *= (scaleX + scaleY) / 2; }
     else if (l.type === 'image') { l.x *= scaleX; l.y *= scaleY; l.w *= scaleX; l.h *= scaleY; }
-    else { l.x1 *= scaleX; l.x2 *= scaleX; l.y1 *= scaleY; l.y2 *= scaleY; }
+    else {
+      l.x1 *= scaleX; l.x2 *= scaleX; l.y1 *= scaleY; l.y2 *= scaleY;
+      if (l.block) l.block *= (scaleX + scaleY) / 2;
+    }
   }
   const cropRect = crop || !editState.cropRect ? null : {
     x: editState.cropRect.x * scaleX, y: editState.cropRect.y * scaleY,
@@ -2205,7 +2395,7 @@ function addToClipboard(base64) {
   arr.push(base64);
   saveClipboardData(arr);
   renderClipboardThumbs();
-  toast(`クリップボードに保存しました（${arr.length}/${CLIP_MAX}）`);
+  toast(`ストックに保存しました（${arr.length}/${CLIP_MAX}）`);
   return true;
 }
 function renderClipboardThumbs() {
@@ -2263,7 +2453,7 @@ function pasteClipboardItem(base64) {
   img.src = base64;
 }
 
-// クリップボード保存（集約ボタン）: TRIM範囲 > キャンバス全体 の優先順で保存
+// ストック保存（集約ボタン。内部名は clipboard のまま）: TRIM範囲 > キャンバス全体 の優先順で保存
 document.getElementById('saveClipboardBtn').addEventListener('click', () => {
   if (!editState.baseImage) { toast('保存できる内容がありません'); return; }
   const r = editState.cropRect;
@@ -2292,10 +2482,10 @@ document.getElementById('clipboardThumbs').addEventListener('click', e => {
 
 // 全クリア
 document.getElementById('clearClipboardBtn').addEventListener('click', () => {
-  if (!confirm('クリップボードを全てクリアしますか？')) return;
+  if (!confirm('ストックを全てクリアしますか？')) return;
   saveClipboardData([]);
   renderClipboardThumbs();
-  toast('クリップボードをクリアしました');
+  toast('ストックをクリアしました');
 });
 
 // ページロード時に復元
@@ -2360,6 +2550,7 @@ function syncShapePanelFromLayer(l) {
   const wrapper = document.getElementById('shapeFillColorPicker');
   wrapper.style.opacity = l.fill ? '' : '0.4';
   wrapper.style.pointerEvents = l.fill ? '' : 'none';
+  syncAnnotatePanel();
 }
 
 // ============================================================
@@ -2442,7 +2633,7 @@ function refreshColorPickers() {
 // === TEXT MODAL ===
 // ============================================================
 const textModal = document.getElementById('textModal');
-const textModalState = { mode: 'add', editLayerId: null };
+const textModalState = { mode: 'add', editLayerId: null, pos: null }; // pos: 注釈モードでクリックした位置（無ければ中央）
 
 // ===== テキストプレビュー =====
 function updateTextPreview() {
@@ -2578,6 +2769,7 @@ function openTextModal(mode, layer) {
 
 function closeTextModal() {
   textModal.style.display = 'none';
+  textModalState.pos = null;
   clearTimeout(draftSaveTimer);
   try { localStorage.removeItem(TEXT_DRAFT_KEY); } catch {}
 }
@@ -2586,6 +2778,7 @@ function submitTextModal() {
   const txt = document.getElementById('textInput').value.trim();
   if (!txt) { toast('テキストを入力してください'); return; }
 
+  const pos = textModalState.pos; // closeTextModal() で消えるので先に取り出す
   const props = {
     text: txt,
     direction: editState.textDirection,
@@ -2607,12 +2800,16 @@ function submitTextModal() {
   } else {
     const layer = {
       id: uid(), type: 'text',
-      x: editState.baseWidth / 2 - 50, y: editState.baseHeight / 2 - 16,
+      x: pos ? pos.x : editState.baseWidth / 2 - 50, y: pos ? pos.y : editState.baseHeight / 2 - 16,
       ...props,
     };
     editState.layers.push(layer);
-    editState.selectedLayerId = layer.id;
-    selectTool('select');
+    if (pos) {
+      editState.selectedLayerId = null; // 注釈モード: テキストツールのまま続けて置ける
+    } else {
+      editState.selectedLayerId = layer.id;
+      selectTool('select');
+    }
   }
   saveLastTextSettings(props); // 設定を localStorage に保存
   closeTextModal();
@@ -2684,6 +2881,7 @@ document.addEventListener('paste', e => {
 
   // 画像が見つかったのでデフォルト動作を抑制
   e.preventDefault();
+  rememberClipboardImage(imageBlob); // 同じ画像のバナーを重ねて出さない
 
   // ベース画像が未読込の場合は、貼り付け画像をベース画像として読み込む
   if (!editState.baseImage) {
@@ -2746,6 +2944,14 @@ function getCanvasPos(e) {
     x: (e.clientX - rect.left) * (canvas.width / rect.width),
     y: (e.clientY - rect.top) * (canvas.height / rect.height),
   };
+}
+
+// 新規図形の塗りつぶし設定。編集モードは従来どおり SHAPE タブの値。
+// 注釈モードは「塗りつぶし」を四角/楕円だけに効かせ、塗り色は線の色と同じにする（矢印の頭が白くならないように）
+function shapeFillProps(tool) {
+  const on = document.getElementById('shapeFill').checked;
+  if (currentMode === 'annotate') return { fill: on && (tool === 'rect' || tool === 'ellipse') };
+  return { fill: on, fillColor: document.getElementById('shapeFillColor').value };
 }
 
 function createFreehandLayer(points, color, strokeWidth) {
@@ -2849,7 +3055,9 @@ canvas.addEventListener('mousedown', e => {
     else editState.dragging = { type: 'crop', startX: pos.x, startY: pos.y }; // 枠の外 → 範囲を引き直す
     return;
   }
-  if (['ellipse','rect','arrow','doubleArrow','line'].includes(tool)) { editState.dragging = { type: 'shape', startX: pos.x, startY: pos.y, shape: tool }; return; }
+  if (['ellipse','rect','arrow','doubleArrow','line','mosaic'].includes(tool)) { editState.dragging = { type: 'shape', startX: pos.x, startY: pos.y, shape: tool }; return; }
+  if (tool === 'marker') { placeMarker(pos); return; }
+  if (tool === 'text') { addTextAt(pos); return; }
   if (tool === 'select') {
     // 選択中 image レイヤーのハンドルを最優先でチェック
     if (editState.selectedLayerId) {
@@ -2967,8 +3175,8 @@ canvas.addEventListener('mousemove', e => {
       x1: editState.dragging.startX, y1: editState.dragging.startY, x2: pos.x, y2: pos.y,
       color: document.getElementById('shapeColor').value,
       strokeWidth: parseInt(document.getElementById('strokeWidth').value),
-      fill: document.getElementById('shapeFill').checked,
-      fillColor: document.getElementById('shapeFillColor').value });
+      ...shapeFillProps(editState.dragging.shape),
+      ...(editState.dragging.shape === 'mosaic' ? { block: defaultMosaicBlock() } : {}) });
   } else if (editState.dragging.type === 'move') {
     const dx = pos.x - editState.dragging.startX; const dy = pos.y - editState.dragging.startY;
     const layer = editState.layers.find(l => l.id === editState.dragging.layerId);
@@ -3090,8 +3298,8 @@ canvas.addEventListener('mouseup', e => {
         x1: editState.dragging.startX, y1: editState.dragging.startY, x2: pos.x, y2: pos.y,
         color: document.getElementById('shapeColor').value,
         strokeWidth: parseInt(document.getElementById('strokeWidth').value),
-        fill: document.getElementById('shapeFill').checked,
-        fillColor: document.getElementById('shapeFillColor').value };
+        ...shapeFillProps(editState.dragging.shape),
+        ...(editState.dragging.shape === 'mosaic' ? { block: defaultMosaicBlock() } : {}) };
       editState.layers.push(layer); editState.selectedLayerId = null;
       saveHistory(); updateLayerList(); updateCanvasInfo();
     }
@@ -3216,6 +3424,7 @@ function updateLayerList() {
   if (editState.layers.length === 0) {
     list.innerHTML = '<div style="padding:8px; color:#000000; font-size:12px; text-align:center;">レイヤーなし</div>';
     document.getElementById('editTextBtn').style.display = 'none';
+    syncAnnotatePanel();
     return;
   }
   list.innerHTML = '';
@@ -3228,10 +3437,13 @@ function updateLayerList() {
     div.draggable = true;
     div.dataset.layerId = l.id;
     const lbl = l.type === 'text'
-      ? `T ${l.direction === 'vertical' ? '縦' : '横'} ${l.text.slice(0,10)}${l.text.length > 10 ? '…' : ''}`
+      ? `${icon('type')}${l.direction === 'vertical' ? '縦' : '横'} ${l.text.slice(0,10)}${l.text.length > 10 ? '…' : ''}`
       : l.type === 'image'
-      ? `[IMG] ${l.name}`
-      : l.shape === 'freehand' ? '✎ 手書き' : `${l.shape === 'ellipse' ? '〇' : l.shape === 'rect' ? '□' : l.shape === 'arrow' ? '→' : l.shape === 'doubleArrow' ? '↔' : '／'} 図形`;
+      ? `${icon('image')}${l.name}`
+      : l.shape === 'marker' ? `${icon('hash-circle')}番号 ${markerNumber(l)}`
+      : l.shape === 'mosaic' ? `${icon('grid')}モザイク`
+      : l.shape === 'freehand' ? `${icon('pencil')}手書き`
+      : `${icon(l.shape === 'ellipse' ? 'circle' : l.shape === 'rect' ? 'square' : l.shape === 'arrow' ? 'arrow-right' : l.shape === 'doubleArrow' ? 'move-horizontal' : 'slash')}図形`;
     const editBtn = l.type === 'text'
       ? `<button class="edit-layer-btn" style="border:none; background:none; color:#ea580c; padding:2px 6px; font-size:12px; cursor:pointer;">編集</button>`
       : '';
@@ -3290,6 +3502,7 @@ function updateLayerList() {
   // サイドバーの「編集」ボタン表示切替
   const selLayer = editState.layers.find(l => l.id === editState.selectedLayerId && l.type === 'text');
   document.getElementById('editTextBtn').style.display = selLayer ? 'block' : 'none';
+  syncAnnotatePanel();
 }
 
 // --- Save ---
@@ -3415,6 +3628,8 @@ document.getElementById('redoBtn').addEventListener('click', async () => {
 
 // --- Keyboard shortcuts ---
 const shortcutMap = { v:'select', c:'crop', o:'ellipse', r:'rect', a:'arrow', d:'doubleArrow', l:'line', p:'freehand' };
+// 注釈モード: パネルにあるツールだけ（C/D は無効）。T=テキスト N=番号 M=モザイク
+const annotateShortcutMap = { v:'select', r:'rect', o:'ellipse', a:'arrow', l:'line', p:'freehand', t:'text', n:'marker', m:'mosaic' };
 
 document.addEventListener('keydown', e => {
   const inField = ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName);
@@ -3437,7 +3652,8 @@ document.addEventListener('keydown', e => {
     editState.selectedLayerId = null; saveHistory(); render(); updateLayerList(); updateCanvasInfo(); return;
   }
   const key = e.key.toLowerCase();
-  if (shortcutMap[key] && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); selectTool(shortcutMap[key], true); }
+  const keyMap = currentMode === 'annotate' ? annotateShortcutMap : shortcutMap;
+  if (keyMap[key] && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); selectTool(keyMap[key], true); }
 });
 
 document.addEventListener('keyup', e => {
@@ -4193,7 +4409,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-11-04-01'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-11-18-01'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
@@ -4207,7 +4423,7 @@ if ('serviceWorker' in navigator) {
           const nw = reg.installing;
           if (nw) nw.addEventListener('statechange', () => {
             if (nw.state === 'installed' && navigator.serviceWorker.controller)
-              toast('🔄 新しいバージョンが利用可能です。再読込してください');
+              toast('新しいバージョンが利用可能です。再読込してください');
           });
         });
       })
@@ -4226,11 +4442,11 @@ if (installBtn) {
     if (!deferredInstallPrompt) { toast('既にインストール済みか非対応ブラウザです'); return; }
     deferredInstallPrompt.prompt();
     const { outcome } = await deferredInstallPrompt.userChoice;
-    if (outcome === 'accepted') { toast('🎉 アプリとしてインストールしました'); installBtn.style.display = 'none'; }
+    if (outcome === 'accepted') { toast('アプリとしてインストールしました'); installBtn.style.display = 'none'; }
     deferredInstallPrompt = null;
   });
 }
-window.addEventListener('appinstalled', () => { if (installBtn) installBtn.style.display = 'none'; toast('🎉 インストール完了'); });
+window.addEventListener('appinstalled', () => { if (installBtn) installBtn.style.display = 'none'; toast('インストール完了'); });
 
 // ============================================================
 // === INIT ===
@@ -4252,6 +4468,243 @@ function setLayerDockCollapsed(c) {
 }
 layerDockToggle.addEventListener('click', () => setLayerDockCollapsed(!layerDock.classList.contains('collapsed')));
 setLayerDockCollapsed(localStorage.getItem('ie_layerDockCollapsed') === '1'); // 既定=開く
+
+// ============================================================
+// === ANNOTATE MODE（スクショ注釈）===
+// 図形・文字の描画は既存の drawShape / drawText を再利用する。ここは入力の橋渡しと配置だけ。
+// 色・太さ・塗りつぶしの「正」は SHAPE タブの #shapeColor / #strokeWidth / #shapeFill
+// ============================================================
+const ANN_COLORS = ['#FF0000', '#FF7F00', '#FFD400', '#00A000', '#0066FF', '#000000', '#FFFFFF'];
+const ANN_HINTS = {
+  rect: 'ドラッグで四角を描きます', ellipse: 'ドラッグで楕円を描きます',
+  arrow: 'ドラッグで矢印を引きます', line: 'ドラッグで線を引きます',
+  freehand: 'なぞって手書きします', text: 'クリックした位置に文字を追加します（文字をクリックで編集）',
+  mosaic: '隠したい範囲をドラッグします。あとから動かせます',
+  select: '注釈をクリックで選択、ドラッグで移動、Delete で削除します',
+};
+const annColorsHost = document.getElementById('annColors');
+const annSwatches = ANN_COLORS.map(color => {
+  const sw = document.createElement('button');
+  sw.type = 'button'; sw.className = 'color-swatch'; sw.title = color; sw.style.background = color;
+  sw.addEventListener('click', () => {
+    const input = document.getElementById('shapeColor');
+    input.value = color;
+    if (input._syncColorPicker) input._syncColorPicker();
+    input.dispatchEvent(new Event('input', { bubbles: true })); // 選択中の図形の色も既存処理で更新される
+    syncAnnotatePanel();
+  });
+  annColorsHost.appendChild(sw);
+  return sw;
+});
+
+document.getElementById('annStrokeWidth').addEventListener('input', e => {
+  const input = document.getElementById('strokeWidth');
+  input.value = e.target.value;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  syncAnnotatePanel();
+});
+document.getElementById('annStrokeWidth').addEventListener('change', () => {
+  document.getElementById('strokeWidth').dispatchEvent(new Event('change', { bubbles: true }));
+});
+document.getElementById('annFill').addEventListener('change', e => {
+  const input = document.getElementById('shapeFill');
+  input.checked = e.target.checked;
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+});
+// SHAPE タブ側で色・太さを変えた時も注釈パネルへ反映
+document.getElementById('shapeColor').addEventListener('input', () => syncAnnotatePanel());
+document.getElementById('strokeWidth').addEventListener('input', () => syncAnnotatePanel());
+
+function syncAnnotatePanel() {
+  const color = (document.getElementById('shapeColor').value || '').toLowerCase();
+  annSwatches.forEach((sw, i) => sw.classList.toggle('active', ANN_COLORS[i].toLowerCase() === color));
+  const width = document.getElementById('strokeWidth').value;
+  document.getElementById('annStrokeWidth').value = width;
+  document.getElementById('annStrokeWidthLabel').textContent = width;
+  document.getElementById('annFill').checked = document.getElementById('shapeFill').checked;
+  const tool = editState.currentTool;
+  document.getElementById('annFillLabel').hidden = !(tool === 'rect' || tool === 'ellipse');
+  const markers = editState.layers.filter(l => l.type === 'shape' && l.shape === 'marker').length;
+  document.getElementById('annHint').textContent = tool === 'marker'
+    ? `クリックで番号を置きます（次: ${markers + 1}）。番号はレイヤー順に自動で振られます`
+    : (ANN_HINTS[tool] || '');
+}
+
+// 番号マーカーを置く（サイズは画像サイズと太さスライダーから決める）
+function markerDiameter() {
+  const base = Math.max(24, Math.round(Math.max(editState.baseWidth, editState.baseHeight) / 40));
+  const sw = parseInt(document.getElementById('strokeWidth').value, 10) || 6;
+  return Math.round(base * (0.6 + sw / 15));
+}
+
+function placeMarker(pos) {
+  const d = markerDiameter();
+  editState.layers.push({
+    id: uid(), type: 'shape', shape: 'marker',
+    x1: pos.x - d / 2, y1: pos.y - d / 2, x2: pos.x + d / 2, y2: pos.y + d / 2,
+    color: document.getElementById('shapeColor').value,
+    strokeWidth: parseInt(document.getElementById('strokeWidth').value, 10) || 6, fill: true,
+  });
+  editState.selectedLayerId = null;
+  saveHistory(); render(); updateLayerList(); updateCanvasInfo();
+}
+
+// テキストツール: 既存の文字をクリックなら編集、空きをクリックならその位置に追加（既存のテキストモーダルを使う）
+function addTextAt(pos) {
+  const hit = findLayerAt(pos.x, pos.y);
+  if (hit && hit.type === 'text') {
+    editState.selectedLayerId = hit.id; render(); updateLayerList();
+    openTextModal('edit', hit);
+    return;
+  }
+  openTextModal('add', null);
+  textModalState.pos = { x: pos.x, y: pos.y };
+  const color = document.getElementById('shapeColor').value; // 選んだ注釈色を文字色の初期値に
+  document.getElementById('textColor').value = color;
+  refreshColorPickers();
+  updateTextPreview();
+}
+
+// ============================================================
+// === 画像をコピー（canvas → OS クリップボード。失敗時はダウンロード）===
+// ============================================================
+async function copyImageToClipboard() {
+  if (!editState.baseImage) { toast('コピーする画像がありません'); return; }
+  // 選択枠・トリミング枠を出さずに書き出す（SAVE と同じ扱い）。toBlob は呼んだ時点の絵を確保する
+  const prevSel = editState.selectedLayerId, prevCrop = editState.cropRect;
+  editState.selectedLayerId = null; editState.cropRect = null; editState.cropHidden = true; render();
+  const blobPromise = new Promise((resolve, reject) => {
+    canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob failed')), 'image/png');
+  });
+  editState.cropHidden = false; editState.selectedLayerId = prevSel; editState.cropRect = prevCrop; render();
+  blobPromise.catch(() => {}); // 後続の try で扱う（未処理警告の抑止）
+  try {
+    if (!navigator.clipboard || typeof navigator.clipboard.write !== 'function' || !window.ClipboardItem) {
+      throw new Error('clipboard write unsupported');
+    }
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })]);
+    toast('画像をコピーしました');
+  } catch (err) {
+    try {
+      const blob = await blobPromise;
+      const name = (document.getElementById('fileName').value.replace(/[\x00-\x1f\\/:*?"<>|]/g, '_').trim() || 'note_image') + '.png';
+      downloadBlob(blob, name);
+      toast('コピーできなかったため、PNG を保存しました');
+    } catch (e2) {
+      toast('コピーに失敗しました');
+    }
+  }
+}
+document.getElementById('annCopyBtn').addEventListener('click', copyImageToClipboard);
+document.getElementById('copyImageBtnSave').addEventListener('click', copyImageToClipboard);
+
+// ============================================================
+// === 取り込み共通（クリップボード検知・ファイル渡し起動）===
+// ============================================================
+// 編集済みの内容があるか（画像だけ読み込んだ直後は false）
+function hasEditsInProgress() {
+  return !!editState.baseImage && (editState.layers.length > 0 || editState.history.length > 1);
+}
+
+// 外から来た画像を読み込む。編集中の内容がある時だけ確認し、勝手には上書きしない
+function importImageBlob(blob, message) {
+  if (hasEditsInProgress() && !confirm('編集中の画像を、新しい画像で置き換えますか？\n（置き換えると元に戻せません）')) return false;
+  if (currentMode === 'transparent') switchMode('edit');
+  loadEditImage(blob, message);
+  return true;
+}
+
+// ============================================================
+// === クリップボードの画像を自動検知（起動時・前面に戻った時）===
+// 権限なし・非対応・読み取り失敗は黙って無視。従来の Ctrl/Cmd+V はそのまま動く
+// ============================================================
+const CLIP_SIG_KEY = 'ie_lastClipboardSig';
+const clipWatch = { busy: false, lastCheck: 0, lastSig: null, shown: null }; // shown: { blob, sig }
+try { clipWatch.lastSig = localStorage.getItem(CLIP_SIG_KEY); } catch {}
+
+// 種別・サイズ・サンプリングしたバイト列のハッシュで簡易判定する
+async function clipboardSignature(blob) {
+  let h = 2166136261;
+  try {
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const step = Math.max(1, Math.floor(bytes.length / 4096));
+    for (let i = 0; i < bytes.length; i += step) { h ^= bytes[i]; h = Math.imul(h, 16777619) >>> 0; }
+  } catch {}
+  return `${blob.type}:${blob.size}:${h.toString(36)}`;
+}
+
+function setLastClipSig(sig) {
+  clipWatch.lastSig = sig;
+  try { localStorage.setItem(CLIP_SIG_KEY, sig); } catch {}
+}
+// Ctrl/Cmd+V で取り込んだ画像・バナーで読み込んだ画像は、同じものを二度提案しない
+function rememberClipboardImage(blob) {
+  clipboardSignature(blob).then(sig => { setLastClipSig(sig); hideClipBanner(); }).catch(() => {});
+}
+
+const clipBanner = document.getElementById('clipBanner');
+function showClipBanner(blob, sig) { clipWatch.shown = { blob, sig }; clipBanner.hidden = false; }
+function hideClipBanner() { clipWatch.shown = null; clipBanner.hidden = true; }
+
+document.getElementById('clipBannerLoad').addEventListener('click', () => {
+  const shown = clipWatch.shown;
+  if (!shown) return;
+  if (importImageBlob(shown.blob, 'クリップボードの画像を読み込みました')) {
+    setLastClipSig(shown.sig); hideClipBanner();
+  }
+});
+document.getElementById('clipBannerClose').addEventListener('click', () => {
+  if (clipWatch.shown) setLastClipSig(clipWatch.shown.sig);
+  hideClipBanner();
+});
+
+async function checkClipboardImage() {
+  if (clipWatch.busy) return;
+  if (!navigator.clipboard || typeof navigator.clipboard.read !== 'function') return;
+  if (document.visibilityState !== 'visible' || !document.hasFocus()) return;
+  const now = Date.now();
+  if (now - clipWatch.lastCheck < 400) return; // focus と visibilitychange の二重発火を間引く
+  clipWatch.lastCheck = now;
+  clipWatch.busy = true;
+  try {
+    const items = await navigator.clipboard.read();
+    for (const item of items) {
+      const type = item.types.find(t => t.startsWith('image/'));
+      if (!type) continue;
+      const blob = await item.getType(type);
+      const sig = await clipboardSignature(blob);
+      if (sig === clipWatch.lastSig) { hideClipBanner(); return; }
+      if (!clipWatch.shown || clipWatch.shown.sig !== sig) showClipBanner(blob, sig);
+      return;
+    }
+    hideClipBanner(); // クリップボードに画像が無くなった
+  } catch (e) {
+    // 権限拒否・非対応・読み取り失敗: 何も出さず無視する
+  } finally {
+    clipWatch.busy = false;
+  }
+}
+window.addEventListener('focus', checkClipboardImage);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkClipboardImage(); });
+setTimeout(checkClipboardImage, 500); // 起動時
+
+// ============================================================
+// === ファイルを渡して起動（manifest の file_handlers）===
+// ============================================================
+if ('launchQueue' in window && window.launchQueue && typeof window.launchQueue.setConsumer === 'function') {
+  window.launchQueue.setConsumer(async launchParams => {
+    try {
+      const handles = launchParams && launchParams.files;
+      if (!handles || !handles.length) return;
+      const file = await handles[0].getFile();
+      if (!file.type.startsWith('image/')) { toast('画像ファイルではありません'); return; }
+      importImageBlob(file, `${file.name || '画像'} を読み込みました`);
+      if (handles.length > 1) toast(`${handles.length}枚のうち最初の1枚を読み込みました`);
+    } catch (e) {
+      toast('ファイルを開けませんでした');
+    }
+  });
+}
 
 // ============================================================
 // === SECTION NAV ===

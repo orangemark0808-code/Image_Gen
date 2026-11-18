@@ -29,5 +29,18 @@
       "type": "image/png",
       "purpose": "maskable"
     }
-  ]
+  ],
+  "file_handlers": [
+    {
+      "action": "./index.html",
+      "accept": {
+        "image/png": [".png"],
+        "image/jpeg": [".jpg", ".jpeg"],
+        "image/webp": [".webp"]
+      }
+    }
+  ],
+  "launch_handler": {
+    "client_mode": ["focus-existing", "auto"]
+  }
 }
