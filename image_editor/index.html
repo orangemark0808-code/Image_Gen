@@ -458,6 +458,12 @@ canvas {
 .acc-item:hover { color: #ea580c; border-color: #fbd38d; }
 .acc-item.active { color: #c2410c; border-color: #fb923c; background: #fff7ed; }
 
+/* ===== CANVAS SIZE ===== */
+.canvas-size-row { display: grid; grid-template-columns: 1fr auto 1fr; gap: 6px; align-items: end; }
+.canvas-size-lock { width: 40px; height: 40px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; box-shadow: none; }
+.canvas-size-lock[aria-pressed="true"] { color: #c2410c; border-color: #fb923c; background: #fff7ed; }
+.canvas-size-msg { min-height: 18px; margin-top: 6px; font-family: 'DM Mono', 'Courier New', monospace; font-size: 11px; line-height: 1.6; color: #c2410c; }
+
 /* ===== Hamburger (mobile) ===== */
 .hamburger-btn {
   display: none;
@@ -567,6 +573,8 @@ canvas {
   <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></symbol>
   <symbol id="i-redo" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  <symbol id="i-unlock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></symbol>
   <symbol id="i-image" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></symbol>
   <symbol id="i-clipboard" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></symbol>
 </svg>
@@ -597,6 +605,7 @@ canvas {
       <div class="acc-menu" id="editAccMenu" role="group" aria-label="編集機能">
         <button id="tab-trim" class="acc-item active" data-sec="sec-trim" aria-controls="sec-trim" aria-pressed="true">TRIM</button>
         <button id="tab-resize" class="acc-item" data-sec="sec-resize" aria-controls="sec-resize" aria-pressed="false">RESIZE</button>
+        <button id="tab-canvas" class="acc-item" data-sec="sec-canvas" aria-controls="sec-canvas" aria-pressed="false">CANVAS</button>
         <button id="tab-apply" class="acc-item" data-sec="sec-apply" aria-controls="sec-apply" aria-pressed="false">APPLY</button>
         <button id="tab-text" class="acc-item" data-sec="sec-text" aria-controls="sec-text" aria-pressed="false">TEXT</button>
         <button id="tab-shape" class="acc-item" data-sec="sec-shape" aria-controls="sec-shape" aria-pressed="false">SHAPE</button>
@@ -670,6 +679,25 @@ canvas {
           <div class="help-box" style="margin-top:4px;">縦横比は自動で維持されます</div>
         </div>
         <button id="doResizeBtn" class="primary btn-action" style="margin-top:14px;">リサイズ実行</button>
+      </div>
+
+      <!-- 2.5 キャンバスサイズ（左上基準・内容は動かさない） -->
+      <div class="section" id="sec-canvas" role="region" aria-labelledby="tab-canvas" hidden>
+        <div class="section-title">CANVAS SIZE</div>
+        <div class="canvas-size-row">
+          <div>
+            <label for="canvasSizeW" style="margin-top:0;">W (px)</label>
+            <input type="number" id="canvasSizeW" min="1" max="8000" step="1" inputmode="numeric" placeholder="W">
+          </div>
+          <button id="canvasSizeLock" class="canvas-size-lock" type="button" aria-pressed="false" aria-label="縦横比ロック（現在オフ）" title="縦横比ロック"><svg class="ico" aria-hidden="true"><use href="#i-unlock"/></svg></button>
+          <div>
+            <label for="canvasSizeH" style="margin-top:0;">H (px)</label>
+            <input type="number" id="canvasSizeH" min="1" max="8000" step="1" inputmode="numeric" placeholder="H">
+          </div>
+        </div>
+        <div id="canvasSizeMsg" class="canvas-size-msg" role="status" aria-live="polite"></div>
+        <button id="applyCanvasSize" class="primary btn-action" style="margin-top:10px;">APPLY</button>
+        <div class="help-box" style="margin-top:10px;">キャンバスの左上を基準に、画像・レイヤー・描画の位置はそのままで広さだけ変えます。広げた部分は透明です。範囲は 1〜8000px。</div>
       </div>
 
       <!-- 3. 実行 -->
@@ -2031,6 +2059,7 @@ function loadEditImage(file, message = '画像を読み込みました') {
 
 // --- Canvas info ---
 function updateCanvasInfo() {
+  if (typeof syncCanvasSizeInputs === 'function') syncCanvasSizeInputs();
   if (editState.baseImage) {
     document.getElementById('canvasInfo').textContent =
       `${editState.baseWidth} × ${editState.baseHeight} px / レイヤー ${editState.layers.length}個 / ツール: ${toolName(editState.currentTool)}`;
@@ -2369,6 +2398,126 @@ function resizeCanvas(newW, newH, crop = null) {
   document.getElementById('resizeWidth').value = newW;
   document.getElementById('resizeHeight').value = newH;
 }
+
+// ============================================================
+// === CANVAS SIZE（左上基準でキャンバスだけ広げる／縮める）===
+// ============================================================
+const CANVAS_SIZE_MIN = 1, CANVAS_SIZE_MAX = 8000;
+const canvasSizeW = document.getElementById('canvasSizeW');
+const canvasSizeH = document.getElementById('canvasSizeH');
+const canvasSizeLock = document.getElementById('canvasSizeLock');
+const canvasSizeMsg = document.getElementById('canvasSizeMsg');
+const canvasSizeState = { locked: false, lastW: '', lastH: '', syncedW: 0, syncedH: 0 };
+
+// 現在のキャンバスサイズを入力欄へ反映（読み込み・Undo/Redo・適用後）。入力途中の値は、サイズが変わった時だけ置き換える
+function syncCanvasSizeInputs() {
+  if (!editState.baseImage) return;
+  if (canvasSizeState.syncedW === editState.baseWidth && canvasSizeState.syncedH === editState.baseHeight) return;
+  canvasSizeState.syncedW = editState.baseWidth; canvasSizeState.syncedH = editState.baseHeight;
+  canvasSizeW.value = canvasSizeState.lastW = String(editState.baseWidth);
+  canvasSizeH.value = canvasSizeState.lastH = String(editState.baseHeight);
+  canvasSizeMsg.textContent = '';
+}
+
+function canvasSizeInRange(n) { return Number.isInteger(n) && n >= CANVAS_SIZE_MIN && n <= CANVAS_SIZE_MAX; }
+function canvasSizeRangeMessage() { return `${CANVAS_SIZE_MIN}〜${CANVAS_SIZE_MAX}px の整数で入力してください`; }
+function rejectCanvasSizeInput(input, last) {
+  input.value = last; // 範囲外は入力させない（直前の有効な値へ戻す）
+  canvasSizeMsg.textContent = canvasSizeRangeMessage();
+  toast(canvasSizeRangeMessage());
+}
+
+function onCanvasSizeInput(changed) {
+  const other = changed === canvasSizeW ? canvasSizeH : canvasSizeW;
+  const isW = changed === canvasSizeW;
+  const lastKey = isW ? 'lastW' : 'lastH', lastOtherKey = isW ? 'lastH' : 'lastW';
+  if (changed.value === '') { canvasSizeState[lastKey] = ''; canvasSizeMsg.textContent = ''; return; } // 打ち直し中は許可（APPLY時に検証）
+  const n = Number(changed.value);
+  if (!canvasSizeInRange(n)) { rejectCanvasSizeInput(changed, canvasSizeState[lastKey]); return; }
+  if (canvasSizeState.locked && editState.baseImage) {
+    const ratio = editState.baseWidth / editState.baseHeight;
+    const m = Math.round(isW ? n / ratio : n * ratio);
+    if (!canvasSizeInRange(m)) { rejectCanvasSizeInput(changed, canvasSizeState[lastKey]); return; }
+    other.value = String(m); canvasSizeState[lastOtherKey] = String(m);
+  }
+  canvasSizeState[lastKey] = String(n);
+  canvasSizeMsg.textContent = '';
+}
+canvasSizeW.addEventListener('input', () => onCanvasSizeInput(canvasSizeW));
+canvasSizeH.addEventListener('input', () => onCanvasSizeInput(canvasSizeH));
+
+canvasSizeLock.addEventListener('click', () => {
+  canvasSizeState.locked = !canvasSizeState.locked;
+  canvasSizeLock.setAttribute('aria-pressed', String(canvasSizeState.locked));
+  canvasSizeLock.setAttribute('aria-label', canvasSizeState.locked ? '縦横比ロック（現在オン）' : '縦横比ロック（現在オフ）');
+  canvasSizeLock.querySelector('use').setAttribute('href', canvasSizeState.locked ? '#i-lock' : '#i-unlock');
+  if (canvasSizeState.locked && editState.baseImage && canvasSizeInRange(Number(canvasSizeW.value))) onCanvasSizeInput(canvasSizeW); // ON にした時点の W に H を合わせる
+});
+
+// レイヤー1つの右端・下端（回転は無視した目安）
+function layerExtent(l) {
+  if (l.type === 'text') { const b = getTextBounds(l); return { r: l.x + b.w, b: l.y + b.h }; }
+  if (l.type === 'image') return { r: l.x + l.w, b: l.y + l.h };
+  return { r: Math.max(l.x1, l.x2), b: Math.max(l.y1, l.y2) };
+}
+
+// 縮小で切り取られる内容があるか（ベース画像の不透明部分 or レイヤーのはみ出し）
+function canvasShrinkCutsContent(newW, newH) {
+  if (newW >= editState.baseWidth && newH >= editState.baseHeight) {
+    return editState.layers.some(l => { const e = layerExtent(l); return e.r > newW || e.b > newH; });
+  }
+  const d = editState.baseImage.data, W = editState.baseWidth, H = editState.baseHeight;
+  for (let y = 0; y < H; y++) {
+    const rowStart = y >= newH ? 0 : newW;
+    for (let x = rowStart; x < W; x++) if (d[(y * W + x) * 4 + 3] > 0) return true;
+  }
+  return editState.layers.some(l => { const e = layerExtent(l); return e.r > newW || e.b > newH; });
+}
+
+// 左上基準でキャンバスサイズだけを変える。ベース画像・レイヤーの座標は一切動かさない
+function setCanvasSizeKeepTopLeft(newW, newH) {
+  const out = document.createElement('canvas');
+  out.width = newW; out.height = newH;
+  const oc = out.getContext('2d', { willReadFrequently: true });
+  oc.drawImage(getBaseCanvas(), 0, 0); // 増えた分は透明のまま／縮小時は右・下がはみ出して切れる
+  const baseImage = oc.getImageData(0, 0, newW, newH);
+  const prevW = editState.baseWidth, prevH = editState.baseHeight;
+  try {
+    canvas.width = newW; canvas.height = newH;
+    ctx.putImageData(baseImage, 0, 0);
+  } catch (e) {
+    canvas.width = prevW; canvas.height = prevH;
+    render();
+    throw e;
+  }
+  editState.baseImage = baseImage;
+  editState.baseWidth = newW; editState.baseHeight = newH; editState.aspectRatio = newW / newH;
+  editState.cropRect = null; // トリミング枠は新しいキャンバスに合わせて作り直す
+}
+
+document.getElementById('applyCanvasSize').addEventListener('click', () => {
+  if (!editState.baseImage) { toast('先に画像を読み込んでください'); return; }
+  const w = Number(canvasSizeW.value), h = Number(canvasSizeH.value);
+  if (canvasSizeW.value === '' || canvasSizeH.value === '' || !canvasSizeInRange(w) || !canvasSizeInRange(h)) {
+    canvasSizeMsg.textContent = canvasSizeRangeMessage();
+    toast(canvasSizeRangeMessage());
+    return;
+  }
+  if (w === editState.baseWidth && h === editState.baseHeight) { canvasSizeMsg.textContent = ''; toast('キャンバスサイズは変わっていません'); return; }
+  if ((w < editState.baseWidth || h < editState.baseHeight) && canvasShrinkCutsContent(w, h)) {
+    const ok = confirm(`キャンバスを ${w} × ${h} px に縮小します。\n範囲からはみ出した部分は切り取られます。続けますか？\n（元に戻す操作で復元できます）`);
+    if (!ok) return;
+  }
+  try {
+    setCanvasSizeKeepTopLeft(w, h);
+  } catch (e) {
+    toast('キャンバスサイズを変更できませんでした。サイズを小さくして再実行してください');
+    return;
+  }
+  canvasSizeMsg.textContent = '';
+  saveHistory(); zoomFit(); render(); updateCanvasInfo(); updateLayerList();
+  toast(`キャンバスを ${w} × ${h} px にしました`);
+});
 
 // RESIZE タブの「リサイズ実行」ボタン（TARGET に応じてキャンバス全体 or 選択レイヤー）
 document.getElementById('doResizeBtn').addEventListener('click', () => {
@@ -4466,7 +4615,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-11-18-07'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-11-20-01'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
