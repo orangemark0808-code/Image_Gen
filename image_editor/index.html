@@ -4624,6 +4624,36 @@ tpClearBtn.addEventListener('click', () => {
 // ============================================================
 // === KEYBOARD SHORTCUTS ===
 // ============================================================
+// ===== Enter で実行ボタンを押す（トリミング・リサイズ・CANVAS APPLY・トリミング+リサイズ・新規作成・ダウンロード）=====
+// 入力欄にフォーカスがある時は、その欄が属するパネルの実行ボタン。それ以外は表示中のパネルの実行ボタン
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || e.isComposing || e.keyCode === 229 || e.defaultPrevented) return; // 日本語入力の確定Enterは無視
+  if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+  if (textModal.style.display === 'flex') return;
+  const el = document.activeElement;
+  const tag = el ? el.tagName : '';
+  if (tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'BUTTON' || tag === 'A') return; // ボタン等は元々のEnter動作に任せる
+  let btnId = null;
+  if (tag === 'INPUT') {
+    if (!['text', 'number', ''].includes(el.type)) return; // チェック・ラジオ・スライダー等は対象外
+    if (el.closest('#blankCanvasBlock')) btnId = 'createBlankCanvasBtn';
+    else if (el.closest('#sec-canvas')) btnId = 'applyCanvasSize';
+    else if (el.closest('#sec-resize')) btnId = 'doResizeBtn';
+    else if (el.closest('#sec-save')) btnId = 'saveBtn';
+  } else if (currentMode === 'edit') {
+    const sec = editSectionButtons.find(b => b.classList.contains('active'))?.dataset.sec;
+    btnId = { 'sec-resize': 'doResizeBtn', 'sec-canvas': 'applyCanvasSize', 'sec-apply': 'applyBoth' }[sec] || null;
+  }
+  const btn = btnId && document.getElementById(btnId);
+  if (!btn || btn.disabled || btn.offsetParent === null) return;
+  e.preventDefault();
+  btn.click();
+});
+// テキスト追加ウィンドウは Enter が改行なので、Ctrl/Cmd+Enter で「追加」を実行
+textModal.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.isComposing) { e.preventDefault(); document.getElementById('textModalSubmitBtn').click(); }
+});
+
 document.addEventListener('keydown', e => {
   // input / textarea にフォーカスがある時は無視
   const tag = document.activeElement?.tagName;
@@ -4646,7 +4676,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-11-20-04'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-11-20-05'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
