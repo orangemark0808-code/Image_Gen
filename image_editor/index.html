@@ -2040,11 +2040,12 @@ function loadEditImage(file, message = '画像を読み込みました') {
     img.onload = () => {
       const w = img.naturalWidth; const h = img.naturalHeight;
       canvas.width = w; canvas.height = h;
-      ctx.clearRect(0, 0, w, h); ctx.drawImage(img, 0, 0, w, h);
-      editState.baseImage = ctx.getImageData(0, 0, w, h);
+      ctx.clearRect(0, 0, w, h);
+      editState.baseImage = ctx.getImageData(0, 0, w, h); // 土台は透明なキャンバスだけ。読み込んだ画像は2枚目以降と同じ画像レイヤーにする
       editState.baseWidth = w; editState.baseHeight = h;
       editState.aspectRatio = w / h;
-      editState.layers = []; editState.baseIndex = 0; editState.history = []; editState.historyIdx = -1;
+      editState.layers = [{ id: uid(), type: 'image', name: 'Clip_001', x: 0, y: 0, w, h, src: e.target.result }];
+      editState.baseIndex = 0; editState.selectedLayerId = null; editState.history = []; editState.historyIdx = -1;
       document.getElementById('resizeWidth').value = w;
       document.getElementById('resizeHeight').value = h;
       document.getElementById('canvasUploadPrompt').style.display = 'none';
@@ -4645,7 +4646,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-11-20-03'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-11-20-04'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
