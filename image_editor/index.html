@@ -2087,11 +2087,17 @@ function updateCropStatus() {
 }
 
 // --- D&D for edit mode ---
+// 1枚目はベース画像として読み込み、2枚目以降は貼り付けと同じくレイヤーとして重ねる（キャンバスサイズは変えない）
+function dropEditImage(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  importImageBlob(file, '画像を読み込みました');
+}
+
 document.body.addEventListener('dragover', e => e.preventDefault());
 document.body.addEventListener('drop', e => {
   e.preventDefault();
   if (currentMode === 'transparent') return;
-  if (e.dataTransfer.files[0]) loadEditImage(e.dataTransfer.files[0]);
+  dropEditImage(e.dataTransfer.files[0]);
 });
 
 const canvasUploadPrompt = document.getElementById('canvasUploadPrompt');
@@ -2140,8 +2146,8 @@ canvasWrapper.addEventListener('dragleave', e => {
   if (!canvasWrapper.contains(e.relatedTarget)) canvasWrapper.classList.remove('canvas-dragover');
 });
 canvasWrapper.addEventListener('drop', e => {
-  e.preventDefault(); canvasWrapper.classList.remove('canvas-dragover');
-  if (e.dataTransfer.files[0]) loadEditImage(e.dataTransfer.files[0]);
+  e.preventDefault(); e.stopPropagation(); canvasWrapper.classList.remove('canvas-dragover'); // body 側と二重に追加しない
+  dropEditImage(e.dataTransfer.files[0]);
 });
 
 // --- Tool selection ---
@@ -4615,7 +4621,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // === VERSION ===
 // ============================================================
-const APP_VERSION = '2026-11-20-01'; // service-worker.js の CACHE_VERSION と一致させること
+const APP_VERSION = '2026-11-20-02'; // service-worker.js の CACHE_VERSION と一致させること
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
 // ============================================================
